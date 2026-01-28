@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>テスト仕様書エディター</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        #canvas {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            cursor: grab;
+        }
+
+        #canvas.grabbing {
+            cursor: grabbing;
+        }
+
+        svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .node {
+            position: absolute;
+            background: white;
+            border: 3px solid #667eea;
+            border-radius: 12px;
+            padding: 15px;
+            min-width: 200px;
+            max-width: 400px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            cursor: move;
+            z-index: 2;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.3s, background-color 0.3s;
+        }
+
+        .node:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .node.dragging {
+            opacity: 0.8;
+            z-index: 1000;
+        }
+
+        .node.selected {
+            border-color: #ff6b6b;
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.3);
+        }
+
+        /* コネクター */
+        .connector {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #667eea;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s;
+            opacity: 0;
+        }
+
+        .node:hover .connector {
+            opacity: 1;
+        }
+
+        .connector:hover {
+            width: 16px;
+            height: 16px;
+            background: #5568d3;
+            box-shadow: 0 0 8px rgba(102, 126, 234, 0.6);
+        }
+
+        .connector.active {
+            opacity: 1;
+            background: #ff6b6b;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.3);
+            }
+        }
+
+        .connector.top {
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .connector.bottom {
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .connector.left {
+            left: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .connector.right {
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .connector.top:hover,
+        .connector.top.active {
+            transform: translateX(-50%) scale(1.3);
+        }
+
+        .connector.bottom:hover,
+        .connector.bottom.active {
+            transform: translateX(-50%) scale(1.3);
+        }
+
+        .connector.left:hover,
+        .connector.left.active {
+            transform: translateY(-50%) scale(1.3);
+        }
+
+        .connector.right:hover,
+        .connector.right.active {
+            transform: translateY(-50%) scale(1.3);
+        }
+
+        /* ステータスによるノードスタイル変更 */
+        .node.status-OK {
+            border-color: #2ecc71;
+            border-width: 3px;
+        }
+
+        .node.status-NG {
+            border-color: #e74c3c;
+            border-width: 3px;
+        }
+
+        .node.status-却下 {
+            background-color: #e0e0e0;
+        }
+
+        .node.status-保留 {
+            background-color: #e6d5f5;
+        }
+
+        .node-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0;
+            gap: 10px;
+        }
+
+        .node-left-section {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 80px;
+        }
+
+        .node-id-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        /* テスト種別プルダウン */
+        .test-type {
+            padding: 4px 8px;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            width: 100%;
+        }
+
+        .test-type:focus {
+            outline: none;
+            border-color: #5568d3;
+        }
+
+        .test-type.type-正常系 {
+            background-color: #2ecc71;
+            color: white;
+            border-color: #27ae60;
+        }
+
+        .test-type.type-異常系 {
+            background-color: #e74c3c;
+            color: white;
+            border-color: #c0392b;
+        }
+
+        .test-type.type-その他 {
+            background-color: #95a5a6;
+            color: white;
+            border-color: #7f8c8d;
+        }
+
+        .node-id {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 14px;
+            min-width: 60px;
+            padding: 4px 8px;
+            background: #f0f4ff;
+            border-radius: 4px;
+            cursor: text;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .node-id:hover {
+            border-color: #667eea;
+        }
+
+        .node-id:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+
+        .node-status {
+            padding: 4px 10px;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            background: white;
+            color: #333;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            width: 100%;
+        }
+
+        .node-status:hover {
+            background: #f0f4ff;
+        }
+
+        .node-status:focus {
+            outline: none;
+            border-color: #5568d3;
+        }
+
+        .node-status.status-起票 {
+            border-color: #95a5a6;
+            color: #95a5a6;
+        }
+
+        .node-status.status-OK {
+            border-color: #2ecc71;
+            color: #2ecc71;
+        }
+
+        .node-status.status-NG {
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .node-status.status-却下 {
+            border-color: #95a5a6;
+            color: #95a5a6;
+        }
+
+        .node-status.status-保留 {
+            border-color: #95a5a6;
+            color: #95a5a6;
+        }
+
+        .node-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .node-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .node-btn:hover {
+            background: #5568d3;
+        }
+
+        .node-btn.delete {
+            background: #ff6b6b;
+        }
+
+        .node-btn.delete:hover {
+            background: #ee5a52;
+        }
+
+        .node-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .node-content:hover {
+            background-color: #f8f9fa;
+        }
+
+        .node-content h1 { font-size: 1.5em; margin: 0.5em 0; }
+        .node-content h2 { font-size: 1.3em; margin: 0.5em 0; }
+        .node-content h3 { font-size: 1.1em; margin: 0.5em 0; }
+        .node-content p { margin: 0.5em 0; }
+        .node-content ul, .node-content ol { margin-left: 1.5em; }
+        .node-content code { 
+            background: #f4f4f4; 
+            padding: 2px 6px; 
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .node-content pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .node-content strong { font-weight: bold; }
+        .node-content em { font-style: italic; }
+
+        .edit-mode {
+            display: none;
+        }
+
+        .node.editing .edit-mode {
+            display: block;
+        }
+
+        .node.editing .view-mode {
+            display: none;
+        }
+
+        .node-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            resize: vertical;
+        }
+
+        .toolbar {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .toolbar button {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            margin-right: 10px;
+        }
+
+        .toolbar button:hover {
+            background: #5568d3;
+        }
+
+        .info {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            font-size: 12px;
+            color: #333;
+            max-width: 300px;
+        }
+
+        .info h3 {
+            margin-bottom: 8px;
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        .info ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info li {
+            margin-bottom: 5px;
+            padding-left: 15px;
+            position: relative;
+        }
+
+        .info li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+        }
+
+        .connection {
+            stroke: white;
+            stroke-width: 2;
+            opacity: 0.8;
+            pointer-events: stroke;
+            cursor: pointer;
+        }
+
+        .connection:hover {
+            stroke-width: 4;
+            opacity: 1;
+        }
+
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 10000;
+            min-width: 150px;
+            display: none;
+        }
+
+        .context-menu.show {
+            display: block;
+        }
+
+        .context-menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 14px;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .context-menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .context-menu-item:hover {
+            background: #f0f4ff;
+        }
+
+        .context-menu-item:first-child {
+            border-radius: 6px 6px 0 0;
+        }
+
+        .context-menu-item:last-child {
+            border-radius: 0 0 6px 6px;
+        }
+
+        .context-menu-item.delete {
+            color: #e74c3c;
+            font-weight: 500;
+        }
+
+        .context-menu-item.delete:hover {
+            background: #fee;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button id="addNodeBtn">➕ ノード追加</button>
+        <button id="clearBtn">🗑️ すべてクリア</button>
+    </div>
+
+    <div class="info">
+        <h3>📝 操作方法</h3>
+        <ul>
+            <li>ノードをドラッグして移動</li>
+            <li>テストケースIDをクリックして編集</li>
+            <li>種別で正常系/異常系を選択</li>
+            <li>ステータスでノードの見た目が変化</li>
+            <li>マークダウン部分をダブルクリックで編集</li>
+            <li>ノードの4方向の点をクリックして接続</li>
+            <li>ノードを右クリックで削除</li>
+            <li>接続線を右クリックで削除</li>
+            <li>背景をドラッグして全体移動</li>
+        </ul>
+    </div>
+
+    <div id="canvas">
+        <svg id="svg"></svg>
+    </div>
+
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item delete" id="deleteNode">🗑️ ノードを削除</div>
+        <div class="context-menu-item delete" id="deleteConnection">🗑️ 接続を削除</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const svg = document.getElementById('svg');
+        const addNodeBtn = document.getElementById('addNodeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const contextMenu = document.getElementById('contextMenu');
+        const deleteNodeBtn = document.getElementById('deleteNode');
+        const deleteConnectionBtn = document.getElementById('deleteConnection');
+
+        let nodes = [];
+        let connections = [];
+        let nodeIdCounter = 0;
+        let isDraggingCanvas = false;
+        let dragStart = { x: 0, y: 0 };
+        let selectedConnection = null;
+        let selectedNode = null;
+        let connectingFrom = null;
+
+        // ノード作成
+        function createNode(x, y, content = '# 新しいテストケース\n\n内容を記述...') {
+            const nodeId = nodeIdCounter++;
+            const node = document.createElement('div');
+            node.className = 'node';
+            node.style.left = x + 'px';
+            node.style.top = y + 'px';
+            
+            node.innerHTML = `
+                <div class="connector top" data-direction="top"></div>
+                <div class="connector bottom" data-direction="bottom"></div>
+                <div class="connector left" data-direction="left"></div>
+                <div class="connector right" data-direction="right"></div>
+                <div class="node-header">
+                    <div class="node-left-section">
+                        <select class="test-type type-正常系">
+                            <option value="正常系">正常系</option>
+                            <option value="異常系">異常系</option>
+                            <option value="その他">その他</option>
+                        </select>
+                        <select class="node-status status-起票">
+                            <option value="起票">起票</option>
+                            <option value="OK">OK</option>
+                            <option value="NG">NG</option>
+                            <option value="却下">却下</option>
+                            <option value="保留">保留</option>
+                        </select>
+                    </div>
+                    <div class="node-id-container">
+                        <div class="node-id" contenteditable="true">TC-${String(nodeId + 1).padStart(3, '0')}</div>
+                    </div>
+                </div>
+                <div class="view-mode">
+                    <div class="node-content"></div>
+                </div>
+                <div class="edit-mode">
+                    <textarea class="node-textarea">${content}</textarea>
+                    <button class="node-btn" style="margin-top: 10px;">保存</button>
+                </div>
+            `;
+
+            const nodeData = {
+                id: nodeId,
+                element: node,
+                x: x,
+                y: y,
+                content: content,
+                testCaseId: `TC-${String(nodeId + 1).padStart(3, '0')}`,
+                status: '起票',
+                testType: '正常系'
+            };
+
+            nodes.push(nodeData);
+            canvas.appendChild(node);
+
+            // マークダウンレンダリング
+            updateNodeContent(nodeData);
+
+            // イベントリスナー
+            setupNodeEvents(nodeData);
+
+            return nodeData;
+        }
+
+        // ノードコンテンツ更新
+        function updateNodeContent(nodeData) {
+            const contentDiv = nodeData.element.querySelector('.node-content');
+            contentDiv.innerHTML = marked.parse(nodeData.content);
+        }
+
+        // ノードの見た目を更新
+        function updateNodeAppearance(nodeData) {
+            const node = nodeData.element;
+            
+            // ステータスによるノードクラスの更新
+            node.classList.remove('status-起票', 'status-OK', 'status-NG', 'status-却下', 'status-保留');
+            node.classList.add(`status-${nodeData.status}`);
+        }
+
+        // ノードイベント設定
+        function setupNodeEvents(nodeData) {
+            const node = nodeData.element;
+            let isDragging = false;
+            let dragOffset = { x: 0, y: 0 };
+
+            // テスト種別変更
+            const testTypeSelect = node.querySelector('.test-type');
+            testTypeSelect.addEventListener('change', (e) => {
+                nodeData.testType = e.target.value;
+                testTypeSelect.className = `test-type type-${e.target.value}`;
+            });
+
+            // テストケースID編集
+            const nodeIdInput = node.querySelector('.node-id');
+            nodeIdInput.addEventListener('blur', () => {
+                nodeData.testCaseId = nodeIdInput.textContent;
+            });
+
+            nodeIdInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    nodeIdInput.blur();
+                }
+            });
+
+            // ステータス変更
+            const statusSelect = node.querySelector('.node-status');
+            statusSelect.addEventListener('change', (e) => {
+                nodeData.status = e.target.value;
+                statusSelect.className = `node-status status-${e.target.value}`;
+                updateNodeAppearance(nodeData);
+            });
+
+            // ドラッグ開始
+            node.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'BUTTON' || 
+                    e.target.tagName === 'TEXTAREA' || 
+                    e.target.tagName === 'SELECT' || 
+                    e.target.classList.contains('node-id') ||
+                    e.target.classList.contains('connector')) return;
+                
+                isDragging = true;
+                node.classList.add('dragging');
+                dragOffset.x = e.clientX - nodeData.x;
+                dragOffset.y = e.clientY - nodeData.y;
+                e.stopPropagation();
+            });
+
+            // マークダウン部分のダブルクリックで編集モードに
+            const contentDiv = node.querySelector('.node-content');
+            contentDiv.addEventListener('dblclick', () => {
+                node.classList.add('editing');
+                const textarea = node.querySelector('.node-textarea');
+                textarea.focus();
+            });
+
+            // 保存ボタン
+            node.querySelector('.edit-mode button').addEventListener('click', () => {
+                const textarea = node.querySelector('.node-textarea');
+                nodeData.content = textarea.value;
+                updateNodeContent(nodeData);
+                node.classList.remove('editing');
+            });
+
+            // ノードの右クリックメニュー
+            node.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                selectedNode = nodeData;
+                selectedConnection = null;
+                contextMenu.style.left = e.clientX + 'px';
+                contextMenu.style.top = e.clientY + 'px';
+                contextMenu.classList.add('show');
+                
+                // メニュー項目の表示/非表示
+                deleteNodeBtn.style.display = 'block';
+                deleteConnectionBtn.style.display = 'none';
+            });
+
+            // コネクターのクリックイベント
+            const connectors = node.querySelectorAll('.connector');
+            connectors.forEach(connector => {
+                connector.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleConnectorClick(nodeData, connector);
+                });
+            });
+
+            // マウス移動
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    nodeData.x = e.clientX - dragOffset.x;
+                    nodeData.y = e.clientY - dragOffset.y;
+                    node.style.left = nodeData.x + 'px';
+                    node.style.top = nodeData.y + 'px';
+                    updateConnections();
+                }
+            });
+
+            // ドラッグ終了
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    node.classList.remove('dragging');
+                }
+            });
+        }
+
+        // ノード削除
+        function deleteNode(nodeData) {
+            nodeData.element.remove();
+            nodes = nodes.filter(n => n.id !== nodeData.id);
+            connections = connections.filter(c => c.from !== nodeData.id && c.to !== nodeData.id);
+            updateConnections();
+        }
+
+        // 接続作成
+        function createConnection(fromNodeId, toNodeId) {
+            connections.push({ from: fromNodeId, to: toNodeId });
+            updateConnections();
+        }
+
+        // コネクタークリック処理
+        function handleConnectorClick(nodeData, connector) {
+            if (!connectingFrom) {
+                // 接続開始
+                connectingFrom = nodeData;
+                connector.classList.add('active');
+            } else {
+                // 接続完了
+                if (connectingFrom.id !== nodeData.id) {
+                    createConnection(connectingFrom.id, nodeData.id);
+                }
+                // アクティブ状態を解除
+                const activeConnectors = document.querySelectorAll('.connector.active');
+                activeConnectors.forEach(c => c.classList.remove('active'));
+                connectingFrom = null;
+            }
+        }
+
+        // 接続更新
+        function updateConnections() {
+            svg.innerHTML = '';
+            connections.forEach((conn, index) => {
+                const fromNode = nodes.find(n => n.id === conn.from);
+                const toNode = nodes.find(n => n.id === conn.to);
+                
+                if (fromNode && toNode) {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    
+                    const fromRect = fromNode.element.getBoundingClientRect();
+                    const toRect = toNode.element.getBoundingClientRect();
+                    
+                    const fromX = fromNode.x + fromRect.width / 2;
+                    const fromY = fromNode.y + fromRect.height / 2;
+                    const toX = toNode.x + toRect.width / 2;
+                    const toY = toNode.y + toRect.height / 2;
+                    
+                    line.setAttribute('x1', fromX);
+                    line.setAttribute('y1', fromY);
+                    line.setAttribute('x2', toX);
+                    line.setAttribute('y2', toY);
+                    line.classList.add('connection');
+                    line.dataset.connectionIndex = index;
+                    
+                    // 右クリックイベント
+                    line.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        selectedConnection = index;
+                        selectedNode = null;
+                        contextMenu.style.left = e.clientX + 'px';
+                        contextMenu.style.top = e.clientY + 'px';
+                        contextMenu.classList.add('show');
+                        
+                        // メニュー項目の表示/非表示
+                        deleteNodeBtn.style.display = 'none';
+                        deleteConnectionBtn.style.display = 'block';
+                    });
+                    
+                    svg.appendChild(line);
+                }
+            });
+        }
+
+        // ツールバーイベント
+        addNodeBtn.addEventListener('click', () => {
+            createNode(Math.random() * 600 + 100, Math.random() * 400 + 100);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            if (confirm('本当に削除しますか？')) {
+                nodes.forEach(n => n.element.remove());
+                nodes = [];
+                connections = [];
+                updateConnections();
+            }
+        });
+
+        // 右クリックメニューのノード削除
+        deleteNodeBtn.addEventListener('click', () => {
+            if (selectedNode !== null) {
+                if (confirm('本当に削除しますか？')) {
+                    deleteNode(selectedNode);
+                    contextMenu.classList.remove('show');
+                    selectedNode = null;
+                }
+            }
+        });
+
+        // 右クリックメニューの接続削除
+        deleteConnectionBtn.addEventListener('click', () => {
+            if (selectedConnection !== null) {
+                connections.splice(selectedConnection, 1);
+                updateConnections();
+                contextMenu.classList.remove('show');
+                selectedConnection = null;
+            }
+        });
+
+        // 右クリックメニューを閉じる
+        document.addEventListener('click', (e) => {
+            if (!contextMenu.contains(e.target)) {
+                contextMenu.classList.remove('show');
+            }
+        });
+
+        // 右クリックメニューが表示されている時にスクロールやリサイズで閉じる
+        window.addEventListener('scroll', () => {
+            contextMenu.classList.remove('show');
+        });
+
+        window.addEventListener('resize', () => {
+            contextMenu.classList.remove('show');
+        });
+
+        // キャンバスドラッグ
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.target === canvas || e.target === svg) {
+                isDraggingCanvas = true;
+                canvas.classList.add('grabbing');
+                dragStart.x = e.clientX;
+                dragStart.y = e.clientY;
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDraggingCanvas) {
+                const dx = e.clientX - dragStart.x;
+                const dy = e.clientY - dragStart.y;
+                
+                nodes.forEach(nodeData => {
+                    nodeData.x += dx;
+                    nodeData.y += dy;
+                    nodeData.element.style.left = nodeData.x + 'px';
+                    nodeData.element.style.top = nodeData.y + 'px';
+                });
+                
+                updateConnections();
+                dragStart.x = e.clientX;
+                dragStart.y = e.clientY;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDraggingCanvas = false;
+            canvas.classList.remove('grabbing');
+        });
+
+        // 初期ノード作成（デモ用）
+        const node1 = createNode(200, 150, '# ログイン機能テスト\n\n## 前提条件\n- ユーザーが登録済み\n- ログイン画面が表示されている\n\n## テスト手順\n1. ユーザーIDを入力\n2. パスワードを入力\n3. ログインボタンをクリック\n\n## 期待結果\nホーム画面が表示される');
+        const node2 = createNode(550, 100, '# 正常系テスト\n\n## 手順\n- 有効なID/PWを入力\n\n## 結果\n**成功**してログインできる');
+        const node3 = createNode(550, 300, '# 異常系テスト\n\n## 手順\n- 無効なPWを入力\n\n## 結果\n`エラーメッセージ`が表示される');
+        
+        // 初期ノードのテスト種別を設定
+        node2.testType = '正常系';
+        node2.element.querySelector('.test-type').value = '正常系';
+        node2.element.querySelector('.test-type').className = 'test-type type-正常系';
+        
+        node3.testType = '異常系';
+        node3.element.querySelector('.test-type').value = '異常系';
+        node3.element.querySelector('.test-type').className = 'test-type type-異常系';
+        
+        createConnection(node1.id, node2.id);
+        createConnection(node1.id, node3.id);
+    </script>
+</body>
+</html>
