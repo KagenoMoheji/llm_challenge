@@ -1,0 +1,39 @@
+creator: KagenoMoheji
+createDate: 2019-07-13
+updateDate: !!timestamp 2019-07-13
+title: matplotlibでガントチャートを実装する
+tags:
+  - Python
+  - 個人開発
+content:
+  - headline: はじめに
+    body: |
+      今月2本目です！
+      前回と同じくPythonのお話です．
+
+      今回は，ガントチャートを生成する実装について書いていきます．
+      ただし，要件定義(？)は以下になります．
+      - ガントチャートをサブプロットで作って他のグラフと一緒にしたい！！
+      - 時系列データからのガントチャートを作りたい！！
+      - 時系列データの最低単位に秒(またはマイクロ秒)を使いたい！！
+      - pandasめんどいから使いたくない！(コラ)
+  - headline: 実装してみよう
+    body: |
+      …ということで，簡単な時系列データを用いてサブプロットのガントチャートを実装したコードが以下です．
+      ```
+      from datetime import datetime
+      from datetime import timedelta
+      import matplotlib.pyplot as plt
+      import matplotlib.dates as pld
+      import matplotlib.font_manager as plf
+      ```
+      出力結果は図1のようになります。
+      ![図1](https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/media/{記事ID}_{メディアファイル名}.{png|jpg|gif})
+
+      このように，matplotlibの基本の書き方の部分多めに，シンプルかつ柔軟に実装できました．
+      ほかに図2のような出力も出せます。
+      ![図2](https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/media/{記事ID}_{メディアファイル名}.{png|jpg|gif})
+  - headline: まとめ
+    body: |
+      ガントチャートをサブプロットにして別のグラフと合わせる機会は少ないんでしょうか？
+      それでも，そうした機会が巡って必要になった時の参考になれたら幸いです(*´ω｀*)
