@@ -46,11 +46,15 @@
             border-radius: 12px;
             padding: 15px;
             min-width: 200px;
-            max-width: 400px;
+            max-width: 800px;
+            min-height: 100px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             cursor: move;
             z-index: 2;
             transition: transform 0.2s, box-shadow 0.2s, border-color 0.3s, background-color 0.3s;
+            resize: none;
+            display: flex;
+            flex-direction: column;
         }
 
         .node:hover {
@@ -66,6 +70,62 @@
         .node.selected {
             border-color: #ff6b6b;
             box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.3);
+        }
+
+        .node.resizing {
+            transition: none;
+        }
+
+        .node.resizing:hover {
+            transform: none;
+        }
+
+        .view-mode {
+            flex: 1;
+            overflow: auto;
+        }
+
+        /* リサイズハンドル */
+        .resize-handle {
+            position: absolute;
+            background: transparent;
+            z-index: 11;
+        }
+
+        .resize-handle.top {
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            cursor: ns-resize;
+        }
+
+        .resize-handle.bottom {
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            cursor: ns-resize;
+        }
+
+        .resize-handle.left {
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 8px;
+            cursor: ew-resize;
+        }
+
+        .resize-handle.right {
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 8px;
+            cursor: ew-resize;
+        }
+
+        .resize-handle:hover {
+            background: rgba(102, 126, 234, 0.2);
         }
 
         /* コネクター */
@@ -241,6 +301,9 @@
             cursor: text;
             border: 1px solid transparent;
             transition: all 0.2s;
+            word-wrap: break-word;
+            word-break: break-all;
+            overflow-wrap: break-word;
         }
 
         .node-id:hover {
@@ -336,38 +399,53 @@
             padding: 5px;
             border-radius: 4px;
             transition: background-color 0.2s;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
 
         .node-content:hover {
             background-color: #f8f9fa;
         }
 
-        .node-content h1 { font-size: 1.5em; margin: 0.5em 0; }
-        .node-content h2 { font-size: 1.3em; margin: 0.5em 0; }
-        .node-content h3 { font-size: 1.1em; margin: 0.5em 0; }
-        .node-content p { margin: 0.5em 0; }
+        .node-content h1 { font-size: 1.5em; margin: 0.5em 0; word-wrap: break-word; }
+        .node-content h2 { font-size: 1.3em; margin: 0.5em 0; word-wrap: break-word; }
+        .node-content h3 { font-size: 1.1em; margin: 0.5em 0; word-wrap: break-word; }
+        .node-content p { margin: 0.5em 0; word-wrap: break-word; }
         .node-content ul, .node-content ol { margin-left: 1.5em; }
+        .node-content li { word-wrap: break-word; }
         .node-content code { 
             background: #f4f4f4; 
             padding: 2px 6px; 
             border-radius: 3px;
             font-family: monospace;
+            word-wrap: break-word;
+            word-break: break-all;
+            overflow-wrap: break-word;
         }
         .node-content pre {
             background: #f4f4f4;
             padding: 10px;
             border-radius: 5px;
             overflow-x: auto;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .node-content pre code {
+            word-wrap: break-word;
+            white-space: pre-wrap;
         }
         .node-content strong { font-weight: bold; }
         .node-content em { font-style: italic; }
 
         .edit-mode {
             display: none;
+            height: 100%;
         }
 
         .node.editing .edit-mode {
-            display: block;
+            display: flex;
+            flex-direction: column;
         }
 
         .node.editing .view-mode {
@@ -376,13 +454,15 @@
 
         .node-textarea {
             width: 100%;
+            height: 100%;
             min-height: 100px;
             padding: 10px;
             border: 2px solid #667eea;
             border-radius: 6px;
             font-family: monospace;
             font-size: 13px;
-            resize: vertical;
+            resize: none;
+            box-sizing: border-box;
         }
 
         .toolbar {
@@ -523,10 +603,12 @@
         <h3>📝 操作方法</h3>
         <ul>
             <li>ノードをドラッグして移動</li>
+            <li>ノードの4辺をドラッグでリサイズ</li>
             <li>テストケースIDをクリックして編集</li>
             <li>種別で正常系/異常系を選択</li>
             <li>ステータスでノードの見た目が変化</li>
             <li>マークダウン部分をダブルクリックで編集</li>
+            <li>編集中は外側クリックで自動保存</li>
             <li>ノードの4方向の点をクリックして接続</li>
             <li>ノードを右クリックで削除</li>
             <li>接続線を右クリックで削除</li>
@@ -570,6 +652,10 @@
             node.style.top = y + 'px';
             
             node.innerHTML = `
+                <div class="resize-handle top"></div>
+                <div class="resize-handle bottom"></div>
+                <div class="resize-handle left"></div>
+                <div class="resize-handle right"></div>
                 <div class="connector top" data-direction="top"></div>
                 <div class="connector bottom" data-direction="bottom"></div>
                 <div class="connector left" data-direction="left"></div>
@@ -598,7 +684,6 @@
                 </div>
                 <div class="edit-mode">
                     <textarea class="node-textarea">${content}</textarea>
-                    <button class="node-btn" style="margin-top: 10px;">保存</button>
                 </div>
             `;
 
@@ -607,6 +692,8 @@
                 element: node,
                 x: x,
                 y: y,
+                width: null,
+                height: null,
                 content: content,
                 testCaseId: `TC-${String(nodeId + 1).padStart(3, '0')}`,
                 status: '起票',
@@ -618,6 +705,16 @@
 
             // マークダウンレンダリング
             updateNodeContent(nodeData);
+
+            // 初期サイズを記録
+            setTimeout(() => {
+                if (!nodeData.width) {
+                    nodeData.width = node.offsetWidth;
+                }
+                if (!nodeData.height) {
+                    nodeData.height = node.offsetHeight;
+                }
+            }, 0);
 
             // イベントリスナー
             setupNodeEvents(nodeData);
@@ -680,7 +777,8 @@
                     e.target.tagName === 'TEXTAREA' || 
                     e.target.tagName === 'SELECT' || 
                     e.target.classList.contains('node-id') ||
-                    e.target.classList.contains('connector')) return;
+                    e.target.classList.contains('connector') ||
+                    e.target.classList.contains('resize-handle')) return;
                 
                 isDragging = true;
                 node.classList.add('dragging');
@@ -692,17 +790,113 @@
             // マークダウン部分のダブルクリックで編集モードに
             const contentDiv = node.querySelector('.node-content');
             contentDiv.addEventListener('dblclick', () => {
+                // 現在のノードのサイズを取得して固定
+                const currentWidth = node.offsetWidth;
+                const currentHeight = node.offsetHeight;
+                
+                // ノードのサイズを明示的に設定
+                if (!nodeData.width || nodeData.width < currentWidth) {
+                    nodeData.width = currentWidth;
+                }
+                if (!nodeData.height || nodeData.height < currentHeight) {
+                    nodeData.height = currentHeight;
+                }
+                
+                node.style.width = nodeData.width + 'px';
+                node.style.height = nodeData.height + 'px';
+                
                 node.classList.add('editing');
                 const textarea = node.querySelector('.node-textarea');
                 textarea.focus();
             });
 
-            // 保存ボタン
-            node.querySelector('.edit-mode button').addEventListener('click', () => {
-                const textarea = node.querySelector('.node-textarea');
-                nodeData.content = textarea.value;
-                updateNodeContent(nodeData);
-                node.classList.remove('editing');
+            // テキストエリア外クリックで保存
+            const textarea = node.querySelector('.node-textarea');
+            document.addEventListener('click', (e) => {
+                if (node.classList.contains('editing')) {
+                    // テキストエリアとその親要素以外をクリックした場合
+                    if (!textarea.contains(e.target) && !node.contains(e.target)) {
+                        nodeData.content = textarea.value;
+                        updateNodeContent(nodeData);
+                        node.classList.remove('editing');
+                    } else if (node.contains(e.target) && !textarea.contains(e.target) && e.target.tagName !== 'TEXTAREA') {
+                        // ノード内のテキストエリア以外をクリックした場合
+                        nodeData.content = textarea.value;
+                        updateNodeContent(nodeData);
+                        node.classList.remove('editing');
+                    }
+                }
+            });
+
+            // リサイズハンドルのイベント
+            const resizeHandles = node.querySelectorAll('.resize-handle');
+            resizeHandles.forEach(handle => {
+                let isResizing = false;
+                let resizeStartX = 0;
+                let resizeStartY = 0;
+                let startWidth = 0;
+                let startHeight = 0;
+                let startX = 0;
+                let startY = 0;
+
+                handle.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    isResizing = true;
+                    resizeStartX = e.clientX;
+                    resizeStartY = e.clientY;
+                    startWidth = node.offsetWidth;
+                    startHeight = node.offsetHeight;
+                    startX = nodeData.x;
+                    startY = nodeData.y;
+                    node.classList.add('resizing');
+
+                    const handleMouseMove = (e) => {
+                        if (!isResizing) return;
+
+                        const deltaX = e.clientX - resizeStartX;
+                        const deltaY = e.clientY - resizeStartY;
+
+                        if (handle.classList.contains('right')) {
+                            const newWidth = Math.max(200, startWidth + deltaX);
+                            node.style.width = newWidth + 'px';
+                            nodeData.width = newWidth;
+                        } else if (handle.classList.contains('left')) {
+                            const newWidth = Math.max(200, startWidth - deltaX);
+                            if (newWidth > 200) {
+                                node.style.width = newWidth + 'px';
+                                nodeData.width = newWidth;
+                                nodeData.x = startX + deltaX;
+                                node.style.left = nodeData.x + 'px';
+                            }
+                        } else if (handle.classList.contains('bottom')) {
+                            const newHeight = Math.max(100, startHeight + deltaY);
+                            node.style.height = newHeight + 'px';
+                            nodeData.height = newHeight;
+                        } else if (handle.classList.contains('top')) {
+                            const newHeight = Math.max(100, startHeight - deltaY);
+                            if (newHeight > 100) {
+                                node.style.height = newHeight + 'px';
+                                nodeData.height = newHeight;
+                                nodeData.y = startY + deltaY;
+                                node.style.top = nodeData.y + 'px';
+                            }
+                        }
+
+                        updateConnections();
+                    };
+
+                    const handleMouseUp = () => {
+                        if (isResizing) {
+                            isResizing = false;
+                            node.classList.remove('resizing');
+                            document.removeEventListener('mousemove', handleMouseMove);
+                            document.removeEventListener('mouseup', handleMouseUp);
+                        }
+                    };
+
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                });
             });
 
             // ノードの右クリックメニュー
