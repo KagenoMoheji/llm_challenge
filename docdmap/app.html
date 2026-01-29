@@ -536,6 +536,7 @@
             opacity: 0.8;
             pointer-events: stroke;
             cursor: pointer;
+            marker-end: url(#arrowhead);
         }
 
         .connection:hover {
@@ -591,12 +592,60 @@
         .context-menu-item.delete:hover {
             background: #fee;
         }
+
+        /* エクスポートメニュー */
+        .export-menu {
+            position: fixed;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 10000;
+            min-width: 180px;
+            display: none;
+            padding: 10px;
+        }
+
+        .export-menu.show {
+            display: block;
+        }
+
+        .export-menu h4 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+            font-size: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .export-menu button {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+            margin-bottom: 6px;
+            text-align: left;
+        }
+
+        .export-menu button:last-child {
+            margin-bottom: 0;
+        }
+
+        .export-menu button:hover {
+            background: #5568d3;
+        }
     </style>
 </head>
 <body>
     <div class="toolbar">
         <button id="addNodeBtn">➕ ノード追加</button>
         <button id="clearBtn">🗑️ すべてクリア</button>
+        <button id="exportBtn">💾 エクスポート</button>
     </div>
 
     <div class="info">
@@ -625,14 +674,26 @@
         <div class="context-menu-item delete" id="deleteConnection">🗑️ 接続を削除</div>
     </div>
 
+    <div id="exportMenu" class="export-menu">
+        <h4>📥 エクスポート形式を選択</h4>
+        <button id="exportCsvBtn">📄 CSV形式</button>
+        <button id="exportJsonBtn">📋 JSON形式</button>
+        <button id="exportSvgBtn">🖼️ SVG形式</button>
+    </div>
+
     <script>
         const canvas = document.getElementById('canvas');
         const svg = document.getElementById('svg');
         const addNodeBtn = document.getElementById('addNodeBtn');
         const clearBtn = document.getElementById('clearBtn');
+        const exportBtn = document.getElementById('exportBtn');
         const contextMenu = document.getElementById('contextMenu');
+        const exportMenu = document.getElementById('exportMenu');
         const deleteNodeBtn = document.getElementById('deleteNode');
         const deleteConnectionBtn = document.getElementById('deleteConnection');
+        const exportCsvBtn = document.getElementById('exportCsvBtn');
+        const exportJsonBtn = document.getElementById('exportJsonBtn');
+        const exportSvgBtn = document.getElementById('exportSvgBtn');
 
         let nodes = [];
         let connections = [];
@@ -642,6 +703,25 @@
         let selectedConnection = null;
         let selectedNode = null;
         let connectingFrom = null;
+
+        // UUID生成関数
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // UNIX時間取得
+        function getUnixTime() {
+            return Math.floor(Date.now() / 1000);
+        }
+
+        // 一意のノードID生成
+        function generateNodeUniqueId() {
+            return `${generateUUID()}_${getUnixTime()}`;
+        }
 
         // ノード作成
         function createNode(x, y, content = '# 新しいテストケース\n\n内容を記述...') {
@@ -689,6 +769,7 @@
 
             const nodeData = {
                 id: nodeId,
+                uniqueId: generateNodeUniqueId(),
                 element: node,
                 x: x,
                 y: y,
@@ -951,21 +1032,37 @@
         }
 
         // 接続作成
-        function createConnection(fromNodeId, toNodeId) {
-            connections.push({ from: fromNodeId, to: toNodeId });
+        function createConnection(fromNodeId, toNodeId, fromDirection, toDirection) {
+            connections.push({ 
+                from: fromNodeId, 
+                to: toNodeId,
+                fromDirection: fromDirection || 'center',
+                toDirection: toDirection || 'center'
+            });
             updateConnections();
         }
 
         // コネクタークリック処理
         function handleConnectorClick(nodeData, connector) {
+            const direction = connector.dataset.direction;
+            
             if (!connectingFrom) {
                 // 接続開始
-                connectingFrom = nodeData;
+                connectingFrom = {
+                    node: nodeData,
+                    direction: direction,
+                    connector: connector
+                };
                 connector.classList.add('active');
             } else {
                 // 接続完了
-                if (connectingFrom.id !== nodeData.id) {
-                    createConnection(connectingFrom.id, nodeData.id);
+                if (connectingFrom.node.id !== nodeData.id) {
+                    createConnection(
+                        connectingFrom.node.id, 
+                        nodeData.id,
+                        connectingFrom.direction,
+                        direction
+                    );
                 }
                 // アクティブ状態を解除
                 const activeConnectors = document.querySelectorAll('.connector.active');
@@ -974,16 +1071,219 @@
             }
         }
 
-        // 接続更新
-        function updateConnections() {
-            svg.innerHTML = '';
-            connections.forEach((conn, index) => {
+        // CSVエスケープ関数
+        function escapeCsv(value) {
+            if (value == null) return '""';
+            const stringValue = String(value);
+            // ダブルクォーテーションをエスケープ（二重化）
+            const escaped = stringValue.replace(/"/g, '""');
+            // カンマ、改行、ダブルクォーテーションが含まれる場合は引用符で囲む
+            return `"${escaped}"`;
+        }
+
+        // CSV形式でエクスポート
+        function exportToCsv() {
+            // テストケースIDの重複チェック
+            const duplicates = checkDuplicateTestCaseIds();
+            if (duplicates.length > 0) {
+                alert('重複のテストケースIDがあります。一意の値を登録してください。\n重複ID: ' + duplicates.join(', '));
+                return;
+            }
+
+            // ヘッダー行（英語）
+            const headers = [
+                'unique_id',
+                'test_case_id',
+                'test_type',
+                'status',
+                'markdown_content',
+                'height',
+                'width',
+                'x_position',
+                'y_position',
+                'connected_node_ids'
+            ];
+
+            let csvContent = headers.map(h => escapeCsv(h)).join(',') + '\n';
+
+            // データ行
+            nodes.forEach(node => {
+                // 接続先のノードIDリストを取得（方向情報付き）
+                const connectedToNodeIds = connections
+                    .filter(conn => conn.from === node.id)
+                    .map(conn => {
+                        const targetNode = nodes.find(n => n.id === conn.to);
+                        return targetNode ? {
+                            direction: 'to',
+                            node_id: targetNode.uniqueId
+                        } : null;
+                    })
+                    .filter(conn => conn !== null);
+
+                // 接続元のノードIDリストも取得
+                const connectedFromNodeIds = connections
+                    .filter(conn => conn.to === node.id)
+                    .map(conn => {
+                        const sourceNode = nodes.find(n => n.id === conn.from);
+                        return sourceNode ? {
+                            direction: 'from',
+                            node_id: sourceNode.uniqueId
+                        } : null;
+                    })
+                    .filter(conn => conn !== null);
+
+                // 両方を結合してJSON文字列化
+                const allConnections = [...connectedToNodeIds, ...connectedFromNodeIds];
+                const connectionsJson = JSON.stringify(allConnections);
+
+                const row = [
+                    node.uniqueId,
+                    node.testCaseId.trim(),
+                    node.testType,
+                    node.status,
+                    node.content,
+                    node.height || node.element.offsetHeight,
+                    node.width || node.element.offsetWidth,
+                    node.x,
+                    node.y,
+                    connectionsJson
+                ];
+
+                csvContent += row.map(value => escapeCsv(value)).join(',') + '\n';
+            });
+
+            // ダウンロード
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `test_mindmap_${timestamp}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // JSON形式でエクスポート
+        function exportToJson() {
+            // テストケースIDの重複チェック
+            const duplicates = checkDuplicateTestCaseIds();
+            if (duplicates.length > 0) {
+                alert('重複のテストケースIDがあります。一意の値を登録してください。\n重複ID: ' + duplicates.join(', '));
+                return;
+            }
+
+            const exportData = {
+                export_date: new Date().toISOString(),
+                version: '1.0',
+                nodes: nodes.map(node => {
+                    // 接続先のノードIDリストを取得（方向情報付き）
+                    const connectedToNodeIds = connections
+                        .filter(conn => conn.from === node.id)
+                        .map(conn => {
+                            const targetNode = nodes.find(n => n.id === conn.to);
+                            return targetNode ? {
+                                direction: 'to',
+                                node_id: targetNode.uniqueId
+                            } : null;
+                        })
+                        .filter(conn => conn !== null);
+
+                    // 接続元のノードIDリストも取得
+                    const connectedFromNodeIds = connections
+                        .filter(conn => conn.to === node.id)
+                        .map(conn => {
+                            const sourceNode = nodes.find(n => n.id === conn.from);
+                            return sourceNode ? {
+                                direction: 'from',
+                                node_id: sourceNode.uniqueId
+                            } : null;
+                        })
+                        .filter(conn => conn !== null);
+
+                    // 両方を結合
+                    const allConnections = [...connectedToNodeIds, ...connectedFromNodeIds];
+
+                    return {
+                        unique_id: node.uniqueId,
+                        test_case_id: node.testCaseId.trim(),
+                        test_type: node.testType,
+                        status: node.status,
+                        markdown_content: node.content,
+                        height: node.height || node.element.offsetHeight,
+                        width: node.width || node.element.offsetWidth,
+                        x_position: node.x,
+                        y_position: node.y,
+                        connected_node_ids: allConnections
+                    };
+                })
+            };
+
+            // JSON文字列に変換（整形あり）
+            const jsonContent = JSON.stringify(exportData, null, 2);
+
+            // ダウンロード
+            const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `test_mindmap_${timestamp}.json`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // SVG形式でエクスポート
+        function exportToSvg() {
+            // キャンバスの境界を計算
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            
+            nodes.forEach(node => {
+                const rect = node.element.getBoundingClientRect();
+                minX = Math.min(minX, node.x);
+                minY = Math.min(minY, node.y);
+                maxX = Math.max(maxX, node.x + rect.width);
+                maxY = Math.max(maxY, node.y + rect.height);
+            });
+
+            const padding = 50;
+            const viewBoxX = minX - padding;
+            const viewBoxY = minY - padding;
+            const viewBoxWidth = maxX - minX + padding * 2;
+            const viewBoxHeight = maxY - minY + padding * 2;
+
+            // SVG要素の作成
+            let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}" width="${viewBoxWidth}" height="${viewBoxHeight}">
+  <defs>
+    <style>
+      .node-rect { fill: white; stroke: #667eea; stroke-width: 3; }
+      .node-rect-ok { stroke: #2ecc71; }
+      .node-rect-ng { stroke: #e74c3c; }
+      .node-rect-rejected { fill: #e0e0e0; }
+      .node-rect-pending { fill: #e6d5f5; }
+      .connection-line { stroke: white; stroke-width: 2; opacity: 0.8; }
+      .node-text { font-family: 'Segoe UI', sans-serif; font-size: 14px; fill: #333; }
+      .node-id-text { font-weight: bold; fill: #667eea; font-size: 14px; }
+      .test-type-normal { fill: #2ecc71; }
+      .test-type-abnormal { fill: #e74c3c; }
+      .test-type-other { fill: #95a5a6; }
+    </style>
+  </defs>
+  
+  <!-- 接続線 -->
+  <g id="connections">
+`;
+
+            // 接続線を描画
+            connections.forEach(conn => {
                 const fromNode = nodes.find(n => n.id === conn.from);
                 const toNode = nodes.find(n => n.id === conn.to);
                 
                 if (fromNode && toNode) {
-                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    
                     const fromRect = fromNode.element.getBoundingClientRect();
                     const toRect = toNode.element.getBoundingClientRect();
                     
@@ -992,10 +1292,118 @@
                     const toX = toNode.x + toRect.width / 2;
                     const toY = toNode.y + toRect.height / 2;
                     
-                    line.setAttribute('x1', fromX);
-                    line.setAttribute('y1', fromY);
-                    line.setAttribute('x2', toX);
-                    line.setAttribute('y2', toY);
+                    svgContent += `    <line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}" class="connection-line"/>\n`;
+                }
+            });
+
+            svgContent += `  </g>
+  
+  <!-- ノード -->
+  <g id="nodes">
+`;
+
+            // ノードを描画
+            nodes.forEach(node => {
+                const rect = node.element.getBoundingClientRect();
+                const width = node.width || rect.width;
+                const height = node.height || rect.height;
+                
+                let nodeClass = 'node-rect';
+                if (node.status === 'OK') nodeClass += ' node-rect-ok';
+                else if (node.status === 'NG') nodeClass += ' node-rect-ng';
+                else if (node.status === '却下') nodeClass += ' node-rect-rejected';
+                else if (node.status === '保留') nodeClass += ' node-rect-pending';
+
+                let typeClass = 'test-type-other';
+                if (node.testType === '正常系') typeClass = 'test-type-normal';
+                else if (node.testType === '異常系') typeClass = 'test-type-abnormal';
+
+                svgContent += `    <g id="node-${node.uniqueId}">
+      <rect x="${node.x}" y="${node.y}" width="${width}" height="${height}" rx="12" class="${nodeClass}"/>
+      
+      <!-- テスト種別 -->
+      <rect x="${node.x + 10}" y="${node.y + 10}" width="60" height="20" rx="4" class="${typeClass}"/>
+      <text x="${node.x + 40}" y="${node.y + 24}" text-anchor="middle" class="node-text" fill="white" font-size="11">${node.testType}</text>
+      
+      <!-- テストケースID -->
+      <text x="${node.x + 80}" y="${node.y + 24}" class="node-id-text">${escapeXml(node.testCaseId)}</text>
+      
+      <!-- ステータス -->
+      <text x="${node.x + width - 10}" y="${node.y + 24}" text-anchor="end" class="node-text" font-size="12">${escapeXml(node.status)}</text>
+      
+      <!-- コンテンツ（簡略版） -->
+      <text x="${node.x + 15}" y="${node.y + 45}" class="node-text">
+        ${escapeXml(node.content.substring(0, 50) + (node.content.length > 50 ? '...' : ''))}
+      </text>
+    </g>
+`;
+            });
+
+            svgContent += `  </g>
+</svg>`;
+
+            // ダウンロード
+            const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `test_mindmap_${timestamp}.svg`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // XML特殊文字のエスケープ
+        function escapeXml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        }
+
+        // テストケースIDの重複チェック
+        function checkDuplicateTestCaseIds() {
+            const testCaseIds = nodes.map(node => node.testCaseId.trim());
+            const uniqueIds = new Set();
+            const duplicates = [];
+
+            testCaseIds.forEach(id => {
+                if (uniqueIds.has(id)) {
+                    if (!duplicates.includes(id)) {
+                        duplicates.push(id);
+                    }
+                } else {
+                    uniqueIds.add(id);
+                }
+            });
+
+            return duplicates;
+        }
+
+        // 接続更新
+        function updateConnections() {
+            svg.innerHTML = '<defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><polygon points="0 0, 10 3, 0 6" fill="white" /></marker></defs>';
+            
+            connections.forEach((conn, index) => {
+                const fromNode = nodes.find(n => n.id === conn.from);
+                const toNode = nodes.find(n => n.id === conn.to);
+                
+                if (fromNode && toNode) {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    
+                    // コネクターの位置を計算
+                    const fromPos = getConnectorPosition(fromNode, conn.fromDirection || 'center');
+                    const toPos = getConnectorPosition(toNode, conn.toDirection || 'center');
+                    
+                    line.setAttribute('x1', fromPos.x);
+                    line.setAttribute('y1', fromPos.y);
+                    line.setAttribute('x2', toPos.x);
+                    line.setAttribute('y2', toPos.y);
                     line.classList.add('connection');
                     line.dataset.connectionIndex = index;
                     
@@ -1018,9 +1426,65 @@
             });
         }
 
+        // コネクターの位置を取得
+        function getConnectorPosition(nodeData, direction) {
+            const rect = nodeData.element.getBoundingClientRect();
+            const nodeWidth = nodeData.width || rect.width;
+            const nodeHeight = nodeData.height || rect.height;
+            
+            let x, y;
+            
+            switch(direction) {
+                case 'top':
+                    x = nodeData.x + nodeWidth / 2;
+                    y = nodeData.y;
+                    break;
+                case 'bottom':
+                    x = nodeData.x + nodeWidth / 2;
+                    y = nodeData.y + nodeHeight;
+                    break;
+                case 'left':
+                    x = nodeData.x;
+                    y = nodeData.y + nodeHeight / 2;
+                    break;
+                case 'right':
+                    x = nodeData.x + nodeWidth;
+                    y = nodeData.y + nodeHeight / 2;
+                    break;
+                default: // center
+                    x = nodeData.x + nodeWidth / 2;
+                    y = nodeData.y + nodeHeight / 2;
+                    break;
+            }
+            
+            return { x, y };
+        }
+
         // ツールバーイベント
         addNodeBtn.addEventListener('click', () => {
             createNode(Math.random() * 600 + 100, Math.random() * 400 + 100);
+        });
+
+        exportBtn.addEventListener('click', (e) => {
+            const rect = exportBtn.getBoundingClientRect();
+            exportMenu.style.left = rect.left + 'px';
+            exportMenu.style.top = (rect.bottom + 5) + 'px';
+            exportMenu.classList.add('show');
+        });
+
+        exportCsvBtn.addEventListener('click', () => {
+            exportToCsv();
+            exportMenu.classList.remove('show');
+        });
+
+        exportJsonBtn.addEventListener('click', () => {
+            exportToJson();
+            exportMenu.classList.remove('show');
+        });
+
+        exportSvgBtn.addEventListener('click', () => {
+            exportToSvg();
+            exportMenu.classList.remove('show');
         });
 
         clearBtn.addEventListener('click', () => {
@@ -1058,15 +1522,20 @@
             if (!contextMenu.contains(e.target)) {
                 contextMenu.classList.remove('show');
             }
+            if (!exportMenu.contains(e.target) && !exportBtn.contains(e.target)) {
+                exportMenu.classList.remove('show');
+            }
         });
 
         // 右クリックメニューが表示されている時にスクロールやリサイズで閉じる
         window.addEventListener('scroll', () => {
             contextMenu.classList.remove('show');
+            exportMenu.classList.remove('show');
         });
 
         window.addEventListener('resize', () => {
             contextMenu.classList.remove('show');
+            exportMenu.classList.remove('show');
         });
 
         // キャンバスドラッグ
@@ -1116,8 +1585,8 @@
         node3.element.querySelector('.test-type').value = '異常系';
         node3.element.querySelector('.test-type').className = 'test-type type-異常系';
         
-        createConnection(node1.id, node2.id);
-        createConnection(node1.id, node3.id);
+        createConnection(node1.id, node2.id, 'right', 'left');
+        createConnection(node1.id, node3.id, 'right', 'left');
     </script>
 </body>
 </html>
