@@ -111,7 +111,6 @@
             margin-bottom: 60px;
             animation: slideUp 0.6s ease-out both;
             position: relative;
-            cursor: pointer;
         }
 
         /* 縦線の基本スタイル */
@@ -125,53 +124,56 @@
             z-index: 1;
         }
 
-        /* 奇数番目: 右側の縦線 */
-        .content-section:nth-child(odd)::before {
-            right: 0;
-            height: 50px; /* タイトル部分の高さ */
-        }
-
-        /* 偶数番目: 左側の縦線 */
-        .content-section:nth-child(even)::before {
-            left: 0;
-            height: 50px; /* タイトル部分の高さ */
-        }
-
-        /* PC版: hover時に縦線を伸ばす */
-        @media (min-width: 769px) {
-            .content-section:hover::before {
-                height: 100%;
-            }
-        }
-
-        /* スマホ版: クリック時に縦線を伸ばす */
-        @media (max-width: 768px) {
-            .content-section:hover::before {
-                height: 100%;
-            }
-        }
-
         /* PC版: レンガ状レイアウト */
         @media (min-width: 769px) {
+            .content-section {
+                cursor: pointer;
+            }
+
+            /* 奇数番目: 右寄せ + 右側の縦線 */
             .content-section:nth-child(odd) {
                 width: 70%;
                 margin-left: auto;
-                margin-right: 0;
+                margin-right: 15px;
             }
 
+            .content-section:nth-child(odd)::before {
+                right: 0;
+                margin-right: -15px;
+                height: 50px;
+            }
+
+            /* 偶数番目: 左寄せ + 左側の縦線 */
             .content-section:nth-child(even) {
                 width: 70%;
-                margin-left: 0;
+                margin-left: 15px;
                 margin-right: auto;
+            }
+
+            .content-section:nth-child(even)::before {
+                left: 0;
+                margin-left: -15px;
+                height: 50px;
+            }
+
+            /* hover時に縦線を伸ばす */
+            .content-section:hover::before {
+                height: 100%;
             }
         }
 
-        /* スマホ版: 中央配置 */
+        /* スマホ版: 中央配置 + 左側に縦線を常に表示 */
         @media (max-width: 768px) {
             .content-section {
                 width: 100%;
                 margin-left: auto;
                 margin-right: auto;
+            }
+
+            .content-section::before {
+                left: 0;
+                margin-left: -5px;
+                height: 45px;
             }
         }
 
@@ -307,8 +309,40 @@
             margin-top: 12px;
             font-family: 'Meiryo', 'メイリオ', sans-serif;
             font-size: 14px;
-            color: var(--muted);
-            font-style: italic;
+            color: var(--ink);
+        }
+
+        /* 画像モーダル */
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .image-modal.active {
+            display: flex;
+        }
+
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            cursor: default;
+        }
+
+        .article-image img {
+            cursor: pointer;
         }
 
         /* Tags Section */
@@ -405,6 +439,11 @@
     
     <footer class="site-footer">
     </footer>
+
+    <!-- 画像モーダル -->
+    <div id="image-modal" class="image-modal">
+        <img id="modal-image" src="" alt="">
+    </div>
 
     <script>
         // URLパラメータから記事IDを取得
@@ -586,15 +625,34 @@
             html += '</article>';
             contentDiv.innerHTML = html;
             
-            // スマホ版: セクションのクリックでactiveクラスをトグル
-            if (window.innerWidth <= 768) {
-                const sections = document.querySelectorAll('.content-section');
-                sections.forEach(section => {
-                    section.addEventListener('click', function() {
-                        this.classList.toggle('active');
-                    });
+            // 画像クリック時のモーダル表示イベントを追加
+            setupImageModal();
+        }
+
+        // 画像モーダルの設定
+        function setupImageModal() {
+            const modal = document.getElementById('image-modal');
+            const modalImage = document.getElementById('modal-image');
+            const articleImages = document.querySelectorAll('.article-image img');
+
+            // 各画像にクリックイベントを追加
+            articleImages.forEach(img => {
+                img.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    modal.classList.add('active');
+                    modalImage.src = this.src;
+                    modalImage.alt = this.alt;
                 });
-            }
+            });
+
+            // モーダル背景クリックで閉じる
+            modal.addEventListener('click', function(e) {
+                // 画像自体のクリックは無視
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                    modalImage.src = '';
+                }
+            });
         }
 
         // HTMLエスケープ
