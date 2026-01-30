@@ -32,7 +32,7 @@ content:
 
       このように，matplotlibの基本の書き方の部分多めに，シンプルかつ柔軟に実装できました．
       ほかに図2のような出力も出せます。
-      ![図2](https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/{記事ID}_{メディアファイル名}.{png|jpg|gif})
+      ![図2](https://avatars.githubusercontent.com/u/37401955?v=4)
   - headline: まとめ
     body: |
       ガントチャートをサブプロットにして別のグラフと合わせる機会は少ないんでしょうか？
