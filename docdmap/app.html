@@ -645,8 +645,11 @@
     <div class="toolbar">
         <button id="addNodeBtn">➕ ノード追加</button>
         <button id="clearBtn">🗑️ すべてクリア</button>
+        <button id="importBtn">📂 インポート</button>
         <button id="exportBtn">💾 エクスポート</button>
     </div>
+    
+    <input type="file" id="fileInput" accept=".tsv,.json" style="display: none;">
 
     <div class="info">
         <h3>📝 操作方法</h3>
@@ -676,7 +679,7 @@
 
     <div id="exportMenu" class="export-menu">
         <h4>📥 エクスポート形式を選択</h4>
-        <button id="exportCsvBtn">📄 CSV形式</button>
+        <button id="exportTsvBtn">📄 TSV形式</button>
         <button id="exportJsonBtn">📋 JSON形式</button>
         <button id="exportSvgBtn">🖼️ SVG形式</button>
     </div>
@@ -686,12 +689,14 @@
         const svg = document.getElementById('svg');
         const addNodeBtn = document.getElementById('addNodeBtn');
         const clearBtn = document.getElementById('clearBtn');
+        const importBtn = document.getElementById('importBtn');
         const exportBtn = document.getElementById('exportBtn');
+        const fileInput = document.getElementById('fileInput');
         const contextMenu = document.getElementById('contextMenu');
         const exportMenu = document.getElementById('exportMenu');
         const deleteNodeBtn = document.getElementById('deleteNode');
         const deleteConnectionBtn = document.getElementById('deleteConnection');
-        const exportCsvBtn = document.getElementById('exportCsvBtn');
+        const exportTsvBtn = document.getElementById('exportTsvBtn');
         const exportJsonBtn = document.getElementById('exportJsonBtn');
         const exportSvgBtn = document.getElementById('exportSvgBtn');
 
@@ -1071,18 +1076,20 @@
             }
         }
 
-        // CSVエスケープ関数
-        function escapeCsv(value) {
-            if (value == null) return '""';
+        // TSVエスケープ関数（バックスラッシュでエスケープ）
+        function escapeTsv(value) {
+            if (value == null) return '';
             const stringValue = String(value);
-            // ダブルクォーテーションをエスケープ（二重化）
-            const escaped = stringValue.replace(/"/g, '""');
-            // カンマ、改行、ダブルクォーテーションが含まれる場合は引用符で囲む
-            return `"${escaped}"`;
+            // バックスラッシュ、タブ、改行、キャリッジリターンをエスケープ
+            return stringValue
+                .replace(/\\/g, '\\\\')  // バックスラッシュ
+                .replace(/\t/g, '\\t')   // タブ
+                .replace(/\n/g, '\\n')   // 改行
+                .replace(/\r/g, '\\r');  // キャリッジリターン
         }
 
-        // CSV形式でエクスポート
-        function exportToCsv() {
+        // TSV形式でエクスポート
+        function exportToTsv() {
             // テストケースIDの重複チェック
             const duplicates = checkDuplicateTestCaseIds();
             if (duplicates.length > 0) {
@@ -1104,7 +1111,7 @@
                 'connected_node_ids'
             ];
 
-            let csvContent = headers.map(h => escapeCsv(h)).join(',') + '\n';
+            let tsvContent = headers.join('\t') + '\n';
 
             // データ行
             nodes.forEach(node => {
@@ -1115,7 +1122,8 @@
                         const targetNode = nodes.find(n => n.id === conn.to);
                         return targetNode ? {
                             direction: 'to',
-                            node_id: targetNode.uniqueId
+                            node_id: targetNode.uniqueId,
+                            connect_point: conn.fromDirection || 'center'
                         } : null;
                     })
                     .filter(conn => conn !== null);
@@ -1127,7 +1135,8 @@
                         const sourceNode = nodes.find(n => n.id === conn.from);
                         return sourceNode ? {
                             direction: 'from',
-                            node_id: sourceNode.uniqueId
+                            node_id: sourceNode.uniqueId,
+                            connect_point: conn.toDirection || 'center'
                         } : null;
                     })
                     .filter(conn => conn !== null);
@@ -1137,28 +1146,28 @@
                 const connectionsJson = JSON.stringify(allConnections);
 
                 const row = [
-                    node.uniqueId,
-                    node.testCaseId.trim(),
-                    node.testType,
-                    node.status,
-                    node.content,
-                    node.height || node.element.offsetHeight,
-                    node.width || node.element.offsetWidth,
-                    node.x,
-                    node.y,
-                    connectionsJson
+                    escapeTsv(node.uniqueId),
+                    escapeTsv(node.testCaseId.trim()),
+                    escapeTsv(node.testType),
+                    escapeTsv(node.status),
+                    escapeTsv(node.content),
+                    escapeTsv(node.height || node.element.offsetHeight),
+                    escapeTsv(node.width || node.element.offsetWidth),
+                    escapeTsv(node.x),
+                    escapeTsv(node.y),
+                    escapeTsv(connectionsJson)
                 ];
 
-                csvContent += row.map(value => escapeCsv(value)).join(',') + '\n';
+                tsvContent += row.join('\t') + '\n';
             });
 
             // ダウンロード
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const blob = new Blob([tsvContent], { type: 'text/tab-separated-values;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
             link.setAttribute('href', url);
-            link.setAttribute('download', `test_mindmap_${timestamp}.csv`);
+            link.setAttribute('download', `test_mindmap_${timestamp}.tsv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -1185,7 +1194,8 @@
                             const targetNode = nodes.find(n => n.id === conn.to);
                             return targetNode ? {
                                 direction: 'to',
-                                node_id: targetNode.uniqueId
+                                node_id: targetNode.uniqueId,
+                                connect_point: conn.fromDirection || 'center'
                             } : null;
                         })
                         .filter(conn => conn !== null);
@@ -1197,7 +1207,8 @@
                             const sourceNode = nodes.find(n => n.id === conn.from);
                             return sourceNode ? {
                                 direction: 'from',
-                                node_id: sourceNode.uniqueId
+                                node_id: sourceNode.uniqueId,
+                                connect_point: conn.toDirection || 'center'
                             } : null;
                         })
                         .filter(conn => conn !== null);
@@ -1385,6 +1396,205 @@
             return duplicates;
         }
 
+        // TSVパース関数（バックスラッシュエスケープに対応）
+        function parseTsv(text) {
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            
+            return lines.map(line => {
+                const fields = [];
+                let currentField = '';
+                let i = 0;
+                
+                while (i < line.length) {
+                    const char = line[i];
+                    
+                    if (char === '\\' && i + 1 < line.length) {
+                        // エスケープシーケンス処理
+                        const nextChar = line[i + 1];
+                        if (nextChar === '\\') {
+                            currentField += '\\';
+                        } else if (nextChar === 't') {
+                            currentField += '\t';
+                        } else if (nextChar === 'n') {
+                            currentField += '\n';
+                        } else if (nextChar === 'r') {
+                            currentField += '\r';
+                        } else {
+                            currentField += nextChar;
+                        }
+                        i += 2;
+                    } else if (char === '\t') {
+                        // タブでフィールド区切り
+                        fields.push(currentField);
+                        currentField = '';
+                        i++;
+                    } else {
+                        currentField += char;
+                        i++;
+                    }
+                }
+                
+                // 最後のフィールドを追加
+                fields.push(currentField);
+                
+                return fields;
+            });
+        }
+
+        // インポート関数
+        function importFromFile(file) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const fileName = file.name.toLowerCase();
+                
+                try {
+                    let importData;
+                    
+                    if (fileName.endsWith('.json')) {
+                        // JSON形式のインポート
+                        const jsonData = JSON.parse(content);
+                        importData = jsonData.nodes || [];
+                    } else if (fileName.endsWith('.tsv')) {
+                        // TSV形式のインポート
+                        const tsvLines = parseTsv(content);
+                        const headers = tsvLines[0];
+                        importData = tsvLines.slice(1).map(row => {
+                            const obj = {};
+                            headers.forEach((header, index) => {
+                                obj[header] = row[index] || '';
+                            });
+                            return obj;
+                        });
+                    } else {
+                        alert('サポートされていないファイル形式です。TSVまたはJSONファイルを選択してください。');
+                        return;
+                    }
+                    
+                    // 既存のノードと接続をクリア
+                    nodes.forEach(n => n.element.remove());
+                    nodes = [];
+                    connections = [];
+                    nodeIdCounter = 0;
+                    
+                    // uniqueIdからnodeIdへのマッピング
+                    const uniqueIdToNodeId = new Map();
+                    
+                    // ノードを再作成
+                    importData.forEach(nodeInfo => {
+                        const x = parseFloat(nodeInfo.x_position) || Math.random() * 600 + 100;
+                        const y = parseFloat(nodeInfo.y_position) || Math.random() * 400 + 100;
+                        const content = nodeInfo.markdown_content || '';
+                        
+                        const newNode = createNode(x, y, content);
+                        
+                        // ノードデータを復元
+                        newNode.uniqueId = nodeInfo.unique_id;
+                        newNode.testCaseId = nodeInfo.test_case_id;
+                        newNode.testType = nodeInfo.test_type || '正常系';
+                        newNode.status = nodeInfo.status || '起票';
+                        newNode.width = parseFloat(nodeInfo.width) || null;
+                        newNode.height = parseFloat(nodeInfo.height) || null;
+                        
+                        // サイズを設定
+                        if (newNode.width) {
+                            newNode.element.style.width = newNode.width + 'px';
+                        }
+                        if (newNode.height) {
+                            newNode.element.style.height = newNode.height + 'px';
+                        }
+                        
+                        // UIを更新
+                        const nodeIdInput = newNode.element.querySelector('.node-id');
+                        nodeIdInput.textContent = newNode.testCaseId;
+                        
+                        const testTypeSelect = newNode.element.querySelector('.test-type');
+                        testTypeSelect.value = newNode.testType;
+                        testTypeSelect.className = `test-type type-${newNode.testType}`;
+                        
+                        const statusSelect = newNode.element.querySelector('.node-status');
+                        statusSelect.value = newNode.status;
+                        statusSelect.className = `node-status status-${newNode.status}`;
+                        updateNodeAppearance(newNode);
+                        
+                        // マッピングを保存
+                        uniqueIdToNodeId.set(nodeInfo.unique_id, newNode.id);
+                    });
+                    
+                    // 接続を再作成
+                    importData.forEach(nodeInfo => {
+                        const fromNodeId = uniqueIdToNodeId.get(nodeInfo.unique_id);
+                        if (fromNodeId === undefined || fromNodeId === null) return;
+                        
+                        let connectionsList;
+                        try {
+                            // 文字列の場合はJSONパース、既にオブジェクトの場合はそのまま使用
+                            connectionsList = typeof nodeInfo.connected_node_ids === 'string' 
+                                ? JSON.parse(nodeInfo.connected_node_ids) 
+                                : nodeInfo.connected_node_ids;
+                        } catch (e) {
+                            console.error('Failed to parse connected_node_ids:', e);
+                            connectionsList = [];
+                        }
+                        
+                        if (Array.isArray(connectionsList)) {
+                            connectionsList.forEach(conn => {
+                                if (conn.direction === 'to') {
+                                    // このノードから相手ノードへの接続
+                                    const toNodeId = uniqueIdToNodeId.get(conn.node_id);
+                                    if (toNodeId !== undefined && toNodeId !== null) {
+                                        // directionが'to'の場合、connect_pointはfromDirection（このノードの接続点）
+                                        // 接続先の接続点は、相手ノードのconnected_node_idsから取得する必要がある
+                                        
+                                        // 相手ノードのデータを探す
+                                        const targetNodeInfo = importData.find(n => n.unique_id === conn.node_id);
+                                        let toConnectPoint = 'center';
+                                        
+                                        if (targetNodeInfo) {
+                                            let targetConnectionsList;
+                                            try {
+                                                targetConnectionsList = typeof targetNodeInfo.connected_node_ids === 'string'
+                                                    ? JSON.parse(targetNodeInfo.connected_node_ids)
+                                                    : targetNodeInfo.connected_node_ids;
+                                            } catch (e) {
+                                                targetConnectionsList = [];
+                                            }
+                                            
+                                            if (Array.isArray(targetConnectionsList)) {
+                                                // 相手ノードのconnected_node_idsから、このノードへの'from'接続を探す
+                                                const reverseConn = targetConnectionsList.find(
+                                                    c => c.direction === 'from' && c.node_id === nodeInfo.unique_id
+                                                );
+                                                if (reverseConn) {
+                                                    toConnectPoint = reverseConn.connect_point || 'center';
+                                                }
+                                            }
+                                        }
+                                        
+                                        createConnection(
+                                            fromNodeId, 
+                                            toNodeId,
+                                            conn.connect_point || 'center',
+                                            toConnectPoint
+                                        );
+                                    }
+                                }
+                            });
+                        }
+                    });
+                    
+                    alert('インポートが完了しました。');
+                    
+                } catch (error) {
+                    console.error('Import error:', error);
+                    alert('ファイルの読み込みに失敗しました。ファイル形式を確認してください。\nエラー: ' + error.message);
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+
         // 接続更新
         function updateConnections() {
             svg.innerHTML = '<defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><polygon points="0 0, 10 3, 0 6" fill="white" /></marker></defs>';
@@ -1465,6 +1675,19 @@
             createNode(Math.random() * 600 + 100, Math.random() * 400 + 100);
         });
 
+        importBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                importFromFile(file);
+            }
+            // ファイル入力をリセット（同じファイルを再度選択できるように）
+            fileInput.value = '';
+        });
+
         exportBtn.addEventListener('click', (e) => {
             const rect = exportBtn.getBoundingClientRect();
             exportMenu.style.left = rect.left + 'px';
@@ -1472,8 +1695,8 @@
             exportMenu.classList.add('show');
         });
 
-        exportCsvBtn.addEventListener('click', () => {
-            exportToCsv();
+        exportTsvBtn.addEventListener('click', () => {
+            exportToTsv();
             exportMenu.classList.remove('show');
         });
 
