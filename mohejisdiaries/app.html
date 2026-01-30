@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>記事を読み込み中...</title>
-    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
     <style>
@@ -23,19 +22,43 @@
         }
 
         body {
-            font-family: 'Crimson Pro', serif;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
             background-color: var(--cream);
             color: var(--ink);
             line-height: 1.8;
             font-size: 18px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            width: 100%;
+            height: 300px;
+            background-color: #4169e1;
+        }
+
+        /* Main */
+        .site-main {
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Footer */
+        .site-footer {
+            width: 100%;
+            height: 50px;
+            background-color: #000000;
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 60px 24px;
             opacity: 0;
             animation: fadeIn 0.8s ease-out 0.2s forwards;
+            width: 100%;
         }
 
         @keyframes fadeIn {
@@ -52,19 +75,20 @@
         }
 
         .article-title {
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
             font-size: 42px;
             font-weight: 700;
             line-height: 1.2;
             margin-bottom: 24px;
             color: var(--ink);
             letter-spacing: -0.02em;
+            text-align: left;
         }
 
         .article-meta {
             display: flex;
             gap: 20px;
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
             font-size: 14px;
             color: var(--muted);
             flex-wrap: wrap;
@@ -86,6 +110,30 @@
         .content-section {
             margin-bottom: 60px;
             animation: slideUp 0.6s ease-out both;
+        }
+
+        /* PC版: レンガ状レイアウト */
+        @media (min-width: 769px) {
+            .content-section:nth-child(odd) {
+                width: 70%;
+                margin-left: auto;
+                margin-right: 0;
+            }
+
+            .content-section:nth-child(even) {
+                width: 70%;
+                margin-left: 0;
+                margin-right: auto;
+            }
+        }
+
+        /* スマホ版: 中央配置 */
+        @media (max-width: 768px) {
+            .content-section {
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
         }
 
         .content-section:nth-child(2) {
@@ -112,13 +160,14 @@
         }
 
         .section-headline {
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
             font-size: 28px;
             font-weight: 600;
             margin-bottom: 20px;
             color: var(--ink);
             position: relative;
             padding-left: 20px;
+            text-align: left;
         }
 
         .section-headline::before {
@@ -133,6 +182,7 @@
 
         .section-body {
             line-height: 1.9;
+            text-align: left;
         }
 
         .section-body p {
@@ -143,7 +193,7 @@
         .section-body h2,
         .section-body h3,
         .section-body h4 {
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
             margin-top: 1.5em;
             margin-bottom: 0.5em;
             font-weight: 600;
@@ -179,15 +229,6 @@
             font-size: 14px;
         }
 
-        .section-body img {
-            max-width: 100%;
-            height: auto;
-            margin: 2em 0;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            display: block;
-        }
-
         .section-body ul,
         .section-body ol {
             margin-left: 1.5em;
@@ -217,6 +258,30 @@
             border-bottom-color: var(--accent);
         }
 
+        /* 画像スタイル - .article-imageの後に配置 */
+        .article-image {
+            margin: 2em auto 2em auto;
+            text-align: center;
+        }
+
+        .article-image img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            display: block;
+            margin: 0 auto;
+            margin-bottom: 0;
+        }
+
+        .article-image figcaption {
+            margin-top: 12px;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+            font-size: 14px;
+            color: var(--muted);
+            font-style: italic;
+        }
+
         /* Tags Section */
         .article-footer {
             margin-top: 80px;
@@ -231,7 +296,7 @@
         }
 
         .tag {
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
             font-size: 13px;
             padding: 8px 16px;
             background: var(--ink);
@@ -252,7 +317,7 @@
         .loading {
             text-align: center;
             padding: 100px 20px;
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
             color: var(--muted);
         }
 
@@ -271,7 +336,7 @@
             text-align: center;
             padding: 100px 20px;
             color: var(--accent);
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
         }
 
         /* Responsive */
@@ -291,9 +356,17 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <div id="article-content" class="loading">記事を読み込み中</div>
-    </div>
+    <header class="site-header">
+    </header>
+    
+    <main class="site-main">
+        <div class="container">
+            <div id="article-content" class="loading">記事を読み込み中</div>
+        </div>
+    </main>
+    
+    <footer class="site-footer">
+    </footer>
 
     <script>
         // URLパラメータから記事IDを取得
@@ -389,40 +462,23 @@
             return mimeTypes[ext] || 'image/png';
         }
 
-        // Markdownをレンダリング(画像URLを処理)
+        // Markdownをレンダリング(画像は直接URLを使用)
         async function renderMarkdown(markdown) {
-            // 画像のURLを抽出
-            const imageRegex = /!\[([^\]]*)\]\((https:\/\/api\.github\.com\/repos\/[^\)]+)\)/g;
-            const images = [];
-            let match;
+            // marked.jsのレンダラーをカスタマイズ
+            const renderer = new marked.Renderer();
             
-            while ((match = imageRegex.exec(markdown)) !== null) {
-                images.push({
-                    fullMatch: match[0],
-                    alt: match[1],
-                    url: match[2]
-                });
-            }
-
-            // 画像を並列取得
-            const imagePromises = images.map(async (img) => {
-                const base64Url = await fetchGitHubImage(img.url);
-                return {
-                    original: img.fullMatch,
-                    replacement: `![${img.alt}](${base64Url})`
-                };
-            });
-
-            const processedImages = await Promise.all(imagePromises);
-
-            // Markdownの画像URLを置換
-            let processedMarkdown = markdown;
-            processedImages.forEach(img => {
-                processedMarkdown = processedMarkdown.replace(img.original, img.replacement);
-            });
-
+            // 画像レンダリングをカスタマイズ
+            renderer.image = function(href, title, text) {
+                return `
+                    <figure class="article-image">
+                        <img src="${href}" alt="${text || ''}" />
+                        ${text ? `<figcaption>${text}</figcaption>` : ''}
+                    </figure>
+                `;
+            };
+            
             // MarkedでHTMLに変換
-            return marked.parse(processedMarkdown);
+            return marked.parse(markdown, { renderer: renderer });
         }
 
         // 日付をフォーマット
