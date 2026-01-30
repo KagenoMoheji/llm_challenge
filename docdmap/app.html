@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>テスト仕様書エディター</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -128,6 +128,19 @@
             background: rgba(102, 126, 234, 0.2);
         }
 
+        /* タッチデバイス用にリサイズハンドルを大きく */
+        @media (pointer: coarse) {
+            .resize-handle.top,
+            .resize-handle.bottom {
+                height: 16px;
+            }
+            
+            .resize-handle.left,
+            .resize-handle.right {
+                width: 16px;
+            }
+        }
+
         /* コネクター */
         .connector {
             position: absolute;
@@ -165,6 +178,36 @@
             }
             50% {
                 transform: scale(1.3);
+            }
+        }
+
+        /* タッチデバイス用にコネクターを大きく */
+        @media (pointer: coarse) {
+            .connector {
+                width: 20px;
+                height: 20px;
+            }
+            
+            .connector:hover,
+            .connector:active {
+                width: 24px;
+                height: 24px;
+            }
+            
+            .connector.top {
+                top: -10px;
+            }
+            
+            .connector.bottom {
+                bottom: -10px;
+            }
+            
+            .connector.left {
+                left: -10px;
+            }
+            
+            .connector.right {
+                right: -10px;
             }
         }
 
@@ -544,6 +587,41 @@
             color: #667eea;
         }
 
+        /* モバイル対応 */
+        @media (max-width: 768px) {
+            .toolbar {
+                top: 10px;
+                left: 10px;
+                padding: 10px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+            
+            .toolbar button {
+                padding: 8px 12px;
+                font-size: 12px;
+                margin-right: 0;
+            }
+            
+            .info {
+                bottom: 10px;
+                right: 10px;
+                font-size: 11px;
+                max-width: 200px;
+                padding: 10px;
+            }
+            
+            .info h3 {
+                font-size: 12px;
+            }
+            
+            .info li {
+                font-size: 10px;
+                margin-bottom: 3px;
+            }
+        }
+
         .connection {
             stroke: white;
             stroke-width: 2;
@@ -722,6 +800,10 @@
         let selectedConnection = null;
         let selectedNode = null;
         let connectingFrom = null;
+        
+        // タッチ操作用の変数
+        let touchStartTime = 0;
+        let touchMoved = false;
 
         // UUID生成関数
         function generateUUID() {
@@ -956,7 +1038,7 @@
                 updateAllStatusOptions();
             });
 
-            // ドラッグ開始
+            // ドラッグ開始（マウス）
             node.addEventListener('mousedown', (e) => {
                 if (e.target.tagName === 'BUTTON' || 
                     e.target.tagName === 'TEXTAREA' || 
@@ -970,6 +1052,53 @@
                 dragOffset.x = e.clientX - nodeData.x;
                 dragOffset.y = e.clientY - nodeData.y;
                 e.stopPropagation();
+            });
+
+            // タッチ開始
+            node.addEventListener('touchstart', (e) => {
+                if (e.target.tagName === 'BUTTON' || 
+                    e.target.tagName === 'TEXTAREA' || 
+                    e.target.tagName === 'SELECT' || 
+                    e.target.classList.contains('node-id') ||
+                    e.target.classList.contains('connector') ||
+                    e.target.classList.contains('resize-handle')) return;
+                
+                const touch = e.touches[0];
+                touchStartTime = Date.now();
+                touchMoved = false;
+                isDragging = true;
+                node.classList.add('dragging');
+                dragOffset.x = touch.clientX - nodeData.x;
+                dragOffset.y = touch.clientY - nodeData.y;
+                e.stopPropagation();
+            }, { passive: false });
+
+            // タッチ移動
+            node.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    touchMoved = true;
+                    const touch = e.touches[0];
+                    nodeData.x = touch.clientX - dragOffset.x;
+                    nodeData.y = touch.clientY - dragOffset.y;
+                    node.style.left = nodeData.x + 'px';
+                    node.style.top = nodeData.y + 'px';
+                    updateConnections();
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            // タッチ終了
+            node.addEventListener('touchend', (e) => {
+                if (isDragging) {
+                    isDragging = false;
+                    node.classList.remove('dragging');
+                    
+                    // ダブルタップ判定（編集モード用）
+                    const touchDuration = Date.now() - touchStartTime;
+                    if (!touchMoved && touchDuration < 300) {
+                        // シングルタップの処理はここには書かない
+                    }
+                }
             });
 
             // マークダウン部分のダブルクリックで編集モードに
@@ -1024,6 +1153,7 @@
                 let startX = 0;
                 let startY = 0;
 
+                // マウスダウン
                 handle.addEventListener('mousedown', (e) => {
                     e.stopPropagation();
                     isResizing = true;
@@ -1081,6 +1211,66 @@
 
                     document.addEventListener('mousemove', handleMouseMove);
                     document.addEventListener('mouseup', handleMouseUp);
+                });
+
+                // タッチ開始
+                handle.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                    const touch = e.touches[0];
+                    isResizing = true;
+                    resizeStartX = touch.clientX;
+                    resizeStartY = touch.clientY;
+                    startWidth = node.offsetWidth;
+                    startHeight = node.offsetHeight;
+                    startX = nodeData.x;
+                    startY = nodeData.y;
+                    node.classList.add('resizing');
+                }, { passive: false });
+
+                // タッチ移動
+                handle.addEventListener('touchmove', (e) => {
+                    if (!isResizing) return;
+                    
+                    const touch = e.touches[0];
+                    const deltaX = touch.clientX - resizeStartX;
+                    const deltaY = touch.clientY - resizeStartY;
+
+                    if (handle.classList.contains('right')) {
+                        const newWidth = Math.max(200, startWidth + deltaX);
+                        node.style.width = newWidth + 'px';
+                        nodeData.width = newWidth;
+                    } else if (handle.classList.contains('left')) {
+                        const newWidth = Math.max(200, startWidth - deltaX);
+                        if (newWidth > 200) {
+                            node.style.width = newWidth + 'px';
+                            nodeData.width = newWidth;
+                            nodeData.x = startX + deltaX;
+                            node.style.left = nodeData.x + 'px';
+                        }
+                    } else if (handle.classList.contains('bottom')) {
+                        const newHeight = Math.max(100, startHeight + deltaY);
+                        node.style.height = newHeight + 'px';
+                        nodeData.height = newHeight;
+                    } else if (handle.classList.contains('top')) {
+                        const newHeight = Math.max(100, startHeight - deltaY);
+                        if (newHeight > 100) {
+                            node.style.height = newHeight + 'px';
+                            nodeData.height = newHeight;
+                            nodeData.y = startY + deltaY;
+                            node.style.top = nodeData.y + 'px';
+                        }
+                    }
+
+                    updateConnections();
+                    e.preventDefault();
+                }, { passive: false });
+
+                // タッチ終了
+                handle.addEventListener('touchend', () => {
+                    if (isResizing) {
+                        isResizing = false;
+                        node.classList.remove('resizing');
+                    }
                 });
             });
 
@@ -1869,7 +2059,7 @@
             exportMenu.classList.remove('show');
         });
 
-        // キャンバスドラッグ
+        // キャンバスドラッグ（マウス）
         canvas.addEventListener('mousedown', (e) => {
             if (e.target === canvas || e.target === svg) {
                 isDraggingCanvas = true;
@@ -1879,6 +2069,18 @@
             }
         });
 
+        // キャンバスタッチ開始
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.target === canvas || e.target === svg) {
+                const touch = e.touches[0];
+                isDraggingCanvas = true;
+                canvas.classList.add('grabbing');
+                dragStart.x = touch.clientX;
+                dragStart.y = touch.clientY;
+            }
+        }, { passive: true });
+
+        // マウス移動
         document.addEventListener('mousemove', (e) => {
             if (isDraggingCanvas) {
                 const dx = e.clientX - dragStart.x;
@@ -1897,7 +2099,35 @@
             }
         });
 
+        // タッチ移動
+        document.addEventListener('touchmove', (e) => {
+            if (isDraggingCanvas) {
+                const touch = e.touches[0];
+                const dx = touch.clientX - dragStart.x;
+                const dy = touch.clientY - dragStart.y;
+                
+                nodes.forEach(nodeData => {
+                    nodeData.x += dx;
+                    nodeData.y += dy;
+                    nodeData.element.style.left = nodeData.x + 'px';
+                    nodeData.element.style.top = nodeData.y + 'px';
+                });
+                
+                updateConnections();
+                dragStart.x = touch.clientX;
+                dragStart.y = touch.clientY;
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // マウスアップ
         document.addEventListener('mouseup', () => {
+            isDraggingCanvas = false;
+            canvas.classList.remove('grabbing');
+        });
+
+        // タッチ終了
+        document.addEventListener('touchend', () => {
             isDraggingCanvas = false;
             canvas.classList.remove('grabbing');
         });
