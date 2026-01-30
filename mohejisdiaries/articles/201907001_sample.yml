@@ -28,11 +28,11 @@ content:
       import matplotlib.font_manager as plf
       ```
       出力結果は図1のようになります。
-      ![図1](https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/media/201907001_sample.png)
+      ![図1](https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/201907001_sample.png)
 
       このように，matplotlibの基本の書き方の部分多めに，シンプルかつ柔軟に実装できました．
       ほかに図2のような出力も出せます。
-      ![図2](https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/media/{記事ID}_{メディアファイル名}.{png|jpg|gif})
+      ![図2](https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/{記事ID}_{メディアファイル名}.{png|jpg|gif})
   - headline: まとめ
     body: |
       ガントチャートをサブプロットにして別のグラフと合わせる機会は少ないんでしょうか？
