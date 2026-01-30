@@ -23,6 +23,8 @@
             height: 100vh;
             position: relative;
             cursor: grab;
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
         }
 
         #canvas.grabbing {
@@ -561,12 +563,58 @@
             font-size: 12px;
             color: #333;
             max-width: 300px;
+            transition: all 0.3s ease;
+        }
+
+        .info.minimized {
+            width: 50px;
+            height: 50px;
+            padding: 10px;
+            max-width: 50px;
+            cursor: pointer;
+        }
+
+        .info.minimized .info-content {
+            display: none;
+        }
+
+        .info.minimized .minimize-btn {
+            transform: rotate(180deg);
+        }
+
+        .info-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
         }
 
         .info h3 {
-            margin-bottom: 8px;
+            margin: 0;
             color: #667eea;
             font-size: 14px;
+            flex: 1;
+        }
+
+        .minimize-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .minimize-btn:hover {
+            background: #5568d3;
         }
 
         .info ul {
@@ -612,6 +660,13 @@
                 padding: 10px;
             }
             
+            .info.minimized {
+                width: 40px;
+                height: 40px;
+                padding: 8px;
+                max-width: 40px;
+            }
+            
             .info h3 {
                 font-size: 12px;
             }
@@ -619,6 +674,12 @@
             .info li {
                 font-size: 10px;
                 margin-bottom: 3px;
+            }
+            
+            .minimize-btn {
+                width: 20px;
+                height: 20px;
+                font-size: 14px;
             }
         }
 
@@ -743,21 +804,27 @@
     
     <input type="file" id="fileInput" accept=".tsv,.json" style="display: none;">
 
-    <div class="info">
-        <h3>📝 操作方法</h3>
-        <ul>
-            <li>ノードをドラッグして移動</li>
-            <li>ノードの4辺をドラッグでリサイズ</li>
-            <li>テストケースIDをクリックして編集</li>
-            <li>種別で正常系/異常系を選択</li>
-            <li>ステータスでノードの見た目が変化</li>
-            <li>マークダウン部分をダブルクリックで編集</li>
-            <li>編集中は外側クリックで自動保存</li>
-            <li>ノードの4方向の点をクリックして接続</li>
-            <li>ノードを右クリックで削除</li>
-            <li>接続線を右クリックで削除</li>
-            <li>背景をドラッグして全体移動</li>
-        </ul>
+    <div class="info" id="infoBox">
+        <div class="info-header">
+            <h3>📝 操作方法</h3>
+            <button class="minimize-btn" id="minimizeBtn">−</button>
+        </div>
+        <div class="info-content">
+            <ul>
+                <li>ノードをドラッグして移動</li>
+                <li>ノードの4辺をドラッグでリサイズ</li>
+                <li>テストケースIDをクリックして編集</li>
+                <li>種別で正常系/異常系を選択</li>
+                <li>ステータスでノードの見た目が変化</li>
+                <li>マークダウン部分をダブルクリックで編集</li>
+                <li>編集中は外側クリックで自動保存</li>
+                <li>ノードの4方向の点をクリックして接続</li>
+                <li>ノードを右クリックで削除</li>
+                <li>接続線を右クリックで削除</li>
+                <li>背景をドラッグして全体移動</li>
+                <li>2本指でピンチズーム</li>
+            </ul>
+        </div>
     </div>
 
     <div id="canvas">
@@ -791,6 +858,8 @@
         const exportTsvBtn = document.getElementById('exportTsvBtn');
         const exportJsonBtn = document.getElementById('exportJsonBtn');
         const exportSvgBtn = document.getElementById('exportSvgBtn');
+        const infoBox = document.getElementById('infoBox');
+        const minimizeBtn = document.getElementById('minimizeBtn');
 
         let nodes = [];
         let connections = [];
@@ -804,6 +873,10 @@
         // タッチ操作用の変数
         let touchStartTime = 0;
         let touchMoved = false;
+        
+        // ズーム用の変数
+        let currentScale = 1;
+        let lastTouchDistance = 0;
 
         // UUID生成関数
         function generateUUID() {
@@ -2048,6 +2121,25 @@
             }
         });
 
+        // 最小化ボタンのイベント
+        minimizeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            infoBox.classList.toggle('minimized');
+            if (infoBox.classList.contains('minimized')) {
+                minimizeBtn.textContent = '+';
+            } else {
+                minimizeBtn.textContent = '−';
+            }
+        });
+
+        // 最小化されたインフォボックスをクリックで展開
+        infoBox.addEventListener('click', () => {
+            if (infoBox.classList.contains('minimized')) {
+                infoBox.classList.remove('minimized');
+                minimizeBtn.textContent = '−';
+            }
+        });
+
         // 右クリックメニューが表示されている時にスクロールやリサイズで閉じる
         window.addEventListener('scroll', () => {
             contextMenu.classList.remove('show');
@@ -2071,7 +2163,16 @@
 
         // キャンバスタッチ開始
         canvas.addEventListener('touchstart', (e) => {
-            if (e.target === canvas || e.target === svg) {
+            if (e.touches.length === 2) {
+                // 2本指でのタッチ開始 - ピンチズーム
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                lastTouchDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+            } else if (e.touches.length === 1 && (e.target === canvas || e.target === svg)) {
+                // 1本指でのタッチ - キャンバス移動
                 const touch = e.touches[0];
                 isDraggingCanvas = true;
                 canvas.classList.add('grabbing');
@@ -2101,7 +2202,30 @@
 
         // タッチ移動
         document.addEventListener('touchmove', (e) => {
-            if (isDraggingCanvas) {
+            if (e.touches.length === 2) {
+                // 2本指でのピンチズーム
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const currentDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+                
+                if (lastTouchDistance > 0) {
+                    const scale = currentDistance / lastTouchDistance;
+                    currentScale *= scale;
+                    
+                    // スケールの制限（0.5倍〜3倍）
+                    currentScale = Math.max(0.5, Math.min(3, currentScale));
+                    
+                    // キャンバスにスケールを適用
+                    canvas.style.transform = `scale(${currentScale})`;
+                }
+                
+                lastTouchDistance = currentDistance;
+                e.preventDefault();
+            } else if (isDraggingCanvas && e.touches.length === 1) {
+                // 1本指でのキャンバス移動
                 const touch = e.touches[0];
                 const dx = touch.clientX - dragStart.x;
                 const dy = touch.clientY - dragStart.y;
@@ -2127,9 +2251,14 @@
         });
 
         // タッチ終了
-        document.addEventListener('touchend', () => {
-            isDraggingCanvas = false;
-            canvas.classList.remove('grabbing');
+        document.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) {
+                lastTouchDistance = 0;
+            }
+            if (e.touches.length === 0) {
+                isDraggingCanvas = false;
+                canvas.classList.remove('grabbing');
+            }
         });
 
         // 初期ノード作成（デモ用）
