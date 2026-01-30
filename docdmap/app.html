@@ -218,6 +218,11 @@
             border-width: 3px;
         }
 
+        .node.status-条件付OK {
+            border-color: #f39c12;
+            border-width: 3px;
+        }
+
         .node.status-NG {
             border-color: #e74c3c;
             border-width: 3px;
@@ -348,6 +353,11 @@
             color: #2ecc71;
         }
 
+        .node-status.status-条件付OK {
+            border-color: #f39c12;
+            color: #f39c12;
+        }
+
         .node-status.status-NG {
             border-color: #e74c3c;
             color: #e74c3c;
@@ -361,6 +371,10 @@
         .node-status.status-保留 {
             border-color: #95a5a6;
             color: #95a5a6;
+        }
+
+        .node-status option:disabled {
+            color: #ccc;
         }
 
         .node-controls {
@@ -755,6 +769,7 @@
                         <select class="node-status status-起票">
                             <option value="起票">起票</option>
                             <option value="OK">OK</option>
+                            <option value="条件付OK">条件付OK</option>
                             <option value="NG">NG</option>
                             <option value="却下">却下</option>
                             <option value="保留">保留</option>
@@ -804,6 +819,9 @@
 
             // イベントリスナー
             setupNodeEvents(nodeData);
+            
+            // ステータスオプションを更新
+            updateStatusOptions(nodeData);
 
             return nodeData;
         }
@@ -819,8 +837,77 @@
             const node = nodeData.element;
             
             // ステータスによるノードクラスの更新
-            node.classList.remove('status-起票', 'status-OK', 'status-NG', 'status-却下', 'status-保留');
+            node.classList.remove('status-起票', 'status-OK', 'status-条件付OK', 'status-NG', 'status-却下', 'status-保留');
             node.classList.add(`status-${nodeData.status}`);
+        }
+
+        // 先行ノードのステータスをチェック
+        function checkPredecessorStatus(nodeData) {
+            // このノードに接続している先行ノード（fromノード）を取得
+            const predecessorConnections = connections.filter(conn => conn.to === nodeData.id);
+            
+            if (predecessorConnections.length === 0) {
+                // 先行ノードがない場合は制約なし
+                return true;
+            }
+            
+            // すべての先行ノードがOK/条件付OK/却下/保留のいずれかかチェック
+            const allPredecessorsOk = predecessorConnections.every(conn => {
+                const predecessorNode = nodes.find(n => n.id === conn.from);
+                return predecessorNode && (
+                    predecessorNode.status === 'OK' || 
+                    predecessorNode.status === '条件付OK' ||
+                    predecessorNode.status === '却下' ||
+                    predecessorNode.status === '保留'
+                );
+            });
+            
+            return allPredecessorsOk;
+        }
+
+        // ステータスのオプションを更新（制約に基づいて無効化）
+        function updateStatusOptions(nodeData) {
+            const statusSelect = nodeData.element.querySelector('.node-status');
+            const canSetTestResult = checkPredecessorStatus(nodeData);
+            
+            // オプションを取得
+            const options = statusSelect.querySelectorAll('option');
+            
+            options.forEach(option => {
+                const value = option.value;
+                
+                if (value === 'OK' || value === '条件付OK' || value === 'NG') {
+                    if (!canSetTestResult) {
+                        option.disabled = true;
+                        // 鍵アイコンを追加
+                        if (!option.textContent.startsWith('🔒 ')) {
+                            option.textContent = '🔒 ' + option.value;
+                        }
+                    } else {
+                        option.disabled = false;
+                        // 鍵アイコンを削除
+                        option.textContent = option.value;
+                    }
+                } else {
+                    option.disabled = false;
+                    option.textContent = option.value;
+                }
+            });
+            
+            // 現在のステータスが無効化された場合、起票に戻す
+            if (!canSetTestResult && (nodeData.status === 'OK' || nodeData.status === '条件付OK' || nodeData.status === 'NG')) {
+                nodeData.status = '起票';
+                statusSelect.value = '起票';
+                statusSelect.className = 'node-status status-起票';
+                updateNodeAppearance(nodeData);
+            }
+        }
+
+        // すべてのノードのステータスオプションを更新
+        function updateAllStatusOptions() {
+            nodes.forEach(node => {
+                updateStatusOptions(node);
+            });
         }
 
         // ノードイベント設定
@@ -852,9 +939,21 @@
             // ステータス変更
             const statusSelect = node.querySelector('.node-status');
             statusSelect.addEventListener('change', (e) => {
-                nodeData.status = e.target.value;
-                statusSelect.className = `node-status status-${e.target.value}`;
+                const newStatus = e.target.value;
+                
+                // 制約チェック
+                if ((newStatus === 'OK' || newStatus === '条件付OK' || newStatus === 'NG') && !checkPredecessorStatus(nodeData)) {
+                    alert('先行のテストケースがOK/条件付OK/却下/保留のいずれかになっていないため、このステータスは選択できません。');
+                    e.target.value = nodeData.status;
+                    return;
+                }
+                
+                nodeData.status = newStatus;
+                statusSelect.className = `node-status status-${newStatus}`;
                 updateNodeAppearance(nodeData);
+                
+                // このノードのステータスが変更されたら、後続ノードのステータスオプションを更新
+                updateAllStatusOptions();
             });
 
             // ドラッグ開始
@@ -1045,6 +1144,9 @@
                 toDirection: toDirection || 'center'
             });
             updateConnections();
+            
+            // 接続が作成されたら、すべてのノードのステータスオプションを更新
+            updateAllStatusOptions();
         }
 
         // コネクタークリック処理
@@ -1584,6 +1686,9 @@
                         }
                     });
                     
+                    // すべてのノードのステータスオプションを更新
+                    updateAllStatusOptions();
+                    
                     alert('インポートが完了しました。');
                     
                 } catch (error) {
@@ -1737,6 +1842,9 @@
                 updateConnections();
                 contextMenu.classList.remove('show');
                 selectedConnection = null;
+                
+                // 接続が削除されたら、すべてのノードのステータスオプションを更新
+                updateAllStatusOptions();
             }
         });
 
