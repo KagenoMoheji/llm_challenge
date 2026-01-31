@@ -32,6 +32,12 @@
             flex-direction: column;
         }
 
+        /* メイン・フッターのみフォントを適用 */
+        .site-main,
+        .site-footer {
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+        }
+
         /* Header */
         .site-header {
             width: 100%;
@@ -41,6 +47,12 @@
             background-size: contain;
             background-position: center;
             background-repeat: no-repeat;
+            font-family: initial; /* システムデフォルトに戻す */
+        }
+
+        /* SVG内のフォントが継承されないようにする */
+        .site-header * {
+            font-family: inherit !important;
         }
 
         /* ヘッダーのレスポンシブ対応 */
@@ -569,7 +581,6 @@
                     return line;
                 })
                 .join('\n');
-            console.log(processedMarkdown)
 
             // marked.jsのレンダラーをカスタマイズ
             const renderer = new marked.Renderer();
