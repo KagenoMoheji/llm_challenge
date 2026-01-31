@@ -32,12 +32,6 @@
             flex-direction: column;
         }
 
-        /* メイン・フッターのみフォントを適用 */
-        .site-main,
-        .site-footer {
-            font-family: 'Meiryo', 'メイリオ', sans-serif;
-        }
-
         /* Header */
         .site-header {
             width: 100%;
@@ -47,12 +41,6 @@
             background-size: contain;
             background-position: center;
             background-repeat: no-repeat;
-            font-family: initial; /* システムデフォルトに戻す */
-        }
-
-        /* SVG内のフォントが継承されないようにする */
-        .site-header * {
-            font-family: inherit !important;
         }
 
         /* ヘッダーのレスポンシブ対応 */
@@ -374,6 +362,14 @@
             cursor: pointer;
         }
 
+        /* エラー表示 */
+        .error {
+            text-align: center;
+            padding: 100px 20px;
+            color: var(--accent);
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+        }
+
         /* Tags Section */
         .article-footer {
             margin-top: 80px;
@@ -405,41 +401,6 @@
             transform: translateY(-2px);
         }
 
-        /* Loading State */
-        .loading {
-            text-align: center;
-            padding: 100px 20px;
-            font-family: 'Meiryo', 'メイリオ', sans-serif;
-            color: var(--muted);
-        }
-
-        .loading::after {
-            content: '...';
-            animation: dots 1.5s infinite;
-        }
-
-        @keyframes dots {
-            0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60%, 100% { content: '...'; }
-        }
-
-        /* ローディング完了後は非表示 */
-        .loaded {
-            display: block;
-        }
-
-        .loaded.loading {
-            display: none;
-        }
-
-        .error {
-            text-align: center;
-            padding: 100px 20px;
-            color: var(--accent);
-            font-family: 'Meiryo', 'メイリオ', sans-serif;
-        }
-
         /* Responsive */
         @media (max-width: 768px) {
             .article-title {
@@ -462,7 +423,7 @@
     
     <main class="site-main">
         <div class="container">
-            <div id="article-content" class="loading">記事を読み込み中</div>
+            <div id="main-content"></div>
         </div>
     </main>
     
@@ -475,7 +436,71 @@
     </div>
 
     <script>
-        // URLパラメータから記事IDを取得
+        // ルーティング処理
+        function getCurrentRoute() {
+            const path = window.location.pathname;
+            const match = path.match(/^\/articles\/(\d{6})\/(\d+)$/);
+            
+            if (match) {
+                return {
+                    type: 'article',
+                    yearMonth: match[1],
+                    number: match[2]
+                };
+            }
+            
+            return { type: 'top' };
+        }
+
+        // 記事IDを生成（採番を3桁0埋め）
+        function generateArticleId(yearMonth, number) {
+            const paddedNumber = String(number).padStart(3, '0');
+            return `${yearMonth}${paddedNumber}`;
+        }
+
+        // ページ遷移（リロードなし）
+        function navigateTo(path) {
+            window.history.pushState({}, '', path);
+            init();
+        }
+
+        // トップページをレンダリング
+        function renderTopPage() {
+            const mainContent = document.getElementById('main-content');
+            document.title = 'ブログトップ';
+            
+            mainContent.innerHTML = `
+                <div style="padding: 60px 24px;">
+                    <h1 style="font-size: 32px; margin-bottom: 40px;">記事一覧</h1>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin-bottom: 20px;">
+                            <span class="article-link" data-path="/articles/201907/1" style="font-size: 18px; color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); cursor: pointer;">
+                                /articles/201907/1
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            `;
+            
+            // リンクのクリックイベントを設定
+            const links = mainContent.querySelectorAll('.article-link');
+            links.forEach(link => {
+                link.addEventListener('click', function() {
+                    const path = this.getAttribute('data-path');
+                    navigateTo(path);
+                });
+                
+                // ホバー時の視覚効果を追加
+                link.addEventListener('mouseenter', function() {
+                    this.style.opacity = '0.7';
+                });
+                link.addEventListener('mouseleave', function() {
+                    this.style.opacity = '1';
+                });
+            });
+        }
+
+        // URLパラメータから記事IDを取得(旧実装・後方互換性のため残す)
         function getArticleIdFromUrl() {
             const params = new URLSearchParams(window.location.search);
             return params.get('id') || '201907001_sample'; // デフォルト値
@@ -617,10 +642,7 @@
 
         // 記事をレンダリング
         async function renderArticle(articleData) {
-            const contentDiv = document.getElementById('article-content');
-            
-            // ローディング表示を削除
-            contentDiv.className = 'loaded';
+            const mainContent = document.getElementById('main-content');
             
             // タイトルを更新
             document.title = articleData.title;
@@ -670,7 +692,7 @@
             }
 
             html += '</article>';
-            contentDiv.innerHTML = html;
+            mainContent.innerHTML = html;
             
             // 画像クリック時のモーダル表示イベントを追加
             setupImageModal();
@@ -711,27 +733,39 @@
 
         // エラー表示
         function showError(message) {
-            const contentDiv = document.getElementById('article-content');
-            contentDiv.className = 'error';
-            contentDiv.innerHTML = `
-                <h2>エラー</h2>
-                <p>${escapeHtml(message)}</p>
+            const mainContent = document.getElementById('main-content');
+            mainContent.innerHTML = `
+                <div class="error">
+                    <h2>エラー</h2>
+                    <p>${escapeHtml(message)}</p>
+                </div>
             `;
         }
 
         // 初期化
         async function init() {
-            try {
-                const articleId = getArticleIdFromUrl();
-                const articleData = await fetchArticleData(articleId);
-                await renderArticle(articleData);
-            } catch (error) {
-                showError(error.message);
+            const route = getCurrentRoute();
+            
+            if (route.type === 'top') {
+                // トップページを表示
+                renderTopPage();
+            } else if (route.type === 'article') {
+                // 記事ページを表示
+                try {
+                    const articleId = generateArticleId(route.yearMonth, route.number);
+                    const articleData = await fetchArticleData(articleId);
+                    await renderArticle(articleData);
+                } catch (error) {
+                    showError(error.message);
+                }
             }
         }
 
         // ページ読み込み時に実行
         window.addEventListener('DOMContentLoaded', init);
+
+        // ブラウザの戻る/進むボタンに対応
+        window.addEventListener('popstate', init);
     </script>
 </body>
 </html>
