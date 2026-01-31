@@ -36,6 +36,9 @@ content:
       ![図1](https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/201907001_sample.png)
 
       このように，matplotlibの基本の書き方の部分多めに，シンプルかつ柔軟に実装できました．
+      ```
+      下に空行無しパターン
+      ```
       ほかに図2のような出力も出せます。
       ![図2](https://avatars.githubusercontent.com/u/37401955?v=4)
   - headline: まとめ
