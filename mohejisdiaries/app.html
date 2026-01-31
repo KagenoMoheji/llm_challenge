@@ -36,7 +36,24 @@
         .site-header {
             width: 100%;
             height: 300px;
-            background-color: #4169e1;
+            background-color: #ffffff;
+            background-image: url('https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/header.svg');
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        /* ヘッダーのレスポンシブ対応 */
+        @media (max-width: 1000px) {
+            .site-header {
+                height: 30vw; /* 幅に応じて高さを調整 */
+            }
+        }
+
+        @media (min-width: 1001px) {
+            .site-header {
+                background-size: auto 300px; /* 高さを300pxに固定 */
+            }
         }
 
         /* Main */
@@ -48,7 +65,7 @@
         /* Footer */
         .site-footer {
             width: 100%;
-            height: 50px;
+            height: 80px;
             background-color: #000000;
         }
 
@@ -217,7 +234,7 @@
         }
 
         .section-body p {
-            margin-bottom: 1.2em;
+            margin-bottom: 0;
         }
 
         .section-body h1,
@@ -249,7 +266,7 @@
             padding: 20px;
             border-radius: 8px;
             overflow-x: auto;
-            margin: 1.5em 0;
+            margin: 0 0;
             line-height: 1.6;
         }
 
@@ -263,11 +280,11 @@
         .section-body ul,
         .section-body ol {
             margin-left: 1.5em;
-            margin-bottom: 1em;
+            margin-bottom: 0;
         }
 
         .section-body li {
-            margin-bottom: 0.5em;
+            margin-bottom: 0;
         }
 
         .section-body blockquote {
@@ -291,7 +308,7 @@
 
         /* 画像スタイル - .article-imageの後に配置 */
         .article-image {
-            margin: 2em auto 2em auto;
+            margin: 0 auto;
             text-align: center;
         }
 
@@ -541,6 +558,19 @@
 
         // Markdownをレンダリング(画像は直接URLを使用)
         async function renderMarkdown(markdown) {
+            // 空行またはスペース/タブのみの行を&&BR&&マーカーに変換
+            const markdownLines = markdown.split('\n');
+            const processedMarkdown = markdownLines
+                .map((line, i) => {
+                    // 空行またはスペース/タブのみの行をマーカーに置換
+                    if (line.trim() === '' && i < markdownLines.length - 1) {
+                        return '\n!!BR!!';
+                    }
+                    return line;
+                })
+                .join('\n');
+            console.log(processedMarkdown)
+
             // marked.jsのレンダラーをカスタマイズ
             const renderer = new marked.Renderer();
             
@@ -555,7 +585,13 @@
             };
             
             // MarkedでHTMLに変換
-            return marked.parse(markdown, { renderer: renderer });
+            let html = marked.parse(processedMarkdown, { renderer: renderer });
+            
+            // マーカーを<br>に変換
+            // html = html.replace(/&amp;&amp;BR&amp;&amp;/g, '<br>');
+            html = html.replace(/!!BR!!/g, '<br>');
+            
+            return html;
         }
 
         // 日付をフォーマット
