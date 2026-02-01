@@ -438,30 +438,59 @@
     <script>
         // ルーティング処理
         function getCurrentRoute() {
-            const path = window.location.pathname;
-            const match = path.match(/^\/articles\/(\d{6})\/(\d+)$/);
+            const params = new URLSearchParams(window.location.search);
+            const pathParam = params.get('path');
             
-            if (match) {
-                return {
-                    type: 'article',
-                    yearMonth: match[1],
-                    number: match[2]
-                };
+            // クエリストリングにpathパラメータがある場合
+            if (pathParam) {
+                // 記事ページの判定 /articles/{yyyy}/{採番}
+                const articleMatch = pathParam.match(/^\/articles\/(\d{4})\/(\d+)$/);
+                
+                if (articleMatch) {
+                    return {
+                        type: 'article',
+                        year: articleMatch[1],
+                        number: articleMatch[2]
+                    };
+                }
+                
+                // 404エラーページの判定
+                if (pathParam === '/errors/404') {
+                    return {
+                        type: '404'
+                    };
+                }
             }
             
+            // pathパラメータがない、または不正な場合はトップページ
             return { type: 'top' };
         }
 
-        // 記事IDを生成（採番を3桁0埋め）
-        function generateArticleId(yearMonth, number) {
+        // 記事IDを生成（採番を3桁0埋め）yyyyNNN形式
+        function generateArticleId(year, number) {
             const paddedNumber = String(number).padStart(3, '0');
-            return `${yearMonth}${paddedNumber}`;
+            return `${year}${paddedNumber}`;
         }
 
         // ページ遷移（リロードなし）
         function navigateTo(path) {
-            window.history.pushState({}, '', path);
+            const currentPath = window.location.pathname;
+            const newUrl = `${currentPath}?path=${encodeURIComponent(path)}`;
+            window.history.pushState({}, '', newUrl);
             init();
+        }
+
+        // 404エラーページをレンダリング
+        function render404Page() {
+            const mainContent = document.getElementById('main-content');
+            document.title = '404 Not Found';
+            
+            mainContent.innerHTML = `
+                <div style="padding: 100px 24px; text-align: center;">
+                    <h1 style="font-size: 48px; margin-bottom: 20px;">404</h1>
+                    <p style="font-size: 24px; color: var(--muted);">404やで(´・ω・｀)</p>
+                </div>
+            `;
         }
 
         // トップページをレンダリング
@@ -474,8 +503,8 @@
                     <h1 style="font-size: 32px; margin-bottom: 40px;">記事一覧</h1>
                     <ul style="list-style: none; padding: 0;">
                         <li style="margin-bottom: 20px;">
-                            <span class="article-link" data-path="/articles/201907/1" style="font-size: 18px; color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); cursor: pointer;">
-                                /articles/201907/1
+                            <span class="article-link" data-path="/articles/2019/1" style="font-size: 18px; color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); cursor: pointer;">
+                                /articles/2019/1
                             </span>
                         </li>
                     </ul>
@@ -518,8 +547,8 @@
                 
                 const files = await response.json();
                 
-                // 記事IDの先頭部分({yyyyMM}{NNN})を抽出
-                const idPrefix = articleId.match(/^(\d{6}\d{3})/);
+                // 記事IDの先頭部分(yyyyNNN)を抽出
+                const idPrefix = articleId.match(/^(\d{4}\d{3})/);
                 if (!idPrefix) {
                     throw new Error('記事IDの形式が正しくありません');
                 }
@@ -531,7 +560,8 @@
                 );
                 
                 if (!matchedFile) {
-                    throw new Error(`記事ID ${articleId} に一致するファイルが見つかりません`);
+                    // 404エラーとして扱う
+                    return null;
                 }
                 
                 return matchedFile.name;
@@ -545,6 +575,11 @@
             try {
                 // まずファイル名を検索
                 const fileName = await findArticleFile(articleId);
+                
+                // ファイルが見つからなかった場合
+                if (!fileName) {
+                    return null;
+                }
                 
                 // ファイルの内容を取得
                 const url = `https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/articles/${fileName}`;
@@ -607,6 +642,15 @@
                 })
                 .join('\n');
 
+            // 内部リンク !!テキスト!!(パス) を一時的なマーカーに変換
+            let withInternalLinks = processedMarkdown.replace(
+                /!!([^!]+)!!\(([^)]+)\)/g,
+                (match, text, path) => {
+                    // ユニークなマーカーを生成
+                    return `__INTERNAL_LINK__${text}__PATH__${path}__END__`;
+                }
+            );
+
             // marked.jsのレンダラーをカスタマイズ
             const renderer = new marked.Renderer();
             
@@ -621,11 +665,18 @@
             };
             
             // MarkedでHTMLに変換
-            let html = marked.parse(processedMarkdown, { renderer: renderer });
+            let html = marked.parse(withInternalLinks, { renderer: renderer });
             
             // マーカーを<br>に変換
-            // html = html.replace(/&amp;&amp;BR&amp;&amp;/g, '<br>');
             html = html.replace(/!!BR!!/g, '<br>');
+            
+            // 内部リンクマーカーをspan要素に変換
+            html = html.replace(
+                /__INTERNAL_LINK__([^_]+)__PATH__([^_]+)__END__/g,
+                (match, text, path) => {
+                    return `<span class="internal-link" data-path="${escapeHtml(path)}" style="color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); cursor: pointer;">${escapeHtml(text)}</span>`;
+                }
+            );
             
             return html;
         }
@@ -696,6 +747,28 @@
             
             // 画像クリック時のモーダル表示イベントを追加
             setupImageModal();
+            
+            // 内部リンクのクリックイベントを設定
+            setupInternalLinks();
+        }
+
+        // 内部リンクのイベント設定
+        function setupInternalLinks() {
+            const internalLinks = document.querySelectorAll('.internal-link');
+            internalLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    const path = this.getAttribute('data-path');
+                    navigateTo(path);
+                });
+                
+                // ホバー時の視覚効果を追加
+                link.addEventListener('mouseenter', function() {
+                    this.style.opacity = '0.7';
+                });
+                link.addEventListener('mouseleave', function() {
+                    this.style.opacity = '1';
+                });
+            });
         }
 
         // 画像モーダルの設定
@@ -749,11 +822,21 @@
             if (route.type === 'top') {
                 // トップページを表示
                 renderTopPage();
+            } else if (route.type === '404') {
+                // 404エラーページを表示
+                render404Page();
             } else if (route.type === 'article') {
                 // 記事ページを表示
                 try {
-                    const articleId = generateArticleId(route.yearMonth, route.number);
+                    const articleId = generateArticleId(route.year, route.number);
                     const articleData = await fetchArticleData(articleId);
+                    
+                    // 記事が見つからなかった場合は404ページへ遷移
+                    if (!articleData) {
+                        navigateTo('/errors/404');
+                        return;
+                    }
+                    
                     await renderArticle(articleData);
                 } catch (error) {
                     showError(error.message);
