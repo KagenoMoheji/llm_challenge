@@ -30,6 +30,9 @@ content:
           1. wao
         1. gao　あああ  いいい
       gyaogyao
+      |hoge|fuga|nyan|
+      |---|---:|:---|
+      |ga~~go~~j|hea__jae__gjagrh|gj**apg**jga|
   - headline: 実装してみよう
     body: |
       …ということで，簡単な時系列データを用いてサブプロットのガントチャートを実装したコードが以下です．
