@@ -29,6 +29,7 @@ content:
       ```
       from datetime import datetime
       from datetime import timedelta
+
       import matplotlib.pyplot as plt
       import matplotlib.dates as pld
       import matplotlib.font_manager as plf
