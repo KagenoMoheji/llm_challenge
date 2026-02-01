@@ -647,7 +647,7 @@
                 /!!([^!]+)!!\(([^)]+)\)/g,
                 (match, text, path) => {
                     // ユニークなマーカーを生成
-                    return `__INTERNAL_LINK__${text}__PATH__${path}__END__`;
+                    return `!!INTERNAL!LINK!!${text}!!PATH!!${path}!!END!!`;
                 }
             );
 
@@ -672,7 +672,7 @@
             
             // 内部リンクマーカーをspan要素に変換
             html = html.replace(
-                /__INTERNAL_LINK__([^_]+)__PATH__([^_]+)__END__/g,
+                /!!INTERNAL!LINK!!([^!]+)!!PATH!!([^!]+)!!END!!/g,
                 (match, text, path) => {
                     return `<span class="internal-link" data-path="${escapeHtml(path)}" style="color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); cursor: pointer;">${escapeHtml(text)}</span>`;
                 }
