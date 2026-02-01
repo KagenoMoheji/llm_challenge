@@ -41,7 +41,7 @@ content:
       ```
 
       出力結果は図1のようになります。
-      ![図1](https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/201907001_sample.png)
+      ![図1](https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/2019001_sample.png)
 
       このように，matplotlibの基本の書き方の部分多めに，シンプルかつ柔軟に実装できました．
       ```
