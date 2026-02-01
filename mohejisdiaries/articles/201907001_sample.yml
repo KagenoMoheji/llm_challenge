@@ -20,10 +20,9 @@ content:
 
       hoegehoge
       1. fugafufa
-          - hoge
+        - hoge
       1. nyan
-          1. wan
-        1. gao
+        1. wan
   - headline: 実装してみよう
     body: |
       …ということで，簡単な時系列データを用いてサブプロットのガントチャートを実装したコードが以下です．
