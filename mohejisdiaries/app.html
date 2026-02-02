@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>記事を読み込み中...</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
     <style>
         :root {
             --cream: #faf8f3;
@@ -304,6 +303,32 @@
 
         .section-body a:hover {
             border-bottom-color: var(--accent);
+        }
+
+        /* テーブルスタイル */
+        .section-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+        }
+
+        .section-body table caption {
+            caption-side: bottom;
+            margin-top: 8px;
+            font-size: 14px;
+            color: var(--ink);
+            text-align: center;
+        }
+
+        .section-body table th,
+        .section-body table td {
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+        }
+
+        .section-body table th {
+            background-color: #f5f3ed;
+            font-weight: 600;
         }
 
         /* 画像スタイル - .article-imageの後に配置 */
@@ -628,57 +653,237 @@
             return mimeTypes[ext] || 'image/png';
         }
 
-        // Markdownをレンダリング(画像は直接URLを使用)
+        // 独自Markdownパーサー
         async function renderMarkdown(markdown) {
-            // 空行またはスペース/タブのみの行を&&BR&&マーカーに変換
+            // エスケープ文字の処理用マップ
+            const escapeMap = new Map();
+            let escapeCounter = 0;
+            
+            // エスケープされた文字を一時的に置換
+            markdown = markdown.replace(/\\(.)/g, (match, char) => {
+                const key = `!!ESCAPE!${escapeCounter++}!!`;
+                escapeMap.set(key, char);
+                return key;
+            });
+            
+            // 空行を<br>に変換
             const markdownLines = markdown.split('\n');
             const processedMarkdown = markdownLines
                 .map((line, i) => {
-                    // 空行またはスペース/タブのみの行をマーカーに置換
                     if (line.trim() === '' && i < markdownLines.length - 1) {
                         return '\n!!BR!!';
                     }
                     return line;
                 })
                 .join('\n');
-
-            // 内部リンク !!テキスト!!(パス) を一時的なマーカーに変換
-            let withInternalLinks = processedMarkdown.replace(
-                /!!([^!]+)!!\(([^)]+)\)/g,
-                (match, text, path) => {
-                    // ユニークなマーカーを生成
-                    return `!!INTERNAL!LINK!!${text}!!PATH!!${path}!!END!!`;
+            
+            let html = processedMarkdown;
+            
+            // コードブロックを先に処理（```で囲まれた部分）
+            const codeBlocks = [];
+            html = html.replace(/```([^\n]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+                const placeholder = `!!CODEBLOCK!${codeBlocks.length}!!`;
+                codeBlocks.push(`<pre><code>${escapeHtml(code.trim().replace('!!BR!!\n', ''))}</code></pre>`);
+                return placeholder;
+            });
+            
+            // 画像を処理 ![alt](url)
+            const images = [];
+            html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
+                const placeholder = `!!IMAGE!${images.length}!!`;
+                images.push(`<figure class="article-image"><img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" />${alt ? `<figcaption>${escapeHtml(alt)}</figcaption>` : ''}</figure>`);
+                return placeholder;
+            });
+            
+            // 内部リンク !!text!!(path)
+            const internalLinks = [];
+            html = html.replace(/!!([^!]+)!!\(([^)]+)\)/g, (match, text, path) => {
+                const placeholder = `!!INTERNAL!${internalLinks.length}!!`;
+                internalLinks.push(`<span class="internal-link" data-path="${escapeHtml(path)}" style="color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); cursor: pointer;">${escapeHtml(text)}</span>`);
+                return placeholder;
+            });
+            
+            // テーブルを処理
+            const tables = [];
+            html = html.replace(/(\|[^\n]+\|\[([^\]]*)\]\n(?:\|[^\n]+\|\n)+)/g, (match, tableContent, caption) => {
+                const lines = tableContent.trim().split('\n').filter(line => line.trim());
+                const placeholder = `!!TABLE!${tables.length}!!`;
+                
+                // ヘッダー行
+                const headerLine = lines[0].replace(/\[.*\]/, '');
+                const headers = headerLine.split('|').filter(cell => cell.trim()).map(h => h.trim());
+                
+                // アライメント行をスキップ（2行目）
+                const alignLine = lines[1];
+                const aligns = alignLine.split('|').filter(cell => cell.trim()).map(cell => {
+                    const trimmed = cell.trim();
+                    if (trimmed.startsWith(':') && trimmed.endsWith(':')) return 'center';
+                    if (trimmed.endsWith(':')) return 'right';
+                    return 'left';
+                });
+                
+                // データ行
+                const dataRows = lines.slice(2);
+                
+                let tableHtml = '<table><caption>' + escapeHtml(caption) + '</caption><thead><tr>';
+                headers.forEach((header, i) => {
+                    tableHtml += `<th style="text-align: ${aligns[i] || 'left'}">${parseInline(header)}</th>`;
+                });
+                tableHtml += '</tr></thead><tbody>';
+                
+                dataRows.forEach(row => {
+                    const cells = row.split('|').filter(cell => cell.trim()).map(c => c.trim());
+                    tableHtml += '<tr>';
+                    cells.forEach((cell, i) => {
+                        tableHtml += `<td style="text-align: ${aligns[i] || 'left'}">${parseInline(cell)}</td>`;
+                    });
+                    tableHtml += '</tr>';
+                });
+                
+                tableHtml += '</tbody></table>';
+                tables.push(tableHtml);
+                return placeholder;
+            });
+            
+            // 行ごとに処理
+            const lines = html.split('\n');
+            const processedLines = [];
+            let i = 0;
+            
+            while (i < lines.length) {
+                let line = lines[i];
+                
+                // 番号付きリスト・箇条書きリストの処理
+                if (/^(\s*)[-*]\s/.test(line) || /^(\s*)\d+\.\s/.test(line)) {
+                    const listItems = [];
+                    
+                    while (i < lines.length && (/^(\s*)[-*]\s/.test(lines[i]) || /^(\s*)\d+\.\s/.test(lines[i]) || /^(\s*)\S/.test(lines[i]))) {
+                        // リスト行または継続行
+                        if (/^(\s*)[-*]\s/.test(lines[i]) || /^(\s*)\d+\.\s/.test(lines[i])) {
+                            listItems.push(lines[i]);
+                        } else if (listItems.length > 0 && lines[i - 1] && lines[i - 1].endsWith('  ')) {
+                            // 前の行が2スペースで終わっている場合、継続行として結合
+                            listItems[listItems.length - 1] += '\n' + lines[i];
+                        } else {
+                            // リストが終了
+                            break;
+                        }
+                        i++;
+                    }
+                    
+                    processedLines.push(parseList(listItems));
+                    continue;
                 }
-            );
-
-            // marked.jsのレンダラーをカスタマイズ
-            const renderer = new marked.Renderer();
+                
+                // インライン要素の処理
+                line = parseInline(line);
+                
+                processedLines.push(`<p>${line}</p>`);
+                i++;
+            }
             
-            // 画像レンダリングをカスタマイズ
-            renderer.image = function(href, title, text) {
-                return `
-                    <figure class="article-image">
-                        <img src="${href}" alt="${text || ''}" />
-                        ${text ? `<figcaption>${text}</figcaption>` : ''}
-                    </figure>
-                `;
-            };
+            html = processedLines.join('\n');
             
-            // MarkedでHTMLに変換
-            let html = marked.parse(withInternalLinks, { renderer: renderer });
+            // プレースホルダーを戻す
+            codeBlocks.forEach((block, i) => {
+                html = html.replace(`!!CODEBLOCK!${i}!!`, block);
+            });
+            images.forEach((img, i) => {
+                html = html.replace(`!!IMAGE!${i}!!`, img);
+            });
+            internalLinks.forEach((link, i) => {
+                html = html.replace(`!!INTERNAL!${i}!!`, link);
+            });
+            tables.forEach((table, i) => {
+                html = html.replace(`!!TABLE!${i}!!`, table);
+            });
             
-            // マーカーを<br>に変換
+            // <br>マーカーを変換
             html = html.replace(/!!BR!!/g, '<br>');
             
-            // 内部リンクマーカーをspan要素に変換
-            html = html.replace(
-                /!!INTERNAL!LINK!!([^!]+)!!PATH!!([^!]+)!!END!!/g,
-                (match, text, path) => {
-                    return `<span class="internal-link" data-path="${escapeHtml(path)}" style="color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); cursor: pointer;">${escapeHtml(text)}</span>`;
-                }
-            );
+            // エスケープされた文字を戻す
+            escapeMap.forEach((value, key) => {
+                html = html.replace(new RegExp(key, 'g'), value);
+            });
             
             return html;
+        }
+        
+        // インライン要素のパース
+        function parseInline(text) {
+            // インラインコード `code`
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // 太字 **text**
+            text = text.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+            
+            // 下線 __text__
+            text = text.replace(/__([^_]+)__/g, '<u>$1</u>');
+            
+            // 取り消し線 ~~text~~
+            text = text.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+            
+            // リンク [text](url)
+            text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent);">$1</a>');
+            
+            return text;
+        }
+        
+        // リストのパース（完全に書き直し）
+        function parseList(items) {
+            // 各アイテムの情報を解析
+            const parsedItems = items.map(item => {
+                const indentMatch = item.match(/^(\s*)/);
+                const indent = indentMatch ? indentMatch[1].length : 0;
+                const level = Math.floor(indent / 2);
+                const isOrdered = /^\s*\d+\.\s/.test(item);
+                let content = item.replace(/^\s*(?:[-*]|\d+\.)\s/, '');
+                
+                // 2スペース改行を<br>に変換
+                content = content.replace(/  \n/g, '<br>');
+                
+                return { level, isOrdered, content, indent };
+            });
+            
+            // HTMLを構築
+            function buildListHTML(items, startIndex = 0, parentLevel = -1) {
+                let html = '';
+                let i = startIndex;
+                
+                while (i < items.length) {
+                    const item = items[i];
+                    
+                    // 親レベルより浅い場合は終了
+                    if (item.level <= parentLevel) {
+                        break;
+                    }
+                    
+                    // 現在のレベルのアイテムを処理
+                    if (item.level === parentLevel + 1) {
+                        html += `<li>${parseInline(item.content)}`;
+                        
+                        // 次のアイテムが子要素かチェック
+                        if (i + 1 < items.length && items[i + 1].level > item.level) {
+                            const childResult = buildListHTML(items, i + 1, item.level);
+                            const childTag = items[i + 1].isOrdered ? 'ol' : 'ul';
+                            html += `<${childTag}>${childResult.html}</${childTag}>`;
+                            i = childResult.nextIndex - 1;
+                        }
+                        
+                        html += '</li>';
+                    }
+                    
+                    i++;
+                }
+                
+                return { html, nextIndex: i };
+            }
+            
+            // ルートレベルのリストタイプを判定
+            const rootType = parsedItems[0].isOrdered ? 'ol' : 'ul';
+            const result = buildListHTML(parsedItems);
+            
+            return `<${rootType}>${result.html}</${rootType}>`;
         }
 
         // 日付をフォーマット
