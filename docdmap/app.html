@@ -33,7 +33,8 @@
             cursor: grab;
             transform-origin: center center;
             transition: transform 0.1s ease-out;
-            overflow: hidden;
+            /* overflow: hidden; */
+            overflow: visible;
         }
 
         #canvas.grabbing {
@@ -48,6 +49,7 @@
             height: 100%;
             pointer-events: none;
             z-index: 1;
+            overflow: visible;
         }
 
         .node {
