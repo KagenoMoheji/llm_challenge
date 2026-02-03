@@ -2170,33 +2170,33 @@
             exportMenu.classList.remove('show');
         });
 
-        // function updateCanvasSize() {
-        //     if (window.visualViewport) {
-        //         // ズーム状態に合わせて、表示上のサイズを強制的に拡大する
-        //         const scale = window.visualViewport.scale;
-        //         const width = window.visualViewport.width;
-        //         const height = window.visualViewport.height;
+        function updateCanvasSize() {
+            if (window.visualViewport) {
+                // ズーム状態に合わせて、表示上のサイズを強制的に拡大する
+                const scale = window.visualViewport.scale;
+                const width = window.visualViewport.width;
+                const height = window.visualViewport.height;
 
-        //         // canvasのスタイルをビューポートの絶対サイズに合わせる
-        //         canvas.style.width = width + 'px';
-        //         canvas.style.height = height + 'px';
+                // canvasのスタイルをビューポートの絶対サイズに合わせる
+                canvas.style.width = width + 'px';
+                canvas.style.height = height + 'px';
                 
-        //         // ズームアウトして画面が余白ができそうな時でも、
-        //         // canvasを左上に固定して画面を覆い尽くさせる
-        //         canvas.style.transform = `scale(${1 / scale})`;
-        //         canvas.style.transformOrigin = '0 0';
-        //     }
-        // }
+                // ズームアウトして画面が余白ができそうな時でも、
+                // canvasを左上に固定して画面を覆い尽くさせる
+                canvas.style.transform = `scale(${1 / scale})`;
+                canvas.style.transformOrigin = '0 0';
+            }
+        }
 
-        // if (window.visualViewport) {
-        //     window.visualViewport.addEventListener('resize', updateCanvasSize);
-        //     window.visualViewport.addEventListener('scroll', updateCanvasSize);
-        // }
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', updateCanvasSize);
+            window.visualViewport.addEventListener('scroll', updateCanvasSize);
+        }
 
         window.addEventListener('resize', () => {
             contextMenu.classList.remove('show');
             exportMenu.classList.remove('show');
-            // updateCanvasSize();
+            updateCanvasSize();
         });
 
         // キャンバスドラッグ（マウス）
