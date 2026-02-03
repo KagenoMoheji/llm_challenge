@@ -683,7 +683,7 @@
             const codeBlocks = [];
             html = html.replace(/```([^\n]*)\n([\s\S]*?)```/g, (match, lang, code) => {
                 const placeholder = `!!CODEBLOCK!${codeBlocks.length}!!`;
-                codeBlocks.push(`<pre><code>${escapeHtml(code.trim().replace('!!BR!!\n', ''))}</code></pre>`);
+                codeBlocks.push(`<pre><code>${escapeHtml(code.trim().replace(/!!BR!!\n/g, ''))}</code></pre>`);
                 return placeholder;
             });
             
@@ -709,7 +709,7 @@
                 const lines = tableContent.trim().split('\n').filter(line => line.trim());
                 const placeholder = `!!TABLE!${tables.length}!!`;
                 
-                // ヘッダー行
+                // ヘッダー行からキャプション部分を除外
                 const headerLine = lines[0].replace(/\[.*\]/, '');
                 const headers = headerLine.split('|').filter(cell => cell.trim()).map(h => h.trim());
                 
