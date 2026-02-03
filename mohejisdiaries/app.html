@@ -713,12 +713,16 @@
             
             // テーブルを処理
             const tables = [];
-            html = html.replace(/(\|[^\n]+\|\[([^\]]*)\]\n(?:\|[^\n]+\|\n)+)/g, (match, tableContent, caption) => {
+            html = html.replace(/(\|[^\n]+\|(\[([^\]]*)\])?\n(?:\|[^\n]+\|\n)+)/g, (match, tableContent, caption) => {
+                let innerCaption = '';
+                if (caption !== undefined) {
+                    innerCaption = caption.replace(/^\[/, '').replace(/\]$/, '');
+                }
                 const lines = tableContent.trim().split('\n').filter(line => line.trim());
                 const placeholder = `!!TABLE!${tables.length}!!`;
                 
                 // ヘッダー行からキャプション部分を除外
-                const headerLine = lines[0].replace(/\[.*\]/, '');
+                const headerLine = lines[0].replace(new RegExp(`\\[${innerCaption}\\]`, 'g'), '');
                 const headers = headerLine.split('|').filter(cell => cell.trim()).map(h => h.trim());
                 
                 // アライメント行をスキップ（2行目）
@@ -733,7 +737,11 @@
                 // データ行
                 const dataRows = lines.slice(2);
                 
-                let tableHtml = '<table><caption>' + escapeHtml(caption) + '</caption><thead><tr>';
+                let tableHtml = '<table>';
+                if (caption !== undefined) {
+                    tableHtml += '<caption>' + escapeHtml(innerCaption) + '</caption>';
+                }
+                tableHtml += '<thead><tr>';
                 headers.forEach((header, i) => {
                     tableHtml += `<th style="text-align: ${aligns[i] || 'left'}">${parseInline(header)}</th>`;
                 });
