@@ -2028,39 +2028,33 @@
         // コネクターの位置を取得
         function getConnectorPosition(nodeData, direction) {
             const rect = nodeData.element.getBoundingClientRect();
+            const nodeWidth = nodeData.width || rect.width;
+            const nodeHeight = nodeData.height || rect.height;
             
-            // スケールが適用されていない場合のノードサイズ
-            const baseWidth = nodeData.width || (rect.width / currentScale);
-            const baseHeight = nodeData.height || (rect.height / currentScale);
-            
-            let offsetX = 0, offsetY = 0;
+            let x, y;
             
             switch(direction) {
                 case 'top':
-                    offsetX = baseWidth / 2;
-                    offsetY = 0;
+                    x = nodeData.x + nodeWidth / 2;
+                    y = nodeData.y;
                     break;
                 case 'bottom':
-                    offsetX = baseWidth / 2;
-                    offsetY = baseHeight;
+                    x = nodeData.x + nodeWidth / 2;
+                    y = nodeData.y + nodeHeight;
                     break;
                 case 'left':
-                    offsetX = 0;
-                    offsetY = baseHeight / 2;
+                    x = nodeData.x;
+                    y = nodeData.y + nodeHeight / 2;
                     break;
                 case 'right':
-                    offsetX = baseWidth;
-                    offsetY = baseHeight / 2;
+                    x = nodeData.x + nodeWidth;
+                    y = nodeData.y + nodeHeight / 2;
                     break;
                 default: // center
-                    offsetX = baseWidth / 2;
-                    offsetY = baseHeight / 2;
+                    x = nodeData.x + nodeWidth / 2;
+                    y = nodeData.y + nodeHeight / 2;
                     break;
             }
-            
-            // 基準位置からのオフセットを加算
-            const x = nodeData.x + offsetX;
-            const y = nodeData.y + offsetY;
             
             return { x, y };
         }
@@ -2254,19 +2248,40 @@
                 
                 if (lastTouchDistance > 0) {
                     const scale = currentDistance / lastTouchDistance;
-                    currentScale *= scale;
+                    const newScale = currentScale * scale;
                     
                     // スケールの制限（0.5倍〜3倍）
-                    currentScale = Math.max(0.5, Math.min(3, currentScale));
+                    const limitedScale = Math.max(0.5, Math.min(3, newScale));
                     
-                    // 全ノードにスケールを適用（SVGには適用しない）
-                    nodes.forEach(nodeData => {
-                        nodeData.element.style.transform = `scale(${currentScale})`;
-                        nodeData.element.style.transformOrigin = 'center center';
-                    });
-                    
-                    // 接続線を更新
-                    updateConnections();
+                    if (limitedScale !== currentScale) {
+                        const scaleRatio = limitedScale / currentScale;
+                        
+                        // 画面中央を基準点として計算
+                        const centerX = window.innerWidth / 2;
+                        const centerY = window.innerHeight / 2;
+                        
+                        // 全ノードの位置をスケールに応じて調整
+                        nodes.forEach(nodeData => {
+                            // 中央からの相対位置を計算
+                            const relativeX = nodeData.x - centerX;
+                            const relativeY = nodeData.y - centerY;
+                            
+                            // スケール比に応じて位置を調整
+                            nodeData.x = centerX + relativeX * scaleRatio;
+                            nodeData.y = centerY + relativeY * scaleRatio;
+                            
+                            // 位置を更新
+                            nodeData.element.style.left = nodeData.x + 'px';
+                            nodeData.element.style.top = nodeData.y + 'px';
+                            nodeData.element.style.transform = 'scale(1)';
+                            nodeData.element.style.transformOrigin = 'center center';
+                        });
+                        
+                        currentScale = limitedScale;
+                        
+                        // 接続線を更新
+                        updateConnections();
+                    }
                 }
                 
                 lastTouchDistance = currentDistance;
