@@ -12,19 +12,28 @@
             box-sizing: border-box;
         }
 
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: fixed;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         #canvas {
-            width: 100vw;
-            height: 100vh;
-            position: relative;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
             cursor: grab;
             transform-origin: center center;
             transition: transform 0.1s ease-out;
+            overflow: hidden;
         }
 
         #canvas.grabbing {
@@ -67,6 +76,7 @@
         .node.dragging {
             opacity: 0.8;
             z-index: 1000;
+            max-width: none !important;
         }
 
         .node.selected {
@@ -1122,6 +1132,11 @@
                 
                 isDragging = true;
                 node.classList.add('dragging');
+                
+                // ドラッグ開始時に現在の幅を固定
+                const currentWidth = node.offsetWidth;
+                node.style.width = currentWidth + 'px';
+                
                 dragOffset.x = e.clientX - nodeData.x;
                 dragOffset.y = e.clientY - nodeData.y;
                 e.stopPropagation();
@@ -1141,6 +1156,11 @@
                 touchMoved = false;
                 isDragging = true;
                 node.classList.add('dragging');
+                
+                // ドラッグ開始時に現在の幅を固定
+                const currentWidth = node.offsetWidth;
+                node.style.width = currentWidth + 'px';
+                
                 dragOffset.x = touch.clientX - nodeData.x;
                 dragOffset.y = touch.clientY - nodeData.y;
                 e.stopPropagation();
