@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>テスト仕様書エディター</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -48,7 +48,6 @@
             height: 100%;
             pointer-events: none;
             z-index: 1;
-            overflow: visible;
         }
 
         .node {
@@ -833,6 +832,7 @@
                 <li>ノードを右クリックで削除</li>
                 <li>接続線を右クリックで削除</li>
                 <li>背景をドラッグして全体移動</li>
+                <li>2本指でピンチズーム</li>
             </ul>
         </div>
     </div>
@@ -883,6 +883,10 @@
         // タッチ操作用の変数
         let touchStartTime = 0;
         let touchMoved = false;
+        
+        // ズーム用の変数
+        let currentScale = 1;
+        let lastTouchDistance = 0;
 
         // UUID生成関数
         function generateUUID() {
@@ -2186,7 +2190,15 @@
 
         // キャンバスタッチ開始
         canvas.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 1 && (e.target === canvas || e.target === svg)) {
+            if (e.touches.length === 2) {
+                // 2本指でのタッチ開始 - ピンチズーム
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                lastTouchDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+            } else if (e.touches.length === 1 && (e.target === canvas || e.target === svg)) {
                 // 1本指でのタッチ - キャンバス移動
                 const touch = e.touches[0];
                 isDraggingCanvas = true;
@@ -2224,7 +2236,32 @@
 
         // タッチ移動
         document.addEventListener('touchmove', (e) => {
-            if (isDraggingCanvas && e.touches.length === 1) {
+            if (e.touches.length === 2) {
+                // 2本指でのピンチズーム
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const currentDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+                
+                if (lastTouchDistance > 0) {
+                    const scale = currentDistance / lastTouchDistance;
+                    currentScale *= scale;
+                    
+                    // スケールの制限（0.5倍〜3倍）
+                    currentScale = Math.max(0.5, Math.min(3, currentScale));
+                    
+                    // 全ノードとSVGにスケールを適用（キャンバスサイズは維持）
+                    nodes.forEach(nodeData => {
+                        nodeData.element.style.transform = `scale(${currentScale})`;
+                    });
+                    svg.style.transform = `scale(${currentScale})`;
+                }
+                
+                lastTouchDistance = currentDistance;
+                e.preventDefault();
+            } else if (isDraggingCanvas && e.touches.length === 1) {
                 // 1本指でのキャンバス移動
                 const touch = e.touches[0];
                 const dx = touch.clientX - dragStart.x;
@@ -2258,6 +2295,9 @@
 
         // タッチ終了
         document.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) {
+                lastTouchDistance = 0;
+            }
             if (e.touches.length === 0) {
                 if (isDraggingCanvas) {
                     // 全ノードのdraggingクラスを削除
