@@ -241,14 +241,22 @@
         .section-body h3,
         .section-body h4 {
             font-family: 'Meiryo', 'メイリオ', sans-serif;
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
+            margin-top: 0;
+            margin-bottom: 0;
             font-weight: 600;
         }
 
         .section-body h1 { font-size: 32px; }
         .section-body h2 { font-size: 26px; }
         .section-body h3 { font-size: 22px; }
+        
+        .section-body h5,
+        .section-body h6 {
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+            margin-top: 0;
+            margin-bottom: 0;
+            font-weight: 600;
+        }
 
         .section-body code {
             background: #f0ede4;
@@ -287,7 +295,7 @@
         }
 
         .section-body blockquote {
-            border-left: 4px solid var(--accent);
+            border-left: 4px solid var(--border);
             padding-left: 20px;
             margin: 1.5em 0;
             font-style: italic;
@@ -752,6 +760,30 @@
             
             while (i < lines.length) {
                 let line = lines[i];
+                
+                // 見出しの処理 (# から ###### まで)
+                const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+                if (headingMatch) {
+                    const level = headingMatch[1].length;
+                    const content = headingMatch[2];
+                    processedLines.push(`<h${level}>${parseInline(content)}</h${level}>`);
+                    i++;
+                    continue;
+                }
+                
+                // 引用の処理 (> で始まる行)
+                if (/^>\s/.test(line)) {
+                    const quoteLines = [];
+                    
+                    while (i < lines.length && /^>\s/.test(lines[i])) {
+                        const quoteLine = lines[i].replace(/^>\s/, '');
+                        quoteLines.push(parseInline(quoteLine));
+                        i++;
+                    }
+                    
+                    processedLines.push(`<blockquote>${quoteLines.join('<br>')}</blockquote>`);
+                    continue;
+                }
                 
                 // 番号付きリスト・箇条書きリストの処理
                 if (/^(\s*)[-*]\s/.test(line) || /^(\s*)\d+\.\s/.test(line)) {
