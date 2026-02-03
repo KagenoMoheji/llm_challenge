@@ -35,7 +35,7 @@ content:
       |ga~~go~~j|hea__jae__gjagrh|gj**apg**jga|
   - headline: 実装してみよう
     body: |
-      …ということで，簡単な時系列データを用いてサブプロットのガントチャートを実装したコードが以下です．
+      …ということで，簡単な時系列データを用いて`サブプロットのガントチャート`を実装したコードが以下です．
       ```
       from datetime import datetime
       from datetime import timedelta
@@ -45,6 +45,9 @@ content:
       import matplotlib.font_manager as plf
       ```
 
+      # ふが
+      ## ほげ
+      ### 出力
       出力結果は図1のようになります。
       ![図1](https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/2019001_sample.png)
 
