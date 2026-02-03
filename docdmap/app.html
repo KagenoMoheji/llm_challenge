@@ -2,8 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0"> -->
     <title>テスト仕様書エディター</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -34,7 +34,7 @@
             cursor: grab;
             transform-origin: center center;
             transition: transform 0.1s ease-out;
-            overflow: visible;
+            overflow: visible; /* 追加 */
         }
 
         #canvas.grabbing {
@@ -49,7 +49,7 @@
             height: 100%;
             pointer-events: none;
             z-index: 1;
-            overflow: visible;
+            overflow: visible; /* 追加 */
         }
 
         .node {
