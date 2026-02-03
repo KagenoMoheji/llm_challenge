@@ -2178,6 +2178,13 @@
                 canvas.classList.add('grabbing');
                 dragStart.x = e.clientX;
                 dragStart.y = e.clientY;
+                
+                // 全ノードの幅を固定してリサイズを防止
+                nodes.forEach(nodeData => {
+                    const currentWidth = nodeData.element.offsetWidth;
+                    nodeData.element.style.width = currentWidth + 'px';
+                    nodeData.element.classList.add('dragging');
+                });
             }
         });
 
@@ -2198,6 +2205,13 @@
                 canvas.classList.add('grabbing');
                 dragStart.x = touch.clientX;
                 dragStart.y = touch.clientY;
+                
+                // 全ノードの幅を固定してリサイズを防止
+                nodes.forEach(nodeData => {
+                    const currentWidth = nodeData.element.offsetWidth;
+                    nodeData.element.style.width = currentWidth + 'px';
+                    nodeData.element.classList.add('dragging');
+                });
             }
         }, { passive: true });
 
@@ -2266,6 +2280,12 @@
 
         // マウスアップ
         document.addEventListener('mouseup', () => {
+            if (isDraggingCanvas) {
+                // 全ノードのdraggingクラスを削除
+                nodes.forEach(nodeData => {
+                    nodeData.element.classList.remove('dragging');
+                });
+            }
             isDraggingCanvas = false;
             canvas.classList.remove('grabbing');
         });
@@ -2276,6 +2296,12 @@
                 lastTouchDistance = 0;
             }
             if (e.touches.length === 0) {
+                if (isDraggingCanvas) {
+                    // 全ノードのdraggingクラスを削除
+                    nodes.forEach(nodeData => {
+                        nodeData.element.classList.remove('dragging');
+                    });
+                }
                 isDraggingCanvas = false;
                 canvas.classList.remove('grabbing');
             }
