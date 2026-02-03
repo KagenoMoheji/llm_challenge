@@ -2,8 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0"> -->
+    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>テスト仕様書エディター</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -28,7 +28,7 @@
         #canvas {
             width: 100vw; /* %からvwに */
             height: 100vh; /* %からvhに */
-            position: absolute;
+            position: fixed; /* absoluteからfixedに */
             top: 0;
             left: 0;
             cursor: grab;
