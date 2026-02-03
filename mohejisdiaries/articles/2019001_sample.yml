@@ -48,6 +48,7 @@ content:
       # ふが
       ## ほげ
       ### 出力
+      > 引用です
       出力結果は図1のようになります。
       ![図1](https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/2019001_sample.png)
 
@@ -59,6 +60,8 @@ content:
       ![図2](https://avatars.githubusercontent.com/u/37401955?v=4)
   - headline: まとめ
     body: |
+      > 複数行の引用です
+      > 複数行の引用です
       ガントチャートをサブプロットにして別のグラフと合わせる機会は少ないんでしょうか？  
       それでも，そうした機会が巡って必要になった時の参考になれたら幸いです(*´ω｀*)  
       ちなみにKagenoMohejiのGithubは[こちら](https://github.com/KagenoMoheji)  
