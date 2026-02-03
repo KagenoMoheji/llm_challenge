@@ -42,12 +42,13 @@
 
         svg {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
             pointer-events: none;
             z-index: 1;
+            overflow: visible;
         }
 
         .node {
@@ -2027,33 +2028,39 @@
         // コネクターの位置を取得
         function getConnectorPosition(nodeData, direction) {
             const rect = nodeData.element.getBoundingClientRect();
-            const nodeWidth = nodeData.width || rect.width;
-            const nodeHeight = nodeData.height || rect.height;
             
-            let x, y;
+            // スケールが適用されていない場合のノードサイズ
+            const baseWidth = nodeData.width || (rect.width / currentScale);
+            const baseHeight = nodeData.height || (rect.height / currentScale);
+            
+            let offsetX = 0, offsetY = 0;
             
             switch(direction) {
                 case 'top':
-                    x = nodeData.x + nodeWidth / 2;
-                    y = nodeData.y;
+                    offsetX = baseWidth / 2;
+                    offsetY = 0;
                     break;
                 case 'bottom':
-                    x = nodeData.x + nodeWidth / 2;
-                    y = nodeData.y + nodeHeight;
+                    offsetX = baseWidth / 2;
+                    offsetY = baseHeight;
                     break;
                 case 'left':
-                    x = nodeData.x;
-                    y = nodeData.y + nodeHeight / 2;
+                    offsetX = 0;
+                    offsetY = baseHeight / 2;
                     break;
                 case 'right':
-                    x = nodeData.x + nodeWidth;
-                    y = nodeData.y + nodeHeight / 2;
+                    offsetX = baseWidth;
+                    offsetY = baseHeight / 2;
                     break;
                 default: // center
-                    x = nodeData.x + nodeWidth / 2;
-                    y = nodeData.y + nodeHeight / 2;
+                    offsetX = baseWidth / 2;
+                    offsetY = baseHeight / 2;
                     break;
             }
+            
+            // 基準位置からのオフセットを加算
+            const x = nodeData.x + offsetX;
+            const y = nodeData.y + offsetY;
             
             return { x, y };
         }
@@ -2252,11 +2259,14 @@
                     // スケールの制限（0.5倍〜3倍）
                     currentScale = Math.max(0.5, Math.min(3, currentScale));
                     
-                    // 全ノードとSVGにスケールを適用（キャンバスサイズは維持）
+                    // 全ノードにスケールを適用（SVGには適用しない）
                     nodes.forEach(nodeData => {
                         nodeData.element.style.transform = `scale(${currentScale})`;
+                        nodeData.element.style.transformOrigin = 'center center';
                     });
-                    svg.style.transform = `scale(${currentScale})`;
+                    
+                    // 接続線を更新
+                    updateConnections();
                 }
                 
                 lastTouchDistance = currentDistance;
