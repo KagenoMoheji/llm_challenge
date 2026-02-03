@@ -48,6 +48,7 @@
             height: 100%;
             pointer-events: none;
             z-index: 1;
+            overflow: visible;
         }
 
         .node {
@@ -832,7 +833,7 @@
                 <li>ノードを右クリックで削除</li>
                 <li>接続線を右クリックで削除</li>
                 <li>背景をドラッグして全体移動</li>
-                <li>2本指でピンチズーム</li>
+                <li>2本指でピンチズーム（スマホ）</li>
             </ul>
         </div>
     </div>
@@ -887,6 +888,9 @@
         // ズーム用の変数
         let currentScale = 1;
         let lastTouchDistance = 0;
+        
+        // 各ノードの基準位置（スケール=1の時の位置）を保存
+        let basePositions = new Map();
 
         // UUID生成関数
         function generateUUID() {
@@ -997,6 +1001,72 @@
             contentDiv.innerHTML = marked.parse(nodeData.content);
         }
 
+        // 最も左上にあるノードを取得
+        function getTopLeftNode() {
+            if (nodes.length === 0) return null;
+            
+            let topLeftNode = nodes[0];
+            let minSum = nodes[0].x + nodes[0].y;
+            
+            nodes.forEach(node => {
+                const sum = node.x + node.y;
+                if (sum < minSum) {
+                    minSum = sum;
+                    topLeftNode = node;
+                }
+            });
+            
+            return topLeftNode;
+        }
+        
+        // ズームを適用
+        function applyZoom(scale) {
+            const topLeftNode = getTopLeftNode();
+            if (!topLeftNode) return;
+            
+            // 基準座標
+            const baseX = topLeftNode.x;
+            const baseY = topLeftNode.y;
+            
+            nodes.forEach(nodeData => {
+                // 基準位置を保存（初回のみ）
+                if (!basePositions.has(nodeData.id)) {
+                    basePositions.set(nodeData.id, {
+                        x: nodeData.x,
+                        y: nodeData.y,
+                        width: nodeData.width || nodeData.element.offsetWidth,
+                        height: nodeData.height || nodeData.element.offsetHeight
+                    });
+                }
+                
+                const basePos = basePositions.get(nodeData.id);
+                
+                // 基準ノードからの差分を計算
+                const deltaX = basePos.x - baseX;
+                const deltaY = basePos.y - baseY;
+                
+                // スケールを適用した新しい位置
+                nodeData.x = baseX + deltaX * scale;
+                nodeData.y = baseY + deltaY * scale;
+                
+                // スケールを適用した新しいサイズ
+                const newWidth = basePos.width * scale;
+                const newHeight = basePos.height * scale;
+                
+                // 位置とサイズを更新
+                nodeData.element.style.left = nodeData.x + 'px';
+                nodeData.element.style.top = nodeData.y + 'px';
+                nodeData.element.style.width = newWidth + 'px';
+                nodeData.element.style.height = newHeight + 'px';
+                
+                nodeData.width = newWidth;
+                nodeData.height = newHeight;
+            });
+            
+            // 接続線を更新
+            updateConnections();
+        }
+        
         // ノードの見た目を更新
         function updateNodeAppearance(nodeData) {
             const node = nodeData.element;
@@ -2249,14 +2319,11 @@
                     const scale = currentDistance / lastTouchDistance;
                     currentScale *= scale;
                     
-                    // スケールの制限（0.5倍〜3倍）
-                    currentScale = Math.max(0.5, Math.min(3, currentScale));
+                    // スケールの制限（0.3倍〜5倍）
+                    currentScale = Math.max(0.3, Math.min(5, currentScale));
                     
-                    // 全ノードとSVGにスケールを適用（キャンバスサイズは維持）
-                    nodes.forEach(nodeData => {
-                        nodeData.element.style.transform = `scale(${currentScale})`;
-                    });
-                    svg.style.transform = `scale(${currentScale})`;
+                    // ズームを適用
+                    applyZoom(currentScale);
                 }
                 
                 lastTouchDistance = currentDistance;
@@ -2272,6 +2339,13 @@
                     nodeData.y += dy;
                     nodeData.element.style.left = nodeData.x + 'px';
                     nodeData.element.style.top = nodeData.y + 'px';
+                    
+                    // 基準位置も更新
+                    if (basePositions.has(nodeData.id)) {
+                        const basePos = basePositions.get(nodeData.id);
+                        basePos.x += dx;
+                        basePos.y += dy;
+                    }
                 });
                 
                 updateConnections();
