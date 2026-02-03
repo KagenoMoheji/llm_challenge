@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>テスト仕様書エディター</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -10,30 +10,47 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        html, body {
+        html {
             width: 100%;
             height: 100%;
             overflow: hidden;
             position: fixed;
+            top: 0;
+            left: 0;
         }
 
         body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            touch-action: none;
         }
 
         #canvas {
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             position: absolute;
             top: 0;
             left: 0;
+            right: 0;
+            bottom: 0;
             cursor: grab;
             transform-origin: center center;
             transition: transform 0.1s ease-out;
             overflow: hidden;
+            touch-action: none;
         }
 
         #canvas.grabbing {
@@ -647,6 +664,23 @@
 
         /* モバイル対応 */
         @media (max-width: 768px) {
+            html {
+                height: 100vh;
+                height: -webkit-fill-available;
+            }
+            
+            body {
+                height: 100vh;
+                height: -webkit-fill-available;
+                min-height: 100vh;
+                min-height: -webkit-fill-available;
+            }
+            
+            #canvas {
+                height: 100vh;
+                height: -webkit-fill-available;
+            }
+            
             .toolbar {
                 top: 10px;
                 left: 10px;
@@ -690,6 +724,16 @@
                 width: 20px;
                 height: 20px;
                 font-size: 14px;
+            }
+        }
+
+        /* 安全領域対応（ノッチ等） */
+        @supports (padding: max(0px)) {
+            body {
+                padding-left: max(0px, env(safe-area-inset-left));
+                padding-right: max(0px, env(safe-area-inset-right));
+                padding-top: max(0px, env(safe-area-inset-top));
+                padding-bottom: max(0px, env(safe-area-inset-bottom));
             }
         }
 
