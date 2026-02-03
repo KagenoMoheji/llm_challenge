@@ -28,7 +28,7 @@
         #canvas {
             width: 100vw; /* %からvwに */
             height: 100vh; /* %からvhに */
-            position: fixed; /* absoluteからfixedに */
+            position: absolute; /* absoluteからfixedに */
             top: 0;
             left: 0;
             cursor: grab;
@@ -36,7 +36,7 @@
             transition: transform 0.1s ease-out;
             /* overflow: visible; 追加 */
             background-color: black;
-            touch-action: none; /* 追加 */
+            /* touch-action: none; 追加 */
         }
 
         #canvas.grabbing {
@@ -2170,9 +2170,33 @@
             exportMenu.classList.remove('show');
         });
 
+        // function updateCanvasSize() {
+        //     if (window.visualViewport) {
+        //         // ズーム状態に合わせて、表示上のサイズを強制的に拡大する
+        //         const scale = window.visualViewport.scale;
+        //         const width = window.visualViewport.width;
+        //         const height = window.visualViewport.height;
+
+        //         // canvasのスタイルをビューポートの絶対サイズに合わせる
+        //         canvas.style.width = width + 'px';
+        //         canvas.style.height = height + 'px';
+                
+        //         // ズームアウトして画面が余白ができそうな時でも、
+        //         // canvasを左上に固定して画面を覆い尽くさせる
+        //         canvas.style.transform = `scale(${1 / scale})`;
+        //         canvas.style.transformOrigin = '0 0';
+        //     }
+        // }
+
+        // if (window.visualViewport) {
+        //     window.visualViewport.addEventListener('resize', updateCanvasSize);
+        //     window.visualViewport.addEventListener('scroll', updateCanvasSize);
+        // }
+
         window.addEventListener('resize', () => {
             contextMenu.classList.remove('show');
             exportMenu.classList.remove('show');
+            // updateCanvasSize();
         });
 
         // キャンバスドラッグ（マウス）
