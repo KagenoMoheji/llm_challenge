@@ -297,7 +297,7 @@
         .section-body blockquote {
             border-left: 4px solid var(--border);
             padding-left: 20px;
-            margin: 1.5em 0;
+            margin: 0;
             font-style: italic;
             color: var(--muted);
         }
@@ -1068,9 +1068,12 @@
                     const articleId = generateArticleId(route.year, route.number);
                     const articleData = await fetchArticleData(articleId);
                     
-                    // 記事が見つからなかった場合は404ページへ遷移
+                    // 記事が見つからなかった場合は404ページへ遷移（履歴を置き換え）
                     if (!articleData) {
-                        navigateTo('/errors/404');
+                        const currentPath = window.location.pathname;
+                        const newUrl = `${currentPath}?path=/errors/404`;
+                        window.history.replaceState({}, '', newUrl);
+                        render404Page();
                         return;
                     }
                     
