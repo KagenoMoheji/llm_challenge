@@ -40,6 +40,12 @@
             background-size: contain;
             background-position: center;
             background-repeat: no-repeat;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .site-header:hover {
+            opacity: 0.8;
         }
 
         /* ヘッダーのレスポンシブ対応 */
@@ -1085,6 +1091,22 @@
                 } catch (error) {
                     showError(error.message);
                 }
+            }
+            
+            // ヘッダークリックでトップページに遷移
+            setupHeaderClick();
+        }
+
+        // ヘッダーのクリックイベントを設定
+        function setupHeaderClick() {
+            const header = document.querySelector('.site-header');
+            if (header) {
+                header.addEventListener('click', function() {
+                    // トップページに遷移
+                    const currentPath = window.location.pathname;
+                    window.history.pushState({}, '', currentPath);
+                    init();
+                });
             }
         }
 
