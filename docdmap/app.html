@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0"> -->
     <title>テスト仕様書エディター</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -26,21 +25,27 @@
         }
 
         #canvas {
-            width: 100vw; /* %からvwに */
-            height: 100vh; /* %からvhに */
-            position: absolute; /* absoluteからfixedに */
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
             top: 0;
             left: 0;
             cursor: grab;
-            transform-origin: center center;
-            transition: transform 0.1s ease-out;
-            /* overflow: visible; 追加 */
-            background-color: black;
-            /* touch-action: none; 追加 */
+            overflow: hidden;
         }
 
         #canvas.grabbing {
             cursor: grabbing;
+        }
+
+        #canvas-content {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
         }
 
         svg {
@@ -51,7 +56,6 @@
             height: 100%;
             pointer-events: none;
             z-index: 1;
-            overflow: visible; /* 追加 */
         }
 
         .node {
@@ -842,7 +846,9 @@
     </div>
 
     <div id="canvas">
-        <svg id="svg"></svg>
+        <div id="canvas-content">
+            <svg id="svg"></svg>
+        </div>
     </div>
 
     <div id="contextMenu" class="context-menu">
@@ -859,6 +865,7 @@
 
     <script>
         const canvas = document.getElementById('canvas');
+        const canvasContent = document.getElementById('canvas-content');
         const svg = document.getElementById('svg');
         const addNodeBtn = document.getElementById('addNodeBtn');
         const clearBtn = document.getElementById('clearBtn');
@@ -971,7 +978,7 @@
             };
 
             nodes.push(nodeData);
-            canvas.appendChild(node);
+            canvasContent.appendChild(node);
 
             // マークダウンレンダリング
             updateNodeContent(nodeData);
@@ -2256,8 +2263,8 @@
                     // スケールの制限（0.5倍〜3倍）
                     currentScale = Math.max(0.5, Math.min(3, currentScale));
                     
-                    // キャンバスにスケールを適用
-                    canvas.style.transform = `scale(${currentScale})`;
+                    // canvas-contentにスケールを適用（canvasのサイズは維持）
+                    canvasContent.style.transform = `scale(${currentScale})`;
                 }
                 
                 lastTouchDistance = currentDistance;
