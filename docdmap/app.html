@@ -2187,7 +2187,7 @@
 
         // キャンバスドラッグ（マウス）
         canvas.addEventListener('mousedown', (e) => {
-            if (e.target === canvas || e.target === svg) {
+            if (e.target === canvas || e.target === canvasContent || e.target === svg) {
                 isDraggingCanvas = true;
                 canvas.classList.add('grabbing');
                 dragStart.x = e.clientX;
@@ -2212,7 +2212,7 @@
                     touch2.clientX - touch1.clientX,
                     touch2.clientY - touch1.clientY
                 );
-            } else if (e.touches.length === 1 && (e.target === canvas || e.target === svg)) {
+            } else if (e.touches.length === 1 && (e.target === canvas || e.target === canvasContent || e.target === svg)) {
                 // 1本指でのタッチ - キャンバス移動
                 const touch = e.touches[0];
                 isDraggingCanvas = true;
