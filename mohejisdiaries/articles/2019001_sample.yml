@@ -70,7 +70,7 @@ content:
       出力結果は図1のようになります。
       ![図1](https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/2019001_sample.png)
 
-      このように，matplotlibの基本の書き方の部分多めに，シンプルかつ柔軟に実装できました．
+      このように，[red:matplotlib]の基本の書き方の部分多めに，シンプルかつ柔軟に実装できました．
       ```
       下に空行無しパターン
       ```
@@ -87,8 +87,8 @@ content:
       warningです
       :::
 
-      それでも，そうした機会が巡って必要になった時の参考になれたら幸いです(*´ω｀*)  
-      ちなみにKagenoMohejiのGithubは[こちら](https://github.com/KagenoMoheji)  
+      それでも，そうした機会が巡って必要になった時の[blue:参考になれたら幸いです(*´ω｀*)  
+      ちなみにKagenoMoheji]のGithubは[こちら](https://github.com/KagenoMoheji)  
       次回の記事は!!こちら!!(/articles/2020/1)
 
       ```
