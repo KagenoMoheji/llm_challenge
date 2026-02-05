@@ -11,7 +11,10 @@ content:
       今月2本目です！  
       前回と同じくPythonのお話です．
       
-      今回は，ガントチャートを生成する~~実装~~について書いていきます．  
+      今回は，ガントチャートを生成する~~実装~~について書いていきます．
+      :::info
+      informationです
+      :::
       ただし，__要件定義(？)__は以下になります．
       - ガントチャートをサブプロットで作って他のグラフと一緒にしたい！！
         - 時系列データからの**ガントチャート**を作りたい！！
@@ -20,6 +23,17 @@ content:
       aaaa
       - pandasめんどいから使いたくない\_\[escape\]！(コラ)  
       bbbb
+
+      - [ ] aaaa
+        - bbbbb
+          1. ggaga
+            - [ ] agagag
+          1. gagaga
+        - [x] gaggaga
+      - [x] bbbb
+        1. aggaga
+          - agagag
+        1. gajgaj
 
       hoegehoge
       1. fugafufa
@@ -43,6 +57,10 @@ content:
       import matplotlib.pyplot as plt
       import matplotlib.dates as pld
       import matplotlib.font_manager as plf
+      :::output
+      標準出力だよ
+      hogehoge
+      :::
       ```
 
       # ふが
@@ -61,11 +79,34 @@ content:
   - headline: まとめ
     body: |
       > 複数行の引用です
+      > > ネストされた引用です
       > 複数行の引用です
-      ガントチャートをサブプロットにして別のグラフと合わせる機会は少ないんでしょうか？  
+      ガントチャートをサブプロットにして別のグラフと合わせる機会は少ないんでしょうか？
+
+      :::warn
+      warningです
+      :::
+
       それでも，そうした機会が巡って必要になった時の参考になれたら幸いです(*´ω｀*)  
       ちなみにKagenoMohejiのGithubは[こちら](https://github.com/KagenoMoheji)  
       次回の記事は!!こちら!!(/articles/2020/1)
+
+      ```
+      gagjaoepgjapega
+        インデント入りだよ
+        インデント入りだよ
+
+      :::output
+        インデント入りだよ
+      gaoegpaejgpagjeapgj
+        インデント入りだよ
+      :::
+      ```
+
+      :::crit
+      クリティカルな警告・禁止事項だよ
+      ががが
+      :::
 
       |hoge|fuga|nyan|
       |---|---:|:---:|
