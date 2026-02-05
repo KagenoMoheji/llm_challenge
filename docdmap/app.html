@@ -570,135 +570,185 @@
             background: #5568d3;
         }
 
-        .info {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            font-size: 12px;
-            color: #333;
-            max-width: 300px;
-            transition: all 0.3s ease;
-        }
-
-        .info.minimized {
-            width: 150px;
-            height: 50px;
-            padding: 10px;
-            max-width: 150px;
-            cursor: pointer;
-        }
-
-        .info.minimized .info-content {
+        /* ハンバーガーメニュー用のスタイル */
+        .hamburger-btn {
             display: none;
-        }
-
-        .info.minimized .minimize-btn {
-            transform: rotate(180deg);
-        }
-
-        .info-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .info h3 {
-            margin: 0;
-            color: #667eea;
-            font-size: 14px;
-            flex: 1;
-        }
-
-        .minimize-btn {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
             background: #667eea;
             color: white;
             border: none;
-            border-radius: 4px;
-            width: 24px;
-            height: 24px;
+            border-radius: 0;
+            padding: 15px;
             cursor: pointer;
             font-size: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-            padding: 0;
-            line-height: 1;
+            font-weight: bold;
+            box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
         }
 
-        .minimize-btn:hover {
+        .hamburger-menu {
+            display: none;
+            position: fixed;
+            bottom: 50px;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+            transform: translateY(100%);
+            transition: transform 0.3s ease-out;
+        }
+
+        .hamburger-menu.open {
+            transform: translateY(0);
+        }
+
+        .hamburger-menu button {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .hamburger-menu button:hover {
             background: #5568d3;
         }
 
-        .info ul {
-            list-style: none;
-            padding: 0;
+        .hamburger-menu button:last-child {
+            margin-bottom: 0;
         }
 
-        .info li {
-            margin-bottom: 5px;
-            padding-left: 15px;
+        .menu-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .menu-overlay.show {
+            display: block;
+        }
+
+        .info {
+            display: none;
+        }
+
+        /* モーダルウィンドウ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
             position: relative;
         }
 
-        .info li:before {
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #667eea;
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: #f0f0f0;
+            color: #667eea;
+        }
+
+        .modal-body ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .modal-body li {
+            margin-bottom: 12px;
+            padding-left: 20px;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .modal-body li:before {
             content: "▸";
             position: absolute;
             left: 0;
             color: #667eea;
+            font-weight: bold;
         }
 
         /* モバイル対応 */
         @media (max-width: 768px) {
             .toolbar {
-                top: 10px;
-                left: 10px;
-                padding: 10px;
-                display: flex;
-                flex-wrap: wrap;
-                gap: 5px;
+                display: none;
             }
             
-            .toolbar button {
-                padding: 8px 12px;
-                font-size: 12px;
-                margin-right: 0;
+            .hamburger-btn {
+                display: block;
             }
             
-            .info {
-                bottom: 10px;
-                right: 10px;
-                font-size: 11px;
-                max-width: 200px;
-                padding: 10px;
-            }
-            
-            .info.minimized {
-                width: 150px;
-                height: 40px;
-                padding: 8px;
-                max-width: 150px;
-            }
-            
-            .info h3 {
-                font-size: 12px;
-            }
-            
-            .info li {
-                font-size: 10px;
-                margin-bottom: 3px;
-            }
-            
-            .minimize-btn {
-                width: 20px;
-                height: 20px;
-                font-size: 14px;
+            .hamburger-menu {
+                display: block;
             }
         }
 
@@ -815,34 +865,49 @@
 </head>
 <body>
     <div class="toolbar">
-        <button id="addNodeBtn">➕ ノード追加</button>
         <button id="clearBtn">🗑️ すべてクリア</button>
         <button id="importBtn">📂 インポート</button>
         <button id="exportBtn">💾 エクスポート</button>
+        <button id="addNodeBtn">➕ ノード追加</button>
+        <button id="helpBtn">📝 操作方法</button>
+    </div>
+    
+    <!-- ハンバーガーメニュー（スマホ版） -->
+    <button class="hamburger-btn" id="hamburgerBtn">☰ メニュー</button>
+    <div class="menu-overlay" id="menuOverlay"></div>
+    <div class="hamburger-menu" id="hamburgerMenu">
+        <button id="clearBtnMobile">🗑️ すべてクリア</button>
+        <button id="importBtnMobile">📂 インポート</button>
+        <button id="exportBtnMobile">💾 エクスポート</button>
+        <button id="addNodeBtnMobile">➕ ノード追加</button>
+        <button id="helpBtnMobile">📝 操作方法</button>
     </div>
     
     <input type="file" id="fileInput" accept=".tsv,.json" style="display: none;">
 
-    <div class="info" id="infoBox">
-        <div class="info-header">
-            <h3>📝 操作方法</h3>
-            <button class="minimize-btn" id="minimizeBtn">−</button>
-        </div>
-        <div class="info-content">
-            <ul>
-                <li>ノードをドラッグして移動</li>
-                <li>ノードの4辺をドラッグでリサイズ</li>
-                <li>テストケースIDをクリックして編集</li>
-                <li>種別で正常系/異常系を選択</li>
-                <li>ステータスでノードの見た目が変化</li>
-                <li>マークダウン部分をダブルクリックで編集</li>
-                <li>編集中は外側クリックで自動保存</li>
-                <li>ノードの4方向の点をクリックして接続</li>
-                <li>ノードを右クリックで削除</li>
-                <li>接続線を右クリックで削除</li>
-                <li>背景をドラッグして全体移動</li>
-                <li>2本指でピンチズーム</li>
-            </ul>
+    <!-- 操作方法モーダル -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📝 操作方法</h3>
+                <button class="modal-close" id="modalCloseBtn">×</button>
+            </div>
+            <div class="modal-body">
+                <ul>
+                    <li>ノードをドラッグして移動</li>
+                    <li>ノードの4辺をドラッグでリサイズ</li>
+                    <li>テストケースIDをクリックして編集</li>
+                    <li>種別で正常系/異常系を選択</li>
+                    <li>ステータスでノードの見た目が変化</li>
+                    <li>マークダウン部分をダブルクリックで編集</li>
+                    <li>編集中は外側クリックで自動保存</li>
+                    <li>ノードの4方向の点をクリックして接続</li>
+                    <li>ノードを右クリックで削除</li>
+                    <li>接続線を右クリックで削除</li>
+                    <li>背景をドラッグして全体移動</li>
+                    <li>2本指でピンチズーム（スマホ）</li>
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -880,8 +945,19 @@
         const exportTsvBtn = document.getElementById('exportTsvBtn');
         const exportJsonBtn = document.getElementById('exportJsonBtn');
         const exportSvgBtn = document.getElementById('exportSvgBtn');
-        const infoBox = document.getElementById('infoBox');
-        const minimizeBtn = document.getElementById('minimizeBtn');
+        const helpBtn = document.getElementById('helpBtn');
+        const helpBtnMobile = document.getElementById('helpBtnMobile');
+        const helpModal = document.getElementById('helpModal');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
+        
+        // ハンバーガーメニュー用
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        const hamburgerMenu = document.getElementById('hamburgerMenu');
+        const menuOverlay = document.getElementById('menuOverlay');
+        const addNodeBtnMobile = document.getElementById('addNodeBtnMobile');
+        const clearBtnMobile = document.getElementById('clearBtnMobile');
+        const importBtnMobile = document.getElementById('importBtnMobile');
+        const exportBtnMobile = document.getElementById('exportBtnMobile');
 
         let nodes = [];
         let connections = [];
@@ -2153,22 +2229,26 @@
             }
         });
 
-        // 最小化ボタンのイベント
-        minimizeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            infoBox.classList.toggle('minimized');
-            if (infoBox.classList.contains('minimized')) {
-                minimizeBtn.textContent = '+';
-            } else {
-                minimizeBtn.textContent = '−';
-            }
+        // 操作方法モーダルの開閉
+        helpBtn.addEventListener('click', () => {
+            helpModal.classList.add('show');
         });
 
-        // 最小化されたインフォボックスをクリックで展開
-        infoBox.addEventListener('click', () => {
-            if (infoBox.classList.contains('minimized')) {
-                infoBox.classList.remove('minimized');
-                minimizeBtn.textContent = '−';
+        helpBtnMobile.addEventListener('click', () => {
+            helpModal.classList.add('show');
+            hamburgerMenu.classList.remove('open');
+            menuOverlay.classList.remove('show');
+            hamburgerBtn.textContent = '☰ メニュー';
+        });
+
+        modalCloseBtn.addEventListener('click', () => {
+            helpModal.classList.remove('show');
+        });
+
+        // モーダルオーバーレイクリックで閉じる
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) {
+                helpModal.classList.remove('show');
             }
         });
 
@@ -2317,6 +2397,68 @@
                 isDraggingCanvas = false;
                 canvas.classList.remove('grabbing');
             }
+        });
+
+        // ハンバーガーメニューの開閉
+        hamburgerBtn.addEventListener('click', () => {
+            const isOpen = hamburgerMenu.classList.contains('open');
+            
+            if (isOpen) {
+                // メニューを閉じる
+                hamburgerMenu.classList.remove('open');
+                menuOverlay.classList.remove('show');
+                hamburgerBtn.textContent = '☰ メニュー';
+            } else {
+                // メニューを開く
+                hamburgerMenu.classList.add('open');
+                menuOverlay.classList.add('show');
+                hamburgerBtn.textContent = '× 閉じる';
+            }
+        });
+
+        menuOverlay.addEventListener('click', () => {
+            hamburgerMenu.classList.remove('open');
+            menuOverlay.classList.remove('show');
+            hamburgerBtn.textContent = '☰ メニュー';
+        });
+
+        // モバイルメニューのボタンイベント
+        addNodeBtnMobile.addEventListener('click', () => {
+            createNode(Math.random() * 600 + 100, Math.random() * 400 + 100);
+            hamburgerMenu.classList.remove('open');
+            menuOverlay.classList.remove('show');
+            hamburgerBtn.textContent = '☰ メニュー';
+        });
+
+        clearBtnMobile.addEventListener('click', () => {
+            if (confirm('本当に削除しますか？')) {
+                nodes.forEach(n => n.element.remove());
+                nodes = [];
+                connections = [];
+                updateConnections();
+            }
+            hamburgerMenu.classList.remove('open');
+            menuOverlay.classList.remove('show');
+            hamburgerBtn.textContent = '☰ メニュー';
+        });
+
+        importBtnMobile.addEventListener('click', () => {
+            fileInput.click();
+            hamburgerMenu.classList.remove('open');
+            menuOverlay.classList.remove('show');
+            hamburgerBtn.textContent = '☰ メニュー';
+        });
+
+        exportBtnMobile.addEventListener('click', () => {
+            const rect = exportBtnMobile.getBoundingClientRect();
+            exportMenu.style.left = '50%';
+            exportMenu.style.transform = 'translateX(-50%)';
+            exportMenu.style.bottom = '100px';
+            exportMenu.style.top = 'auto';
+            exportMenu.classList.add('show');
+            hamburgerMenu.classList.remove('open');
+            menuOverlay.classList.remove('show');
+            hamburgerBtn.textContent = '☰ メニュー';
         });
 
         // 初期ノード作成（デモ用）
