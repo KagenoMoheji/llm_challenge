@@ -1174,12 +1174,14 @@
             testTypeSelect.addEventListener('change', (e) => {
                 nodeData.testType = e.target.value;
                 testTypeSelect.className = `test-type type-${e.target.value}`;
+                saveToSessionStorage(); // sessionStorageに保存
             });
 
             // テストケースID編集
             const nodeIdInput = node.querySelector('.node-id');
             nodeIdInput.addEventListener('blur', () => {
                 nodeData.testCaseId = nodeIdInput.textContent;
+                saveToSessionStorage(); // sessionStorageに保存
             });
 
             nodeIdInput.addEventListener('keydown', (e) => {
@@ -1207,6 +1209,9 @@
                 
                 // このノードのステータスが変更されたら、後続ノードのステータスオプションを更新
                 updateAllStatusOptions();
+                
+                // sessionStorageに保存
+                saveToSessionStorage();
             });
 
             // ドラッグ開始（マウス）
@@ -1314,11 +1319,13 @@
                         nodeData.content = textarea.value;
                         updateNodeContent(nodeData);
                         node.classList.remove('editing');
+                        saveToSessionStorage(); // sessionStorageに保存
                     } else if (node.contains(e.target) && !textarea.contains(e.target) && e.target.tagName !== 'TEXTAREA') {
                         // ノード内のテキストエリア以外をクリックした場合
                         nodeData.content = textarea.value;
                         updateNodeContent(nodeData);
                         node.classList.remove('editing');
+                        saveToSessionStorage(); // sessionStorageに保存
                     }
                 }
             });
@@ -1648,14 +1655,8 @@
         }
 
         // JSON形式でエクスポート
-        function exportToJson() {
-            // テストケースIDの重複チェック
-            const duplicates = checkDuplicateTestCaseIds();
-            if (duplicates.length > 0) {
-                alert('重複のテストケースIDがあります。一意の値を登録してください。\n重複ID: ' + duplicates.join(', '));
-                return;
-            }
-
+        // JSONデータを生成
+        function generateJsonData() {
             const exportData = {
                 export_date: new Date().toISOString(),
                 version: '1.0',
@@ -1703,6 +1704,44 @@
                     };
                 })
             };
+            return exportData;
+        }
+
+        // sessionStorageに保存
+        function saveToSessionStorage() {
+            try {
+                const data = generateJsonData();
+                const jsonString = JSON.stringify(data);
+                sessionStorage.setItem('mindmap_data', jsonString);
+            } catch (e) {
+                console.error('sessionStorageへの保存に失敗しました:', e);
+            }
+        }
+
+        // sessionStorageから読み込み
+        function loadFromSessionStorage() {
+            try {
+                const jsonString = sessionStorage.getItem('mindmap_data');
+                if (jsonString) {
+                    const data = JSON.parse(jsonString);
+                    importFromJsonData(data);
+                    return true;
+                }
+            } catch (e) {
+                console.error('sessionStorageからの読み込みに失敗しました:', e);
+            }
+            return false;
+        }
+
+        function exportToJson() {
+            // テストケースIDの重複チェック
+            const duplicates = checkDuplicateTestCaseIds();
+            if (duplicates.length > 0) {
+                alert('重複のテストケースIDがあります。一意の値を登録してください。\n重複ID: ' + duplicates.join(', '));
+                return;
+            }
+
+            const exportData = generateJsonData();
 
             // JSON文字列に変換（整形あり）
             const jsonContent = JSON.stringify(exportData, null, 2);
@@ -1915,6 +1954,114 @@
         }
 
         // インポート関数
+        // JSONデータからインポート
+        function importFromJsonData(jsonData) {
+            const importData = jsonData.nodes || [];
+            
+            // 既存のノードと接続をクリア
+            nodes.forEach(n => n.element.remove());
+            nodes = [];
+            connections = [];
+            nodeIdCounter = 0;
+            
+            // uniqueIdからnodeIdへのマッピング
+            const uniqueIdToNodeId = new Map();
+            
+            // ノードを再作成
+            importData.forEach(nodeInfo => {
+                const x = parseFloat(nodeInfo.x_position) || Math.random() * 600 + 100;
+                const y = parseFloat(nodeInfo.y_position) || Math.random() * 400 + 100;
+                const content = nodeInfo.markdown_content || '';
+                
+                const newNode = createNode(x, y, content);
+                
+                // ノードデータを復元
+                newNode.uniqueId = nodeInfo.unique_id;
+                newNode.testCaseId = nodeInfo.test_case_id;
+                newNode.testType = nodeInfo.test_type || '正常系';
+                newNode.status = nodeInfo.status || '起票';
+                newNode.width = parseFloat(nodeInfo.width) || null;
+                newNode.height = parseFloat(nodeInfo.height) || null;
+                
+                // サイズを設定
+                if (newNode.width) {
+                    newNode.element.style.width = newNode.width + 'px';
+                }
+                if (newNode.height) {
+                    newNode.element.style.height = newNode.height + 'px';
+                }
+                
+                // UIを更新
+                const nodeIdInput = newNode.element.querySelector('.node-id');
+                nodeIdInput.textContent = newNode.testCaseId;
+                
+                const testTypeSelect = newNode.element.querySelector('.test-type');
+                testTypeSelect.value = newNode.testType;
+                testTypeSelect.className = `test-type type-${newNode.testType}`;
+                
+                const statusSelect = newNode.element.querySelector('.node-status');
+                statusSelect.value = newNode.status;
+                statusSelect.className = `node-status status-${newNode.status}`;
+                updateNodeAppearance(newNode);
+                
+                // マッピングを保存
+                uniqueIdToNodeId.set(nodeInfo.unique_id, newNode.id);
+            });
+            
+            // 接続を再作成
+            importData.forEach(nodeInfo => {
+                const currentNode = nodes.find(n => n.uniqueId === nodeInfo.unique_id);
+                if (!currentNode) return;
+                
+                // connected_node_idsを配列として取得（文字列の場合はパース）
+                let connectedNodeIds = nodeInfo.connected_node_ids || [];
+                if (typeof connectedNodeIds === 'string') {
+                    try {
+                        connectedNodeIds = JSON.parse(connectedNodeIds);
+                    } catch (e) {
+                        console.error('Failed to parse connected_node_ids:', e);
+                        connectedNodeIds = [];
+                    }
+                }
+                
+                connectedNodeIds.forEach(connInfo => {
+                    if (connInfo.direction === 'to') {
+                        const targetNodeId = uniqueIdToNodeId.get(connInfo.node_id);
+                        if (targetNodeId) {
+                            const fromDirection = connInfo.connect_point || 'center';
+                            
+                            // 接続先ノードのデータから接続点を取得
+                            const targetNodeInfo = importData.find(n => n.unique_id === connInfo.node_id);
+                            let toDirection = 'center';
+                            
+                            if (targetNodeInfo) {
+                                let targetConnections = targetNodeInfo.connected_node_ids || [];
+                                if (typeof targetConnections === 'string') {
+                                    try {
+                                        targetConnections = JSON.parse(targetConnections);
+                                    } catch (e) {
+                                        targetConnections = [];
+                                    }
+                                }
+                                
+                                // 相手ノードから自分へのfrom接続を探す
+                                const reverseConn = targetConnections.find(
+                                    c => c.direction === 'from' && c.node_id === nodeInfo.unique_id
+                                );
+                                if (reverseConn) {
+                                    toDirection = reverseConn.connect_point || 'center';
+                                }
+                            }
+                            
+                            createConnection(currentNode.id, targetNodeId, fromDirection, toDirection);
+                        }
+                    }
+                });
+            });
+            
+            updateAllStatusOptions();
+        }
+
         function importFromFile(file) {
             const reader = new FileReader();
             
@@ -1923,142 +2070,28 @@
                 const fileName = file.name.toLowerCase();
                 
                 try {
-                    let importData;
-                    
                     if (fileName.endsWith('.json')) {
                         // JSON形式のインポート
                         const jsonData = JSON.parse(content);
-                        importData = jsonData.nodes || [];
+                        importFromJsonData(jsonData);
                     } else if (fileName.endsWith('.tsv')) {
                         // TSV形式のインポート
                         const tsvLines = parseTsv(content);
                         const headers = tsvLines[0];
-                        importData = tsvLines.slice(1).map(row => {
+                        const importData = tsvLines.slice(1).map(row => {
                             const obj = {};
                             headers.forEach((header, index) => {
                                 obj[header] = row[index] || '';
                             });
                             return obj;
                         });
+                        
+                        // TSVデータをJSON形式に変換してimport
+                        importFromJsonData({ nodes: importData });
                     } else {
                         alert('サポートされていないファイル形式です。TSVまたはJSONファイルを選択してください。');
                         return;
                     }
-                    
-                    // 既存のノードと接続をクリア
-                    nodes.forEach(n => n.element.remove());
-                    nodes = [];
-                    connections = [];
-                    nodeIdCounter = 0;
-                    
-                    // uniqueIdからnodeIdへのマッピング
-                    const uniqueIdToNodeId = new Map();
-                    
-                    // ノードを再作成
-                    importData.forEach(nodeInfo => {
-                        const x = parseFloat(nodeInfo.x_position) || Math.random() * 600 + 100;
-                        const y = parseFloat(nodeInfo.y_position) || Math.random() * 400 + 100;
-                        const content = nodeInfo.markdown_content || '';
-                        
-                        const newNode = createNode(x, y, content);
-                        
-                        // ノードデータを復元
-                        newNode.uniqueId = nodeInfo.unique_id;
-                        newNode.testCaseId = nodeInfo.test_case_id;
-                        newNode.testType = nodeInfo.test_type || '正常系';
-                        newNode.status = nodeInfo.status || '起票';
-                        newNode.width = parseFloat(nodeInfo.width) || null;
-                        newNode.height = parseFloat(nodeInfo.height) || null;
-                        
-                        // サイズを設定
-                        if (newNode.width) {
-                            newNode.element.style.width = newNode.width + 'px';
-                        }
-                        if (newNode.height) {
-                            newNode.element.style.height = newNode.height + 'px';
-                        }
-                        
-                        // UIを更新
-                        const nodeIdInput = newNode.element.querySelector('.node-id');
-                        nodeIdInput.textContent = newNode.testCaseId;
-                        
-                        const testTypeSelect = newNode.element.querySelector('.test-type');
-                        testTypeSelect.value = newNode.testType;
-                        testTypeSelect.className = `test-type type-${newNode.testType}`;
-                        
-                        const statusSelect = newNode.element.querySelector('.node-status');
-                        statusSelect.value = newNode.status;
-                        statusSelect.className = `node-status status-${newNode.status}`;
-                        updateNodeAppearance(newNode);
-                        
-                        // マッピングを保存
-                        uniqueIdToNodeId.set(nodeInfo.unique_id, newNode.id);
-                    });
-                    
-                    // 接続を再作成
-                    importData.forEach(nodeInfo => {
-                        const fromNodeId = uniqueIdToNodeId.get(nodeInfo.unique_id);
-                        if (fromNodeId === undefined || fromNodeId === null) return;
-                        
-                        let connectionsList;
-                        try {
-                            // 文字列の場合はJSONパース、既にオブジェクトの場合はそのまま使用
-                            connectionsList = typeof nodeInfo.connected_node_ids === 'string' 
-                                ? JSON.parse(nodeInfo.connected_node_ids) 
-                                : nodeInfo.connected_node_ids;
-                        } catch (e) {
-                            console.error('Failed to parse connected_node_ids:', e);
-                            connectionsList = [];
-                        }
-                        
-                        if (Array.isArray(connectionsList)) {
-                            connectionsList.forEach(conn => {
-                                if (conn.direction === 'to') {
-                                    // このノードから相手ノードへの接続
-                                    const toNodeId = uniqueIdToNodeId.get(conn.node_id);
-                                    if (toNodeId !== undefined && toNodeId !== null) {
-                                        // directionが'to'の場合、connect_pointはfromDirection（このノードの接続点）
-                                        // 接続先の接続点は、相手ノードのconnected_node_idsから取得する必要がある
-                                        
-                                        // 相手ノードのデータを探す
-                                        const targetNodeInfo = importData.find(n => n.unique_id === conn.node_id);
-                                        let toConnectPoint = 'center';
-                                        
-                                        if (targetNodeInfo) {
-                                            let targetConnectionsList;
-                                            try {
-                                                targetConnectionsList = typeof targetNodeInfo.connected_node_ids === 'string'
-                                                    ? JSON.parse(targetNodeInfo.connected_node_ids)
-                                                    : targetNodeInfo.connected_node_ids;
-                                            } catch (e) {
-                                                targetConnectionsList = [];
-                                            }
-                                            
-                                            if (Array.isArray(targetConnectionsList)) {
-                                                // 相手ノードのconnected_node_idsから、このノードへの'from'接続を探す
-                                                const reverseConn = targetConnectionsList.find(
-                                                    c => c.direction === 'from' && c.node_id === nodeInfo.unique_id
-                                                );
-                                                if (reverseConn) {
-                                                    toConnectPoint = reverseConn.connect_point || 'center';
-                                                }
-                                            }
-                                        }
-                                        
-                                        createConnection(
-                                            fromNodeId, 
-                                            toNodeId,
-                                            conn.connect_point || 'center',
-                                            toConnectPoint
-                                        );
-                                    }
-                                }
-                            });
-                        }
-                    });
-                    
-                    // すべてのノードのステータスオプションを更新
-                    updateAllStatusOptions();
                     
                     alert('インポートが完了しました。');
                     
@@ -2110,6 +2143,9 @@
                     svg.appendChild(line);
                 }
             });
+            
+            // sessionStorageに保存
+            saveToSessionStorage();
         }
 
         // コネクターの位置を取得
@@ -2461,22 +2497,27 @@
             hamburgerBtn.textContent = '☰ メニュー';
         });
 
-        // 初期ノード作成（デモ用）
-        const node1 = createNode(200, 150, '# ログイン機能テスト\n\n## 前提条件\n- ユーザーが登録済み\n- ログイン画面が表示されている\n\n## テスト手順\n1. ユーザーIDを入力\n2. パスワードを入力\n3. ログインボタンをクリック\n\n## 期待結果\nホーム画面が表示される');
-        const node2 = createNode(550, 100, '# 正常系テスト\n\n## 手順\n- 有効なID/PWを入力\n\n## 結果\n**成功**してログインできる');
-        const node3 = createNode(550, 300, '# 異常系テスト\n\n## 手順\n- 無効なPWを入力\n\n## 結果\n`エラーメッセージ`が表示される');
+        // ページロード時にsessionStorageから復元
+        const loadedFromStorage = loadFromSessionStorage();
         
-        // 初期ノードのテスト種別を設定
-        node2.testType = '正常系';
-        node2.element.querySelector('.test-type').value = '正常系';
-        node2.element.querySelector('.test-type').className = 'test-type type-正常系';
-        
-        node3.testType = '異常系';
-        node3.element.querySelector('.test-type').value = '異常系';
-        node3.element.querySelector('.test-type').className = 'test-type type-異常系';
-        
-        createConnection(node1.id, node2.id, 'right', 'left');
-        createConnection(node1.id, node3.id, 'right', 'left');
+        // sessionStorageにデータがない場合のみ、初期ノード作成（デモ用）
+        if (!loadedFromStorage) {
+            const node1 = createNode(200, 150, '# ログイン機能テスト\n\n## 前提条件\n- ユーザーが登録済み\n- ログイン画面が表示されている\n\n## テスト手順\n1. ユーザーIDを入力\n2. パスワードを入力\n3. ログインボタンをクリック\n\n## 期待結果\nホーム画面が表示される');
+            const node2 = createNode(550, 100, '# 正常系テスト\n\n## 手順\n- 有効なID/PWを入力\n\n## 結果\n**成功**してログインできる');
+            const node3 = createNode(550, 300, '# 異常系テスト\n\n## 手順\n- 無効なPWを入力\n\n## 結果\n`エラーメッセージ`が表示される');
+            
+            // 初期ノードのテスト種別を設定
+            node2.testType = '正常系';
+            node2.element.querySelector('.test-type').value = '正常系';
+            node2.element.querySelector('.test-type').className = 'test-type type-正常系';
+            
+            node3.testType = '異常系';
+            node3.element.querySelector('.test-type').value = '異常系';
+            node3.element.querySelector('.test-type').className = 'test-type type-異常系';
+            
+            createConnection(node1.id, node2.id, 'right', 'left');
+            createConnection(node1.id, node3.id, 'right', 'left');
+        }
     </script>
 </body>
 </html>
