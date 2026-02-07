@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>記事を読み込み中...</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
         :root {
             --cream: #faf8f3;
@@ -302,6 +303,59 @@
             border-radius: 0 0 8px 8px;
             margin-top: 0;
             border-top: 2px solid #cccccc;
+        }
+
+        /* インフォメーションブロック */
+        .section-body .info-block {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 0;
+            color: #ffffff;
+        }
+
+        .section-body .info-block .info-header {
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .section-body .info-block .info-header::before {
+            font-family: "Font Awesome 5 Free";
+            font-weight: 900;
+            margin-right: 8px;
+        }
+
+        .section-body .info-block .info-content {
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        /* インフォメーション（緑） */
+        .section-body .info-type-info {
+            background: #4cb100;
+        }
+
+        .section-body .info-type-info .info-header::before {
+            content: "\f058";
+        }
+
+        /* 注意（黄色） */
+        .section-body .info-type-warn {
+            background: #e0af00;
+            color: #ffffff;
+        }
+
+        .section-body .info-type-warn .info-header::before {
+            content: "\f06a";
+        }
+
+        /* 警告（赤） */
+        .section-body .info-type-alert {
+            background: #dc3545;
+        }
+
+        .section-body .info-type-alert .info-header::before {
+            content: "\f057";
         }
 
         .section-body ul,
@@ -771,6 +825,24 @@
                 return placeholder;
             });
             
+            // インフォメーションブロック (:::info, :::warn, :::alert)
+            const infoBlocks = [];
+            html = html.replace(/:::info\n([\s\S]*?)\n:::/g, (match, content) => {
+                const placeholder = `!!INFOBLOCK!${infoBlocks.length}!!`;
+                infoBlocks.push(`<div class="info-block info-type-info"><div class="info-header">インフォメーション</div><div class="info-content">${escapeHtml(content.trim())}</div></div>`);
+                return placeholder;
+            });
+            html = html.replace(/:::warn\n([\s\S]*?)\n:::/g, (match, content) => {
+                const placeholder = `!!INFOBLOCK!${infoBlocks.length}!!`;
+                infoBlocks.push(`<div class="info-block info-type-warn"><div class="info-header">注意</div><div class="info-content">${escapeHtml(content.trim())}</div></div>`);
+                return placeholder;
+            });
+            html = html.replace(/:::alert\n([\s\S]*?)\n:::/g, (match, content) => {
+                const placeholder = `!!INFOBLOCK!${infoBlocks.length}!!`;
+                infoBlocks.push(`<div class="info-block info-type-alert"><div class="info-header">警告</div><div class="info-content">${escapeHtml(content.trim())}</div></div>`);
+                return placeholder;
+            });
+            
             // テーブルを処理
             const tables = [];
             html = html.replace(/(\|[^\n]+\|(\[([^\]]*)\])?\n(?:\|[^\n]+\|\n)+)/g, (match, tableContent, caption) => {
@@ -892,6 +964,9 @@
             });
             internalLinks.forEach((link, i) => {
                 html = html.replace(`!!INTERNAL!${i}!!`, link);
+            });
+            infoBlocks.forEach((block, i) => {
+                html = html.replace(`!!INFOBLOCK!${i}!!`, block);
             });
             tables.forEach((table, i) => {
                 html = html.replace(`!!TABLE!${i}!!`, table);
