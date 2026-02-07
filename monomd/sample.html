@@ -122,23 +122,30 @@
 - ~~Strikethrough~~: \`~~text~~\`
 - \`Inline code\`: \`\`code\`\`
 
-## Lists
-
-### Unordered List
-- Item 1
-- Item 2
-  - Nested item A
-  - Nested item B
-- Item 3
-
-### Ordered List
-1. First item
-2. Second item
-3. Third item
-
-### Checklist
-- [ ] Unchecked task
-- [x] Completed task
+## Complicated lists (Unordered/Ordered/Checklist)
+1. Ordered item 1
+  - Nested unordered item A
+    - [ ] Nested checklist item A
+  - Text  
+wrapped A
+  1. Nested ordered item A
+  1. Nested ordered item B
+    - [x] Text  
+wrapped B
+  - [x] Nested checklist item B
+  - Nested unordered item B
+1. Ordered item 2
+- Unordered item 1
+  1. Nested ordered item C
+  1. Nested ordered item D
+  - [ ] Text
+wrapped C
+- [x] Checklist item 3
+  - [ ] Nested checklist item C
+  1. Nested ordered item E
+  1. Nested ordered item F
+    - Nested unordered item C
+  - Nested unordered item D
 
 ## Code Blocks
 
@@ -150,9 +157,9 @@ console.log(greeting);
 
 ### Code Block with Output
 \`\`\`python
-print("Hello, World!")
+print("Hello, MonoMD!")
 :::output
-Hello, World!
+Hello, MonoMD!
 :::
 \`\`\`
 
@@ -178,6 +185,8 @@ Hello, World!
 > Level 1 quote
 > > Level 2 quote
 > > > Level 3 quote
+> 
+> Hogehoge
 
 ## Information Blocks
 
@@ -201,6 +210,9 @@ Critical information goes here!
 Regular link: [Visit Google](https://google.com)
 
 Internal link: !!Read Article 1!!(/articles/2019/1)
+:::warn
+You need a implementation that detects clicks on the class \`.internal-link\` and either redirects to the internal link specified by the \`data-path\` attribute or uses \`history.pushState()\`.
+:::
 
 Image with caption:
 ![Sample Image Caption](https://via.placeholder.com/600x300)
