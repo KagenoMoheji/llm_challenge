@@ -24,16 +24,29 @@ content:
       - pandasめんどいから使いたくない\_\[escape\]！(コラ)  
       bbbb
 
-      - [ ] aaaa
-        - bbbbb
-          1. ggaga
-            - [ ] agagag
-          1. gagaga
-        - [x] gaggaga
-      - [x] bbbb
-        1. aggaga
-          - agagag
-        1. gajgaj
+      1. Ordered item 1
+        - Nested unordered item A
+          - [ ] Nested checklist item A
+        - Text  
+      wrapped A
+        1. Nested ordered item A
+        1. Nested ordered item B
+          - [x] Text  
+      wrapped B
+        - [x] Nested checklist item B
+        - Nested unordered item B
+      1. Ordered item 2
+      - Unordered item 1
+        1. Nested ordered item C
+        1. Nested ordered item D
+        - [ ] Text
+      wrapped C
+      - [x] Checklist item 3
+        - [ ] Nested checklist item C
+        1. Nested ordered item E
+        1. Nested ordered item F
+          - Nested unordered item C
+        - Nested unordered item D
 
       hoegehoge
       1. fugafufa
