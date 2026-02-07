@@ -430,6 +430,8 @@ async function renderMarkdown(markdown, options = {}) {
  */
 function getMonoMDCSS() {
     return `
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
+
 :root {
     --cream: #faf8f3;
     --ink: #1a1a1a;
