@@ -816,49 +816,89 @@
         }
 
         /* エクスポートメニュー */
-        .export-menu {
-            position: fixed;
-            background: white;
-            border: 2px solid #667eea;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            z-index: 10000;
-            min-width: 180px;
+        /* エクスポートメニュー（モーダル） */
+        .export-modal-overlay {
             display: none;
-            padding: 10px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
         }
 
-        .export-menu.show {
-            display: block;
+        .export-modal-overlay.show {
+            display: flex;
         }
 
-        .export-menu h4 {
-            margin: 0 0 10px 0;
+        .export-modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .export-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .export-modal-header h4 {
+            margin: 0;
             color: #667eea;
-            font-size: 14px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #e0e0e0;
+            font-size: 20px;
         }
 
-        .export-menu button {
+        .export-modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .export-modal-close:hover {
+            background: #f0f0f0;
+            color: #667eea;
+        }
+
+        .export-modal-body button {
             width: 100%;
             background: #667eea;
             color: white;
             border: none;
-            border-radius: 6px;
-            padding: 8px 12px;
+            border-radius: 10px;
+            padding: 15px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 16px;
+            font-weight: bold;
             transition: background 0.2s;
-            margin-bottom: 6px;
+            margin-bottom: 10px;
             text-align: left;
         }
 
-        .export-menu button:last-child {
+        .export-modal-body button:last-child {
             margin-bottom: 0;
         }
 
-        .export-menu button:hover {
+        .export-modal-body button:hover {
             background: #5568d3;
         }
     </style>
@@ -922,11 +962,19 @@
         <div class="context-menu-item delete" id="deleteConnection">🗑️ 接続を削除</div>
     </div>
 
-    <div id="exportMenu" class="export-menu">
-        <h4>📥 エクスポート形式を選択</h4>
-        <button id="exportTsvBtn">📄 TSV形式</button>
-        <button id="exportJsonBtn">📋 JSON形式</button>
-        <button id="exportSvgBtn">🖼️ SVG形式</button>
+    <!-- エクスポートメニュー（モーダル） -->
+    <div class="export-modal-overlay" id="exportModal">
+        <div class="export-modal-content">
+            <div class="export-modal-header">
+                <h4>📥 エクスポート形式を選択</h4>
+                <button class="export-modal-close" id="exportModalCloseBtn">×</button>
+            </div>
+            <div class="export-modal-body">
+                <button id="exportTsvBtn">📄 TSV形式</button>
+                <button id="exportJsonBtn">📋 JSON形式</button>
+                <button id="exportSvgBtn">🖼️ SVG形式</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -939,7 +987,8 @@
         const exportBtn = document.getElementById('exportBtn');
         const fileInput = document.getElementById('fileInput');
         const contextMenu = document.getElementById('contextMenu');
-        const exportMenu = document.getElementById('exportMenu');
+        const exportModal = document.getElementById('exportModal');
+        const exportModalCloseBtn = document.getElementById('exportModalCloseBtn');
         const deleteNodeBtn = document.getElementById('deleteNode');
         const deleteConnectionBtn = document.getElementById('deleteConnection');
         const exportTsvBtn = document.getElementById('exportTsvBtn');
@@ -2200,26 +2249,34 @@
             fileInput.value = '';
         });
 
-        exportBtn.addEventListener('click', (e) => {
-            const rect = exportBtn.getBoundingClientRect();
-            exportMenu.style.left = rect.left + 'px';
-            exportMenu.style.top = (rect.bottom + 5) + 'px';
-            exportMenu.classList.add('show');
+        exportBtn.addEventListener('click', () => {
+            exportModal.classList.add('show');
+        });
+
+        exportModalCloseBtn.addEventListener('click', () => {
+            exportModal.classList.remove('show');
+        });
+
+        // モーダルオーバーレイクリックで閉じる
+        exportModal.addEventListener('click', (e) => {
+            if (e.target === exportModal) {
+                exportModal.classList.remove('show');
+            }
         });
 
         exportTsvBtn.addEventListener('click', () => {
             exportToTsv();
-            exportMenu.classList.remove('show');
+            exportModal.classList.remove('show');
         });
 
         exportJsonBtn.addEventListener('click', () => {
             exportToJson();
-            exportMenu.classList.remove('show');
+            exportModal.classList.remove('show');
         });
 
         exportSvgBtn.addEventListener('click', () => {
             exportToSvg();
-            exportMenu.classList.remove('show');
+            exportModal.classList.remove('show');
         });
 
         clearBtn.addEventListener('click', () => {
@@ -2259,9 +2316,6 @@
         document.addEventListener('click', (e) => {
             if (!contextMenu.contains(e.target)) {
                 contextMenu.classList.remove('show');
-            }
-            if (!exportMenu.contains(e.target) && !exportBtn.contains(e.target)) {
-                exportMenu.classList.remove('show');
             }
         });
 
@@ -2486,12 +2540,7 @@
         });
 
         exportBtnMobile.addEventListener('click', () => {
-            const rect = exportBtnMobile.getBoundingClientRect();
-            exportMenu.style.left = '50%';
-            exportMenu.style.transform = 'translateX(-50%)';
-            exportMenu.style.bottom = '100px';
-            exportMenu.style.top = 'auto';
-            exportMenu.classList.add('show');
+            exportModal.classList.add('show');
             hamburgerMenu.classList.remove('open');
             menuOverlay.classList.remove('show');
             hamburgerBtn.textContent = '☰ メニュー';
