@@ -972,7 +972,6 @@
             <div class="export-modal-body">
                 <button id="exportTsvBtn">📄 TSV形式</button>
                 <button id="exportJsonBtn">📋 JSON形式</button>
-                <button id="exportSvgBtn">🖼️ SVG形式</button>
             </div>
         </div>
     </div>
@@ -993,7 +992,6 @@
         const deleteConnectionBtn = document.getElementById('deleteConnection');
         const exportTsvBtn = document.getElementById('exportTsvBtn');
         const exportJsonBtn = document.getElementById('exportJsonBtn');
-        const exportSvgBtn = document.getElementById('exportSvgBtn');
         const helpBtn = document.getElementById('helpBtn');
         const helpBtnMobile = document.getElementById('helpBtnMobile');
         const helpModal = document.getElementById('helpModal');
@@ -2271,11 +2269,6 @@
 
         exportJsonBtn.addEventListener('click', () => {
             exportToJson();
-            exportModal.classList.remove('show');
-        });
-
-        exportSvgBtn.addEventListener('click', () => {
-            exportToSvg();
             exportModal.classList.remove('show');
         });
 
