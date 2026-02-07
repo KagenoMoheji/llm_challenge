@@ -1,0 +1,28 @@
+{
+  "name": "monomd",
+  "version": "1.0.0",
+  "description": "A redundant-free Markdown parser where every symbol has its own unique role.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": [
+    "markdown",
+    "parser",
+    "html",
+    "converter",
+    "lightweight",
+    "redundant-free",
+    "unique-symbols"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "bugs": {
+    "url": ""
+  },
+  "homepage": ""
+}
