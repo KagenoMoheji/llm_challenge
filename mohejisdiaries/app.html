@@ -1060,7 +1060,7 @@
                 const level = Math.floor(indent / 2);
                 
                 // チェックリストの判定
-                const checklistMatch = item.match(/^(\s*)- \[([ x])\]\s(.+)$/);
+                const checklistMatch = item.match(/^(\s*)- \[([ x])\]\s(.+)$/s);
                 if (checklistMatch) {
                     const checked = checklistMatch[2] === 'x';
                     let content = checklistMatch[3];
@@ -1079,9 +1079,20 @@
             });
             
             // HTMLを構築
-            function buildListHTML(items, startIndex = 0, parentLevel = -1) {
+            function buildListHTML(items, startIndex = 0, parentLevel = -1, parentType = null) {
                 let html = '';
                 let i = startIndex;
+                let currentListType = null;
+                let currentListItems = [];
+                
+                function flushCurrentList() {
+                    if (currentListItems.length > 0 && currentListType) {
+                        const tag = currentListType === 'ordered' ? 'ol' : 'ul';
+                        html += `<${tag}>${currentListItems.join('')}</${tag}>`;
+                        currentListItems = [];
+                        currentListType = null;
+                    }
+                }
                 
                 while (i < items.length) {
                     const item = items[i];
@@ -1093,37 +1104,59 @@
                     
                     // 現在のレベルのアイテムを処理
                     if (item.level === parentLevel + 1) {
+                        // リストタイプが変わった場合、現在のリストを閉じる
+                        if (currentListType !== null && item.type !== 'checklist' && item.type !== currentListType) {
+                            flushCurrentList();
+                        }
+                        
+                        // チェックリストは常に独立して処理
                         if (item.type === 'checklist') {
-                            // チェックリスト項目
+                            flushCurrentList();
                             const checkboxId = `checkbox-${Math.random().toString(36).substr(2, 9)}`;
-                            html += `<li class="checklist-item"><div class="checklist-content"><input type="checkbox" id="${checkboxId}" ${item.checked ? 'checked' : ''} disabled><label for="${checkboxId}">${parseInline(item.content)}</label></div>`;
+                            let itemHtml = `<li class="checklist-item"><div class="checklist-content"><input type="checkbox" id="${checkboxId}" ${item.checked ? 'checked' : ''} disabled><label for="${checkboxId}">${parseInline(item.content)}</label></div>`;
+                            
+                            // 次のアイテムが子要素かチェック
+                            if (i + 1 < items.length && items[i + 1].level > item.level) {
+                                const childResult = buildListHTML(items, i + 1, item.level, item.type);
+                                itemHtml += childResult.html;
+                                i = childResult.nextIndex - 1;
+                            }
+                            
+                            itemHtml += '</li>';
+                            html += `<ul>${itemHtml}</ul>`;
                         } else {
                             // 通常のリスト項目
-                            html += `<li>${parseInline(item.content)}`;
+                            if (currentListType === null) {
+                                currentListType = item.type;
+                            }
+                            
+                            let itemHtml = `<li>${parseInline(item.content)}`;
+                            
+                            // 次のアイテムが子要素かチェック
+                            if (i + 1 < items.length && items[i + 1].level > item.level) {
+                                const childResult = buildListHTML(items, i + 1, item.level, item.type);
+                                itemHtml += childResult.html;
+                                i = childResult.nextIndex - 1;
+                            }
+                            
+                            itemHtml += '</li>';
+                            currentListItems.push(itemHtml);
                         }
-                        
-                        // 次のアイテムが子要素かチェック
-                        if (i + 1 < items.length && items[i + 1].level > item.level) {
-                            const childResult = buildListHTML(items, i + 1, item.level);
-                            const childTag = items[i + 1].type === 'ordered' ? 'ol' : 'ul';
-                            html += `<${childTag}>${childResult.html}</${childTag}>`;
-                            i = childResult.nextIndex - 1;
-                        }
-                        
-                        html += '</li>';
                     }
                     
                     i++;
                 }
                 
+                // 残りのリストを閉じる
+                flushCurrentList();
+                
                 return { html, nextIndex: i };
             }
             
-            // ルートレベルのリストタイプを判定
-            const rootType = parsedItems[0].type === 'ordered' ? 'ol' : 'ul';
+            // ルートレベルから開始
             const result = buildListHTML(parsedItems);
             
-            return `<${rootType}>${result.html}</${rootType}>`;
+            return result.html;
         }
 
         // 日付をフォーマット
