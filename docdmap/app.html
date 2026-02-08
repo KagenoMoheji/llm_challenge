@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>テスト仕様書エディター</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         * {
             margin: 0;
@@ -913,7 +914,7 @@
     </div>
     
     <!-- ハンバーガーメニュー（スマホ版） -->
-    <button class="hamburger-btn" id="hamburgerBtn">☰ メニュー</button>
+    <button class="hamburger-btn" id="hamburgerBtn"><i class="fas fa-bars"></i> メニュー</button>
     <div class="menu-overlay" id="menuOverlay"></div>
     <div class="hamburger-menu" id="hamburgerMenu">
         <button id="clearBtnMobile">🗑️ すべてクリア</button>
@@ -2193,7 +2194,7 @@
             helpModal.classList.add('show');
             hamburgerMenu.classList.remove('open');
             menuOverlay.classList.remove('show');
-            hamburgerBtn.textContent = '☰ メニュー';
+            hamburgerBtn.innerHTML = '<i class="fas fa-bars"></i> メニュー';
         });
 
         modalCloseBtn.addEventListener('click', () => {
@@ -2362,19 +2363,19 @@
                 // メニューを閉じる
                 hamburgerMenu.classList.remove('open');
                 menuOverlay.classList.remove('show');
-                hamburgerBtn.textContent = '☰ メニュー';
+                hamburgerBtn.innerHTML = '<i class="fas fa-bars"></i> メニュー';
             } else {
                 // メニューを開く
                 hamburgerMenu.classList.add('open');
                 menuOverlay.classList.add('show');
-                hamburgerBtn.textContent = '× 閉じる';
+                hamburgerBtn.innerHTML = '<i class="fas fa-xmark"></i> 閉じる';
             }
         });
 
         menuOverlay.addEventListener('click', () => {
             hamburgerMenu.classList.remove('open');
             menuOverlay.classList.remove('show');
-            hamburgerBtn.textContent = '☰ メニュー';
+            hamburgerBtn.innerHTML = '<i class="fas fa-bars"></i> メニュー';
         });
 
         // モバイルメニューのボタンイベント
@@ -2382,7 +2383,7 @@
             createNode(Math.random() * 600 + 100, Math.random() * 400 + 100);
             hamburgerMenu.classList.remove('open');
             menuOverlay.classList.remove('show');
-            hamburgerBtn.textContent = '☰ メニュー';
+            hamburgerBtn.innerHTML = '<i class="fas fa-bars"></i> メニュー';
         });
 
         clearBtnMobile.addEventListener('click', () => {
@@ -2394,21 +2395,21 @@
             }
             hamburgerMenu.classList.remove('open');
             menuOverlay.classList.remove('show');
-            hamburgerBtn.textContent = '☰ メニュー';
+            hamburgerBtn.innerHTML = '<i class="fas fa-bars"></i> メニュー';
         });
 
         importBtnMobile.addEventListener('click', () => {
             fileInput.click();
             hamburgerMenu.classList.remove('open');
             menuOverlay.classList.remove('show');
-            hamburgerBtn.textContent = '☰ メニュー';
+            hamburgerBtn.innerHTML = '<i class="fas fa-bars"></i> メニュー';
         });
 
         exportBtnMobile.addEventListener('click', () => {
             exportModal.classList.add('show');
             hamburgerMenu.classList.remove('open');
             menuOverlay.classList.remove('show');
-            hamburgerBtn.textContent = '☰ メニュー';
+            hamburgerBtn.innerHTML = '<i class="fas fa-bars"></i> メニュー';
         });
 
         // ページロード時にsessionStorageから復元
