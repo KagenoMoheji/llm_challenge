@@ -6,3 +6,5 @@
 *.pptx
 *.xlsx
 *.docx
+*.tgz
+node_modules/
