@@ -15,14 +15,14 @@
     "redundant-free",
     "unique-symbols"
   ],
-  "author": "",
+  "author": "KagenoMoheji",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/KagenoMoheji/llm_challenge"
   },
   "bugs": {
-    "url": ""
+    "url": "https://github.com/KagenoMoheji/llm_challenge/issues"
   },
   "homepage": ""
 }

@@ -1,0 +1,12 @@
+test.js
+example.html
+.git
+.gitignore
+*.log
+.DS_Store
+SUMMARY.md
+RELEASE_GUIDE.md
+*_v*_by_*.html
+*_v*_by_*.js
+*_v*_by_*.md
+*_v*_by_*.json
