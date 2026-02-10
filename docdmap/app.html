@@ -706,6 +706,59 @@
             font-weight: bold;
         }
 
+        /* 画像拡大表示用モーダル */
+        .image-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+            cursor: zoom-out;
+        }
+
+        .image-modal-overlay.show {
+            display: flex;
+        }
+
+        .image-modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .image-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            font-size: 40px;
+            cursor: pointer;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .image-modal-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* ノード内の画像にカーソルを設定 */
+        .node-content img {
+            cursor: zoom-in;
+        }
+
         /* モバイル対応 */
         @media (max-width: 768px) {
             .toolbar {
@@ -945,6 +998,12 @@
         </div>
     </div>
 
+    <!-- 画像拡大表示モーダル -->
+    <div class="image-modal-overlay" id="imageModal">
+        <button class="image-modal-close" id="imageModalCloseBtn">×</button>
+        <img class="image-modal-content" id="imageModalImg" src="" alt="">
+    </div>
+
     <script>
         // monomdのCSSを挿入
         document.addEventListener('DOMContentLoaded', () => {
@@ -987,6 +1046,11 @@
         const helpBtnMobile = document.getElementById('helpBtnMobile');
         const helpModal = document.getElementById('helpModal');
         const modalCloseBtn = document.getElementById('modalCloseBtn');
+        
+        // 画像モーダル用
+        const imageModal = document.getElementById('imageModal');
+        const imageModalImg = document.getElementById('imageModalImg');
+        const imageModalCloseBtn = document.getElementById('imageModalCloseBtn');
         
         // ハンバーガーメニュー用
         const hamburgerBtn = document.getElementById('hamburgerBtn');
@@ -1540,6 +1604,16 @@
                 if (isDragging) {
                     isDragging = false;
                     node.classList.remove('dragging');
+                }
+            });
+
+            // ノード内の画像クリックで拡大表示
+            node.addEventListener('click', (e) => {
+                if (e.target.tagName === 'IMG' && e.target.closest('.node-content')) {
+                    e.stopPropagation();
+                    imageModalImg.src = e.target.src;
+                    imageModalImg.alt = e.target.alt;
+                    imageModal.classList.add('show');
                 }
             });
         }
@@ -2196,6 +2270,18 @@
         helpModal.addEventListener('click', (e) => {
             if (e.target === helpModal) {
                 helpModal.classList.remove('show');
+            }
+        });
+
+        // 画像モーダルの開閉
+        imageModalCloseBtn.addEventListener('click', () => {
+            imageModal.classList.remove('show');
+        });
+
+        // 画像モーダルのオーバーレイクリックで閉じる
+        imageModal.addEventListener('click', (e) => {
+            if (e.target === imageModal || e.target === imageModalCloseBtn) {
+                imageModal.classList.remove('show');
             }
         });
 
