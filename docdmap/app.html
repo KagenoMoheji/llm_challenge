@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>テスト仕様書エディター</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/monomd@1.0.1/index.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style id="monomd-css"></style>
     <style>
         * {
             margin: 0;
@@ -471,9 +472,6 @@
         }
 
         .node-content {
-            font-size: 14px;
-            line-height: 1.6;
-            color: #333;
             cursor: pointer;
             padding: 5px;
             border-radius: 4px;
@@ -486,36 +484,6 @@
         .node-content:hover {
             background-color: #f8f9fa;
         }
-
-        .node-content h1 { font-size: 1.5em; margin: 0.5em 0; word-wrap: break-word; }
-        .node-content h2 { font-size: 1.3em; margin: 0.5em 0; word-wrap: break-word; }
-        .node-content h3 { font-size: 1.1em; margin: 0.5em 0; word-wrap: break-word; }
-        .node-content p { margin: 0.5em 0; word-wrap: break-word; }
-        .node-content ul, .node-content ol { margin-left: 1.5em; }
-        .node-content li { word-wrap: break-word; }
-        .node-content code { 
-            background: #f4f4f4; 
-            padding: 2px 6px; 
-            border-radius: 3px;
-            font-family: monospace;
-            word-wrap: break-word;
-            word-break: break-all;
-            overflow-wrap: break-word;
-        }
-        .node-content pre {
-            background: #f4f4f4;
-            padding: 10px;
-            border-radius: 5px;
-            overflow-x: auto;
-            word-wrap: break-word;
-            white-space: pre-wrap;
-        }
-        .node-content pre code {
-            word-wrap: break-word;
-            white-space: pre-wrap;
-        }
-        .node-content strong { font-weight: bold; }
-        .node-content em { font-style: italic; }
 
         .edit-mode {
             display: none;
@@ -978,6 +946,28 @@
     </div>
 
     <script>
+        // monomdのCSSを挿入
+        document.addEventListener('DOMContentLoaded', () => {
+            const monomdCssElement = document.getElementById('monomd-css');
+            if (monomdCssElement && typeof getMonoMDCSS === 'function') {
+                let css = getMonoMDCSS();
+                
+                // .checklist-content の margin-left のみを置換
+                css = css.replace(
+                    /(\.monomd-body \.checklist-content\s*{[^}]*margin-left:\s*)([^;]+)(;)/,
+                    '$1-22px$3'
+                );
+                
+                // .checklist-content input[type="checkbox"] の margin-top のみを置換
+                css = css.replace(
+                    /(\.monomd-body \.checklist-content input\[type="checkbox"\]\s*{[^}]*margin-top:\s*)([^;]+)(;)/,
+                    '$16px$3'
+                );
+                
+                monomdCssElement.textContent = css;
+            }
+        });
+
         const canvas = document.getElementById('canvas');
         const canvasContent = document.getElementById('canvas-content');
         const svg = document.getElementById('svg');
@@ -1044,7 +1034,7 @@
         }
 
         // ノード作成
-        function createNode(x, y, content = '# 新しいテストケース\n\n内容を記述...') {
+        async function createNode(x, y, content = '# 新しいテストケース\n\n内容を記述...') {
             const nodeId = nodeIdCounter++;
             const node = document.createElement('div');
             node.className = 'node';
@@ -1106,7 +1096,7 @@
             canvasContent.appendChild(node);
 
             // マークダウンレンダリング
-            updateNodeContent(nodeData);
+            await updateNodeContent(nodeData);
 
             // 初期サイズを記録
             setTimeout(() => {
@@ -1128,9 +1118,10 @@
         }
 
         // ノードコンテンツ更新
-        function updateNodeContent(nodeData) {
+        async function updateNodeContent(nodeData) {
             const contentDiv = nodeData.element.querySelector('.node-content');
-            contentDiv.innerHTML = marked.parse(nodeData.content);
+            const result = await renderMarkdown(nodeData.content);
+            contentDiv.innerHTML = result.html;
         }
 
         // ノードの見た目を更新
@@ -1767,12 +1758,12 @@
         }
 
         // sessionStorageから読み込み
-        function loadFromSessionStorage() {
+        async function loadFromSessionStorage() {
             try {
                 const jsonString = sessionStorage.getItem('mindmap_data');
                 if (jsonString) {
                     const data = JSON.parse(jsonString);
-                    importFromJsonData(data);
+                    await importFromJsonData(data);
                     return true;
                 }
             } catch (e) {
@@ -1875,7 +1866,7 @@
 
         // インポート関数
         // JSONデータからインポート
-        function importFromJsonData(jsonData) {
+        async function importFromJsonData(jsonData) {
             const importData = jsonData.nodes || [];
             
             // 既存のノードと接続をクリア
@@ -1888,12 +1879,12 @@
             const uniqueIdToNodeId = new Map();
             
             // ノードを再作成
-            importData.forEach(nodeInfo => {
+            for (const nodeInfo of importData) {
                 const x = parseFloat(nodeInfo.x_position) || Math.random() * 600 + 100;
                 const y = parseFloat(nodeInfo.y_position) || Math.random() * 400 + 100;
                 const content = nodeInfo.markdown_content || '';
                 
-                const newNode = createNode(x, y, content);
+                const newNode = await createNode(x, y, content);
                 
                 // ノードデータを復元
                 newNode.uniqueId = nodeInfo.unique_id;
@@ -1926,7 +1917,7 @@
                 
                 // マッピングを保存
                 uniqueIdToNodeId.set(nodeInfo.unique_id, newNode.id);
-            });
+            }
             
             // 接続を再作成
             importData.forEach(nodeInfo => {
@@ -1985,7 +1976,7 @@
         function importFromFile(file) {
             const reader = new FileReader();
             
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 const content = e.target.result;
                 const fileName = file.name.toLowerCase();
                 
@@ -1993,7 +1984,7 @@
                     if (fileName.endsWith('.json')) {
                         // JSON形式のインポート
                         const jsonData = JSON.parse(content);
-                        importFromJsonData(jsonData);
+                        await importFromJsonData(jsonData);
                     } else if (fileName.endsWith('.tsv')) {
                         // TSV形式のインポート
                         const tsvLines = parseTsv(content);
@@ -2007,7 +1998,7 @@
                         });
                         
                         // TSVデータをJSON形式に変換してimport
-                        importFromJsonData({ nodes: importData });
+                        await importFromJsonData({ nodes: importData });
                     } else {
                         alert('サポートされていないファイル形式です。TSVまたはJSONファイルを選択してください。');
                         return;
@@ -2103,8 +2094,8 @@
         }
 
         // ツールバーイベント
-        addNodeBtn.addEventListener('click', () => {
-            createNode(Math.random() * 600 + 100, Math.random() * 400 + 100);
+        addNodeBtn.addEventListener('click', async () => {
+            await createNode(Math.random() * 600 + 100, Math.random() * 400 + 100);
         });
 
         importBtn.addEventListener('click', () => {
@@ -2379,8 +2370,8 @@
         });
 
         // モバイルメニューのボタンイベント
-        addNodeBtnMobile.addEventListener('click', () => {
-            createNode(Math.random() * 600 + 100, Math.random() * 400 + 100);
+        addNodeBtnMobile.addEventListener('click', async () => {
+            await createNode(Math.random() * 600 + 100, Math.random() * 400 + 100);
             hamburgerMenu.classList.remove('open');
             menuOverlay.classList.remove('show');
             hamburgerBtn.innerHTML = '<i class="fas fa-bars"></i> メニュー';
@@ -2413,26 +2404,28 @@
         });
 
         // ページロード時にsessionStorageから復元
-        const loadedFromStorage = loadFromSessionStorage();
-        
-        // sessionStorageにデータがない場合のみ、初期ノード作成（デモ用）
-        if (!loadedFromStorage) {
-            const node1 = createNode(200, 150, '# ログイン機能テスト\n\n## 前提条件\n- ユーザーが登録済み\n- ログイン画面が表示されている\n\n## テスト手順\n1. ユーザーIDを入力\n2. パスワードを入力\n3. ログインボタンをクリック\n\n## 期待結果\nホーム画面が表示される');
-            const node2 = createNode(550, 100, '# 正常系テスト\n\n## 手順\n- 有効なID/PWを入力\n\n## 結果\n**成功**してログインできる');
-            const node3 = createNode(550, 300, '# 異常系テスト\n\n## 手順\n- 無効なPWを入力\n\n## 結果\n`エラーメッセージ`が表示される');
+        (async () => {
+            const loadedFromStorage = await loadFromSessionStorage();
             
-            // 初期ノードのテスト種別を設定
-            node2.testType = '正常系';
-            node2.element.querySelector('.test-type').value = '正常系';
-            node2.element.querySelector('.test-type').className = 'test-type type-正常系';
-            
-            node3.testType = '異常系';
-            node3.element.querySelector('.test-type').value = '異常系';
-            node3.element.querySelector('.test-type').className = 'test-type type-異常系';
-            
-            createConnection(node1.id, node2.id, 'right', 'left');
-            createConnection(node1.id, node3.id, 'right', 'left');
-        }
+            // sessionStorageにデータがない場合のみ、初期ノード作成（デモ用）
+            if (!loadedFromStorage) {
+                const node1 = await createNode(200, 150, '# ログイン機能テスト\n\n## 前提条件\n- ユーザーが登録済み\n- ログイン画面が表示されている\n\n## テスト手順\n1. ユーザーIDを入力\n2. パスワードを入力\n3. ログインボタンをクリック\n\n## 期待結果\nホーム画面が表示される');
+                const node2 = await createNode(550, 100, '# 正常系テスト\n\n## 手順\n- 有効なID/PWを入力\n\n## 結果\n**成功**してログインできる');
+                const node3 = await createNode(550, 300, '# 異常系テスト\n\n## 手順\n- 無効なPWを入力\n\n## 結果\n`エラーメッセージ`が表示される');
+                
+                // 初期ノードのテスト種別を設定
+                node2.testType = '正常系';
+                node2.element.querySelector('.test-type').value = '正常系';
+                node2.element.querySelector('.test-type').className = 'test-type type-正常系';
+                
+                node3.testType = '異常系';
+                node3.element.querySelector('.test-type').value = '異常系';
+                node3.element.querySelector('.test-type').className = 'test-type type-異常系';
+                
+                createConnection(node1.id, node2.id, 'right', 'left');
+                createConnection(node1.id, node3.id, 'right', 'left');
+            }
+        })();
     </script>
 </body>
 </html>
