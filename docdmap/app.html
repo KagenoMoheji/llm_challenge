@@ -485,6 +485,12 @@
             background-color: #f8f9fa;
         }
 
+        /* スマホでのスクロールを改善 */
+        .node-content .monomd-body {
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+        }
+
         .edit-mode {
             display: none;
             height: 100%;
@@ -1350,30 +1356,68 @@
                 const touch = e.touches[0];
                 touchStartTime = Date.now();
                 touchMoved = false;
-                isDragging = true;
-                node.classList.add('dragging');
                 
-                // ドラッグ開始時に現在の幅を固定
-                const currentWidth = node.offsetWidth;
-                node.style.width = currentWidth + 'px';
+                // タッチ開始位置を記録
+                nodeData.touchStartX = touch.clientX;
+                nodeData.touchStartY = touch.clientY;
+                nodeData.touchStartScrollTop = 0;
+                nodeData.isDraggingNode = false;
+                nodeData.isScrolling = false;
+                
+                // node-content内でのタッチかチェック
+                const contentDiv = node.querySelector('.node-content');
+                nodeData.isTouchOnContent = contentDiv.contains(e.target);
+                
+                // node-content内のスクロール位置を記録
+                if (nodeData.isTouchOnContent) {
+                    const monomdBody = contentDiv.querySelector('.monomd-body');
+                    if (monomdBody) {
+                        nodeData.touchStartScrollTop = monomdBody.scrollTop || 0;
+                    }
+                }
                 
                 dragOffset.x = touch.clientX - nodeData.x;
                 dragOffset.y = touch.clientY - nodeData.y;
-                e.stopPropagation();
             }, { passive: false });
 
             // タッチ移動
             node.addEventListener('touchmove', (e) => {
-                if (isDragging) {
+                const touch = e.touches[0];
+                const deltaX = Math.abs(touch.clientX - nodeData.touchStartX);
+                const deltaY = Math.abs(touch.clientY - nodeData.touchStartY);
+                
+                // まだ方向が確定していない場合
+                if (!nodeData.isDraggingNode && !nodeData.isScrolling) {
+                    // 5px以上動いたら方向を判定
+                    if (deltaX > 5 || deltaY > 5) {
+                        if (nodeData.isTouchOnContent && deltaY > deltaX * 1.5) {
+                            // node-content内で縦方向の動きが大きい場合はスクロール
+                            nodeData.isScrolling = true;
+                        } else {
+                            // それ以外はドラッグ
+                            nodeData.isDraggingNode = true;
+                            isDragging = true;
+                            node.classList.add('dragging');
+                            
+                            // ドラッグ開始時に現在の幅を固定
+                            const currentWidth = node.offsetWidth;
+                            node.style.width = currentWidth + 'px';
+                        }
+                    }
+                }
+                
+                // ドラッグ中
+                if (nodeData.isDraggingNode && isDragging) {
                     touchMoved = true;
-                    const touch = e.touches[0];
                     nodeData.x = touch.clientX - dragOffset.x;
                     nodeData.y = touch.clientY - dragOffset.y;
                     node.style.left = nodeData.x + 'px';
                     node.style.top = nodeData.y + 'px';
                     updateConnections();
                     e.preventDefault();
+                    e.stopPropagation();
                 }
+                // スクロール中はデフォルト動作を許可（preventDefault しない）
             }, { passive: false });
 
             // タッチ終了
@@ -1388,6 +1432,10 @@
                         // シングルタップの処理はここには書かない
                     }
                 }
+                
+                // フラグをリセット
+                nodeData.isDraggingNode = false;
+                nodeData.isScrolling = false;
             });
 
             // マークダウン部分のダブルクリックで編集モードに
