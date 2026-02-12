@@ -2427,6 +2427,13 @@
                     
                     // canvas-contentにスケールを適用（canvasのサイズは維持）
                     canvasContent.style.transform = `scale(${currentScale})`;
+                    
+                    // スケールをsessionStorageに保存
+                    try {
+                        sessionStorage.setItem('mindmap_scale', currentScale.toString());
+                    } catch (e) {
+                        console.error('スケールの保存に失敗:', e);
+                    }
                 }
                 
                 lastTouchDistance = currentDistance;
@@ -2539,6 +2546,19 @@
 
         // ページロード時にsessionStorageから復元
         (async () => {
+            // ズームスケールの復元
+            try {
+                const savedScale = sessionStorage.getItem('mindmap_scale');
+                if (savedScale) {
+                    currentScale = parseFloat(savedScale);
+                    // スケールの制限（0.5倍〜3倍）
+                    currentScale = Math.max(0.5, Math.min(3, currentScale));
+                    canvasContent.style.transform = `scale(${currentScale})`;
+                }
+            } catch (e) {
+                console.error('スケールの復元に失敗:', e);
+            }
+            
             const loadedFromStorage = await loadFromSessionStorage();
             
             // sessionStorageにデータがない場合のみ、初期ノード作成（デモ用）
