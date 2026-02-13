@@ -8,11 +8,12 @@
 # https://qiita.com/jshimazu/items/c484c6b5acd1ca11e05d
 # 
 # [例]
-# $ bash ./install_node_from_nodesource -v 14
-# $ bash ./install_node_from_nodesource -v 14.15.5
+# $ bash ./install_node_from_nodesource -v 14 -h ${NODEJS_HOME}
+# $ bash ./install_node_from_nodesource -v 14.15.5 -h /opt/nodejs
 #######################################################################
 
 node_version=""
+nodejs_home=""
 while [ $# -gt 0 ]; do
     case $1 in
         -v)
@@ -31,6 +32,14 @@ while [ $# -gt 0 ]; do
         *)
             ;;
     esac
+    case $1 in
+        -h)
+            shift
+            nodejs_home=$1
+            ;;
+        *)
+            ;;
+    esac
     shift
 done
 if [ -z ${node_version} ]; then
@@ -38,6 +47,9 @@ if [ -z ${node_version} ]; then
     exit 1
 fi
 # echo ${node_version}
+# echo ${nodejs_home}
 
+mkdir -p ${nodejs_home}/
+cd ${nodejs_home}/
 curl -sL https://deb.nodesource.com/setup_${node_version}.x | bash
 apt-get install -y nodejs

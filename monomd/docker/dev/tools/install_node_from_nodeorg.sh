@@ -5,11 +5,12 @@
 # https://nodejs.org/download/release/
 # 
 # [例]
-# $ bash ./install_node_from_nodeorg -v 14
-# $ bash ./install_node_from_nodeorg -v 14.15.5
+# $ bash ./install_node_from_nodeorg -v 14 -h ${NODEJS_HOME}
+# $ bash ./install_node_from_nodeorg -v 14.15.5 -h /opt/nodejs
 #######################################################################
 
 node_version=""
+nodejs_home=""
 while [ $# -gt 0 ]; do
     case $1 in
         -v)
@@ -26,13 +27,26 @@ while [ $# -gt 0 ]; do
         *)
             ;;
     esac
+    case $1 in
+        -h)
+            shift
+            nodejs_home=$1
+            ;;
+        *)
+            ;;
+    esac
     shift
 done
 if [ -z ${node_version} ]; then
     echo "Error: You should set Node version."
     exit 1
 fi
+if [ -z ${nodejs_home} ]; then
+    echo "Error: You should set NodeJS home directory."
+    exit 1
+fi
 # echo ${node_version}
+# echo ${nodejs_home}
 
 
 
@@ -50,13 +64,15 @@ if [[ ${node_version} =~ ${reg_pattern} ]]; then
 fi
 
 
+mkdir -p ${nodejs_home}/
+cd ${nodejs_home}/
 # 3つの数字からなるバージョンを用いてwgetでNodeJSをダウンロード
 wget -q -nv https://nodejs.org/download/release/v${node_version}/node-v${node_version}-linux-x64.tar.xz
 
 
-# 環境変数で登録してある"/opt/nodejs/"下にbinが配置されるように移動させる
+# 環境変数で登録してある"${nodejs_home}/"下にbinが配置されるように移動させる
 tar Jxfv node-v${node_version}-linux-x64.tar.xz
-mv ./node-v${node_version}-linux-x64/* ./
+mv ./node-v${node_version}-linux-x64/* ${nodejs_home}/
 # インストール済んだらインストーラは不要なので削除
 rm node-v${node_version}-linux-x64.tar.xz
 rm -r ./node-v${node_version}-linux-x64
