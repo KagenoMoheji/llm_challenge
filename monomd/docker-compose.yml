@@ -6,11 +6,12 @@ services:
       context: .
       dockerfile: ./docker/dev/Dockerfile
       args:
+        APPNAME: ${APPNAME}
         SHARED_WORKSPACE_HOST: ${SHARED_WORKSPACE_HOST}
         SHARED_WORKSPACE_CONTAINER: ${SHARED_WORKSPACE_CONTAINER}
         NODE_VERSION: ${NODE_VERSION}
-    image: monomd_dev
-    container_name: monomd_dev
+    image: ${APPNAME}
+    container_name: ${APPNAME}
     ports:
       # webpack-bundle-analyzer用
       - 8765:8765
