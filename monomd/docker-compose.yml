@@ -6,15 +6,19 @@ services:
       context: .
       dockerfile: ./docker/dev/Dockerfile
       args:
+        USER_HOST: ${USER_HOST}
+        UID_HOST: ${UID_HOST}
+        GID_HOST: ${GID_HOST}
         APPNAME: ${APPNAME}
         SHARED_WORKSPACE_HOST: ${SHARED_WORKSPACE_HOST}
         SHARED_WORKSPACE_CONTAINER: ${SHARED_WORKSPACE_CONTAINER}
         NODE_VERSION: ${NODE_VERSION}
+        # PORT_WEBPACK_BUNDLE_ANALYZER: ${PORT_WEBPACK_BUNDLE_ANALYZER}
     image: ${APPNAME}
     container_name: ${APPNAME}
-    ports:
-      # webpack-bundle-analyzer用
-      - 8765:8765
+    # ports:
+    #   # webpack-bundle-analyzer用
+    #   - ${PORT_WEBPACK_BUNDLE_ANALYZER}:${PORT_WEBPACK_BUNDLE_ANALYZER}
     volumes:
       - ./${SHARED_WORKSPACE_HOST}:${SHARED_WORKSPACE_CONTAINER}
       # ---------------------------------------------------------------------------
