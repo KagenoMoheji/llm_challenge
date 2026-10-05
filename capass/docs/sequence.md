@@ -31,14 +31,14 @@ sequenceDiagram
         Note right of tool_server: ツール情報(ツールエンドポイント(コマンド/APIエンドポイント/...)/コンテキスト(説明))/ツール認証情報/AIエージェント情報
         capass_client ->> capass_server: 登録
         Note right of capass_client: ツール情報/ツール認証情報/AIエージェント情報/ツールサーバ公開鍵
-        capass_server ->> capass_server: レコード「ツールエンドポイント/コンテキスト/ツール認証情報/AIエージェント情報/更新日時/ロック状況/ツールサーバ公開鍵」をDB登録
+        capass_server ->> capass_server: レコード[ツールエンドポイント/コンテキスト/ツール認証情報/AIエージェント情報/パスワード更新日時/ツール利用日時/ロック状況/ツールサーバ公開鍵]をDB登録
         capass_server ->> capass_client: 登録完了
         capass_client ->> tool_server: 登録完了
     end
     rect rgba(220, 220, 220, 1)
         Note over capass_provider,capass_server: AIエージェントによるツール実行
         agent ->> agent: タスク実行のプロンプトを受け取る
-        agent ->> capass_client: CaPassクライアントのサブコマンド「list」で使用可能なツール一覧を要求
+        agent ->> capass_client: CaPassクライアントのサブコマンド「list executable」で使用可能なツール一覧を要求
         Note right of agent: エージェント情報
         capass_client ->> capass_server: エージェント情報に対応する使用可能なツール一覧を要求
         Note right of capass_client: エージェント情報
@@ -163,4 +163,59 @@ sequenceDiagram
             capass_client ->> tool_server: 更新失敗エラー
         end
     end
+    rect rgba(220, 220, 220, 1)
+        Note over capass_provider,capass_server: [任意]ツールサーバによるツール認証情報の利用実績の定期更新監視ジョブ
+        loop N日(7日とか？)ごとに実行
+            tool_server ->> capass_client: CaPassクライアントのサブコマンド「list registerd」を実行
+            capass_client ->> capass_server: 実行
+            Note right of capass_client: ツールサーバ公開鍵
+            capass_server ->> capass_server: nonce生成
+            capass_server ->> capass_client: 登録元ツールサーバか本人確認するからnonceに署名して
+            Note right of capass_client: nonce
+            capass_client ->> capass_client: 秘密鍵でnonceに署名
+            capass_client ->> capass_server: 署名したぜ
+            Note right of capass_client: 署名済みnonce
+            capass_server ->> capass_server: DB検索で得たツールサーバ公開鍵で署名済みnonceの検証
+            alt 署名は正当
+                capass_server ->> capass_server: ツールサーバに一致するレコードの[ツールエンドポイント/コンテキスト/ツール認証情報のPrincipal/AIエージェント情報/パスワード更新日時/ツール利用日時/ロック状況]を取得
+                alt 1件以上ヒット
+                    capass_server ->> capass_client: 返す
+                    Note right of capass_client: リスト
+                    capass_client ->> tool_server: 返す
+                    Note right of tool_server: リスト
+                    tool_server ->> tool_server: [活用例1]ツール利用日時が一定期間以上古いものを選択
+                    tool_server ->> capass_client: [活用例1]CaPassクライアントのサブコマンド「update lock」を実行
+                    Note right of tool_server: [活用例1]ツールエンドポイント/ツール認証情報のPrincipal/AIエージェント情報
+                    capass_client ->> capass_server: 実行
+                    Note right of capass_client: [活用例1]ツールエンドポイント/ツール認証情報のPrincipal/AIエージェント情報/ツールサーバ公開鍵
+                    capass_server ->> capass_server: [活用例1]nonce生成
+                    capass_server ->> capass_client: [活用例1]登録元ツールサーバか本人確認するからnonceに署名して
+                    Note right of capass_client: [活用例1]nonce
+                    capass_client ->> capass_client: [活用例1]秘密鍵でnonceに署名
+                    capass_client ->> capass_server: [活用例1]署名したぜ
+                    Note right of capass_client: [活用例1]署名済みnonce
+                    capass_server ->> capass_server: [活用例1]DB検索で得たツールサーバ公開鍵で署名済みnonceの検証
+                    alt 署名は正当
+                        capass_server ->> capass_server: [活用例1]ロックへ更新
+                        capass_server ->> capass_client: [活用例1]ロック成功
+                        capass_client ->> tool_server: [活用例1]ロック成功
+                    else 署名は不当
+                        capass_server ->> capass_client: [活用例1]ロック失敗エラー
+                        capass_client ->> tool_server: [活用例1]ロック失敗エラー
+                    end
+                else 取得結果無し
+                    capass_server ->> capass_client: 登録無し
+                    capass_client ->> tool_server: 登録無し
+                end
+            else 署名は不当
+                capass_server ->> capass_client: 取得失敗エラー
+                capass_client ->> tool_server: 取得失敗エラー
+            end
+        end
+    end
 ```
+
+## TODO
+- もしかしたらAIエージェント側も公開鍵署名やらせた方が良いかも
+- ツール認証情報に一括りにしている箇所があるが、Principal部分だけ一覧に含めて返して良い部分とかあるかも
+- AIエージェント情報に「そのAIエージェントは削除済みか」も持たせたいかも。それによってツールサーバ側でツール認証情報の棚卸する判断できる。
