@@ -61,7 +61,7 @@ sequenceDiagram
                 capass_client ->> agent: 返す
                 Note right of agent: 認証情報
                 agent ->> tool_server: 認証情報を渡しつつツール実行
-                Note right of agent: 認証情報/その他パラメータ
+                Note right of agent: 認証情報/ツールパラメータ
                 tool_server ->> tool_server: 要求された実行内容が、認証情報の認可(スコープ)の範囲内かチェック
                 alt 認可
                     tool_server ->> agent: ツールの正常終了結果を返す

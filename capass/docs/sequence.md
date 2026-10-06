@@ -44,22 +44,22 @@ sequenceDiagram
         Note right of agent: AIエージェント情報
         capass_client ->> capass_server: AIエージェント情報に対応する使用可能なツール一覧を要求
         Note right of capass_client: AIエージェント情報
-        capass_server ->> capass_server: AIエージェント情報に対応するロックされていない「ツールエンドポイント/コンテキスト/ツール代理トークン」一覧を取得
+        capass_server ->> capass_server: AIエージェント情報に対応するロックされていない「ツールエンドポイント/コンテキスト」一覧を取得
         alt 1件以上ヒット
             capass_server ->> capass_client: 返す
-            Note right of capass_client: 「ツールエンドポイント/コンテキスト/ツール代理トークン」一覧
+            Note right of capass_client: 「ツールエンドポイント/コンテキスト」一覧
             capass_client ->> agent: 返す
-            Note right of agent: 「ツールエンドポイント/コンテキスト/ツール代理トークン」一覧
+            Note right of agent: 「ツールエンドポイント/コンテキスト」一覧
             agent ->> agent: タスク遂行に必要なツールの選定/ツールエンドポイントも用いた実行計画を構築
             agent ->> agent: 実行計画におけるあるツールエンドポイントを実行するステップに突入
             agent ->> capass_client: CaPassクライアントのサブコマンド「exec」でツール実行
-            Note right of agent: AIエージェント情報/ツールエンドポイント/ツール代理トークン
+            Note right of agent: AIエージェント情報/ツールエンドポイント/ツールパラメータ
             capass_client ->> capass_server: 実行 ※「AIエージェント <-> CaPassサーバ <-> ツールサーバ」のようにCaPassサーバが実質MCPサーバとして中継した方が、AIエージェントごとにツールサーバと疎通穴あけする手間省けるのかな？
-            Note right of capass_client: AIエージェント情報/ツールエンドポイント/ツール代理トークン
-            capass_server ->> capass_server: DBからAIエージェント情報に対応するロックされていないツールエンドポイントを取得
+            Note right of capass_client: AIエージェント情報/ツールエンドポイント/ツールパラメータ
+            capass_server ->> capass_server: DBからAIエージェント情報/ツールエンドポイントに対応するロックされていないツール代理トークンを取得
             alt 1件ヒット
                 capass_server ->> tool_server: 実行して結果返してくれ
-                Note right of tool_server: AIエージェント情報/ツール代理トークン
+                Note right of tool_server: AIエージェント情報/ツール代理トークン/ツールパラメータ
                 tool_server ->> tool_server: ツールサーバ付きDBからツール代理トークンに対応するPrincipal/Credentialを取得
                 alt 1件ヒット
                     tool_server ->> tool_server: Principal/Credentialを用いて実行し、要求された実行内容が、認証情報の認可(スコープ)の範囲内かチェック
