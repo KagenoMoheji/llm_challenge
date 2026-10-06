@@ -25,15 +25,13 @@ sequenceDiagram
         Note over capass_provider,capass_server: ツールとその(AIエージェント単位の)認証情報のCaPassサーバへの登録
         tool_provider ->> tool_server: ツール認証情報(ユーザ/パスワードまたはクライアントID/シークレットのようなPrincipal/Credentialセット)の発行
         tool_provider ->> tool_server: 発行したツール認証情報に認可(スコープ)付与
-        tool_provider ->> tool_server: ツール認証情報の代理トークンである「ツール代理トークン」を生成
-        tool_provider ->> tool_server: ツールサーバ付きDBに[ツール認証情報/ツール代理トークン/AIエージェント情報/Credential更新日時]を登録
         tool_provider ->> tool_server: CaPassクライアントのサブコマンド「regist」を実行
-        Note right of tool_provider: ツール情報(ツールエンドポイント(ツールサーバでコマンド/APIエンドポイントをトリガーする受け口のAPIエンドポイントとか？いわゆるMCP識別子？)/コンテキスト(説明))/ツール代理トークン/AIエージェント情報
+        Note right of tool_provider: ツール情報(ツールエンドポイント(コマンド/APIエンドポイント/...)/コンテキスト(説明))/ツール認証情報/AIエージェント情報
         tool_server ->> capass_client: 実行
-        Note right of tool_server: ツール情報(ツールエンドポイント/コンテキスト)/ツール代理トークン/AIエージェント情報
+        Note right of tool_server: ツール情報(ツールエンドポイント/コンテキスト)/ツール認証情報/AIエージェント情報
         capass_client ->> capass_server: 登録
-        Note right of capass_client: ツール情報/ツール代理トークン/AIエージェント情報/ツールサーバ公開鍵
-        capass_server ->> capass_server: レコード[ツールエンドポイント/コンテキスト/ツール代理トークン/AIエージェント情報/ツール代理トークン更新日時/ツール利用日時/ロック状況/ツールサーバ公開鍵]をDB登録
+        Note right of capass_client: ツール情報/ツール認証情報/AIエージェント情報/ツールサーバ公開鍵
+        capass_server ->> capass_server: レコード[ツールエンドポイント/コンテキスト/ツール認証情報/AIエージェント情報/Credential更新日時/ツール利用日時/ロック状況/ツールサーバ公開鍵]をDB登録
         capass_server ->> capass_client: 登録完了
         capass_client ->> tool_server: 登録完了
     end
@@ -44,41 +42,31 @@ sequenceDiagram
         Note right of agent: AIエージェント情報
         capass_client ->> capass_server: AIエージェント情報に対応する使用可能なツール一覧を要求
         Note right of capass_client: AIエージェント情報
-        capass_server ->> capass_server: AIエージェント情報に対応するロックされていない「ツールエンドポイント/コンテキスト/ツール代理トークン」一覧を取得
+        capass_server ->> capass_server: AIエージェント情報に対応する「ツールエンドポイント/コンテキスト」一覧を取得
         alt 1件以上ヒット
             capass_server ->> capass_client: 返す
-            Note right of capass_client: 「ツールエンドポイント/コンテキスト/ツール代理トークン」一覧
+            Note right of capass_client: 「ツールエンドポイント/コンテキスト」一覧
             capass_client ->> agent: 返す
-            Note right of agent: 「ツールエンドポイント/コンテキスト/ツール代理トークン」一覧
-            agent ->> agent: タスク遂行に必要なツールの選定/ツールエンドポイントも用いた実行計画を構築
-            agent ->> agent: 実行計画におけるあるツールエンドポイントを実行するステップに突入
-            agent ->> capass_client: CaPassクライアントのサブコマンド「exec」でツール実行
-            Note right of agent: AIエージェント情報/ツールエンドポイント/ツール代理トークン
-            capass_client ->> capass_server: 実行 ※「AIエージェント <-> CaPassサーバ <-> ツールサーバ」のようにCaPassサーバが実質MCPサーバとして中継した方が、AIエージェントごとにツールサーバと疎通穴あけする手間省けるのかな？
-            Note right of capass_client: AIエージェント情報/ツールエンドポイント/ツール代理トークン
-            capass_server ->> capass_server: DBからAIエージェント情報に対応するロックされていないツールエンドポイントを取得
+            Note right of agent: 「ツールエンドポイント/コンテキスト」一覧
+            agent ->> agent: タスク遂行に必要なツールの選定/実行コマンド計画を構築
+            agent ->> agent: 実行コマンド計画におけるあるツールを用いるステップに突入
+            agent ->> capass_client: そのツールの認証情報をCaPassクライアントのサブコマンド「getcred」で要求
+            Note right of agent: AIエージェント情報/ツール名
+            capass_client ->> capass_server: AIエージェント情報/ツール名に対応する認証情報を要求
+            Note right of capass_client: AIエージェント情報/ツール名
+            capass_server ->> capass_server: DBからAIエージェント情報/ツール名に対応するロックされていない認証情報を取得
             alt 1件ヒット
-                capass_server ->> tool_server: 実行して結果返してくれ
-                Note right of tool_server: AIエージェント情報/ツール代理トークン
-                tool_server ->> tool_server: ツールサーバ付きDBからツール代理トークンに対応するPrincipal/Credentialを取得
-                alt 1件ヒット
-                    tool_server ->> tool_server: Principal/Credentialを用いて実行し、要求された実行内容が、認証情報の認可(スコープ)の範囲内かチェック
-                    alt 認可
-                        tool_server ->> capass_server: ツールの正常終了結果を返す
-                        Note right of capass_server: ツールの正常終了結果
-                        capass_server ->> capass_client: 横流しで返す
-                        Note right of capass_client: ツールの正常終了結果
-                        capass_client ->> agent: 返す
-                        Note right of agent: ツールの正常終了結果
-                    else 非認可
-                        tool_server ->> capass_server: 権限ありませんエラー
-                        capass_server ->> capass_client: 横流しで返す
-                        capass_client ->> agent: 横流しで返す
-                    end
-                else 取得結果無し
-                    tool_server ->> capass_server: 権限ありませんエラー
-                    capass_server ->> capass_client: 横流しで返す
-                    capass_client ->> agent: 横流しで返す
+                capass_server ->> capass_client: 返す
+                Note right of capass_client: 認証情報
+                capass_client ->> agent: 返す
+                Note right of agent: 認証情報
+                agent ->> tool_server: 認証情報を渡しつつツール実行
+                Note right of agent: 認証情報/その他パラメータ
+                tool_server ->> tool_server: 要求された実行内容が、認証情報の認可(スコープ)の範囲内かチェック
+                alt 認可
+                    tool_server ->> agent: ツールの正常終了結果を返す
+                else 非認可
+                    tool_server ->> agent: 権限ありませんエラー
                 end
             else 取得結果無し
                 capass_server ->> capass_client: 権限ありませんエラー
@@ -90,22 +78,22 @@ sequenceDiagram
         end
     end
     rect rgba(220, 220, 220, 1)
-        Note over capass_provider,capass_server: CaPassサーバでのツール代理トークンの定期更新監視ジョブ
+        Note over capass_provider,capass_server: CaPassサーバでのツール認証情報の定期更新監視ジョブ
         loop N分(5分とか？)ごとに実行
-            capass_server ->> capass_server: 更新日時がN分(5分とか？)以上過ぎたツール代理トークンを検索
+            capass_server ->> capass_server: 更新日時がN分(5分とか？)以上過ぎたツール認証情報を検索
             alt 1件以上ヒット
                 capass_server ->> capass_server: ロックへ更新
             end
         end
     end
     rect rgba(220, 220, 220, 1)
-        Note over capass_provider,capass_server: ツールサーバでのツール代理トークンの定期更新ジョブ
+        Note over capass_provider,capass_server: ツールサーバでのツール認証情報(Credential)の定期更新ジョブ
         loop N分(CaPassが指定する更新期間以内)ごとに実行
-            tool_server ->> tool_server: ツール代理トークンを更新
-            tool_server ->> capass_client: CaPassクライアントのサブコマンド「chtkn」(change token)を実行
-            Note right of tool_server: ツールエンドポイント/ツール代理トークン/AIエージェント情報
+            tool_server ->> tool_server: ツール認証情報(Credential)を変更
+            tool_server ->> capass_client: CaPassクライアントのサブコマンド「chsec」(change secret)を実行
+            Note right of tool_server: ツールエンドポイント/ツール認証情報/AIエージェント情報
             capass_client ->> capass_server: 実行
-            Note right of capass_client: ツールエンドポイント/ツール代理トークン/AIエージェント情報/ツールサーバ公開鍵
+            Note right of capass_client: ツールエンドポイント/ツール認証情報/AIエージェント情報/ツールサーバ公開鍵
             capass_server ->> capass_server: 受け取った[ツールエンドポイント/AIエージェント情報/ツールサーバ公開鍵]に一致するレコードがあるかDB検索
             alt 1件ヒット
                 capass_server ->> capass_server: nonce生成
@@ -116,7 +104,7 @@ sequenceDiagram
                 Note right of capass_client: 署名済みnonce
                 capass_server ->> capass_server: DB検索で得たツールサーバ公開鍵で署名済みnonceの検証
                 alt 署名は正当
-                    capass_server ->> capass_server: 受け取ったツール代理トークンに更新
+                    capass_server ->> capass_server: 受け取ったツール認証情報に更新
                     capass_server ->> capass_client: 更新完了
                     capass_client ->> tool_server: 更新完了
                 else 署名は不当
@@ -189,7 +177,7 @@ sequenceDiagram
             Note right of capass_client: 署名済みnonce
             capass_server ->> capass_server: DB検索で得たツールサーバ公開鍵で署名済みnonceの検証
             alt 署名は正当
-                capass_server ->> capass_server: ツールサーバに一致するレコードの[ツールエンドポイント/コンテキスト/AIエージェント情報/Credential更新日時/ツール利用日時/ロック状況]を取得
+                capass_server ->> capass_server: ツールサーバに一致するレコードの[ツールエンドポイント/コンテキスト/ツール認証情報のPrincipal/AIエージェント情報/Credential更新日時/ツール利用日時/ロック状況]を取得
                 alt 1件以上ヒット
                     capass_server ->> capass_client: 返す
                     Note right of capass_client: リスト
@@ -197,9 +185,9 @@ sequenceDiagram
                     Note right of tool_server: リスト
                     tool_server ->> tool_server: [活用例1]ツール利用日時が一定期間以上古いものを選択
                     tool_server ->> capass_client: [活用例1]CaPassクライアントのサブコマンド「update lock」を実行
-                    Note right of tool_server: [活用例1]ツールエンドポイント/AIエージェント情報
+                    Note right of tool_server: [活用例1]ツールエンドポイント/ツール認証情報のPrincipal/AIエージェント情報
                     capass_client ->> capass_server: 実行
-                    Note right of capass_client: [活用例1]ツールエンドポイント/AIエージェント情報/ツールサーバ公開鍵
+                    Note right of capass_client: [活用例1]ツールエンドポイント/ツール認証情報のPrincipal/AIエージェント情報/ツールサーバ公開鍵
                     capass_server ->> capass_server: [活用例1]nonce生成
                     capass_server ->> capass_client: [活用例1]登録元ツールサーバか本人確認するからnonceに署名して
                     Note right of capass_client: [活用例1]nonce
@@ -229,4 +217,5 @@ sequenceDiagram
 
 ## TODO
 - もしかしたらAIエージェント側も公開鍵署名やらせた方が良いかも
+- ツール認証情報に一括りにしている箇所があるが、Principal部分だけ一覧に含めて返して良い部分とかあるかも
 - AIエージェント情報に「そのAIエージェントは削除済みか」も持たせたいかも。それによってツールサーバ側でツール認証情報の棚卸する判断できる。
