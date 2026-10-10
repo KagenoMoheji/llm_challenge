@@ -1,4 +1,4 @@
-# PARKing OS
+# Parmos = PARking Maas OS
 
 ## 実装イメージ
 ### 駐車予約プラットフォーム
