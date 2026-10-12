@@ -8,3 +8,6 @@
 *.docx
 *.tgz
 node_modules/
+trash/
+.venv/
+__pycache__/
