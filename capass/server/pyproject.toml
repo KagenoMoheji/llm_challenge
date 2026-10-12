@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "capass-server"
-version = ["version"]
+dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
   "fastapi",
