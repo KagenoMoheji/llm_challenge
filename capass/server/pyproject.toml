@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "capass-server"
+version = ["version"]
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "sqlalchemy>=2.0",
+  "psycopg[binary]",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[project.scripts]
+capass-server = "capass_server.main:run"
+
+[tool.setuptools.packages.find]
+include = ["capass_server*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["unittest_*.py"]
+
+[tool.setuptools.dynamic]
+version = {attr = "capass_server.__version__"}
