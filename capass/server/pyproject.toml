@@ -24,7 +24,8 @@ include = ["capass_server*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["unittest_*.py"]
+# ut=unit test, it=integration test, st=system test, uat=user acceptance test
+python_files = ["ut_*.py", "it_*.py", "st_*.py", "uat_*.py"]
 
 [tool.setuptools.dynamic]
 version = {attr = "capass_server.__version__"}
