@@ -16,6 +16,7 @@ import uvicorn
 from capass_server import __version__
 from capass_server.common.config import ENV_TYPE, DB_RETRY_COUNT, DB_RETRY_DELAY_SEC
 from capass_server.common.db import Base, engine, get_db, wait_for_db
+from capass_server.models import entities  # noqa: F401  (create_all の対象にするため、テーブル定義をBase.metadataへ登録する)
 from capass_server.routes import register_routes
 
 
