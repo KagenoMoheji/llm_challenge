@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from capass_server.common.db import get_db
 from capass_server.schemas.register import RegisterRequest, RegisterResponse
-from capass_server.common.errors import DuplicateRegistrationError, SignatureError
+from capass_server.common.errors import DuplicateRegistrationError, SignatureError, ToolServerNotApprovedError
 from capass_server.services.tool_registration import register_tool
 
 router = APIRouter()
@@ -21,15 +21,17 @@ router = APIRouter()
 def register(req: RegisterRequest, db: Session = Depends(get_db)) -> RegisterResponse:
     """ツール/AIエージェント/ツールサーバ公開鍵の登録(CaPassクライアントの「regist」から呼ばれる)。初回を含め、登録の都度ツールサーバの署名を検証する。"""
     try:
-        registration = register_tool(db, req)
+        agent_tool = register_tool(db, req)
     except SignatureError as e:
         raise HTTPException(status_code=401, detail=str(e), headers={"WWW-Authenticate": "CaPass-Signature"})
+    except ToolServerNotApprovedError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except DuplicateRegistrationError as e:
         raise HTTPException(status_code=409, detail=str(e))
     return RegisterResponse(
-        tool_endpoint=registration.tool_endpoint,
-        agent_id=registration.agent_id,
-        created_at=registration.created_at,
+        tool_endpoint=agent_tool.tool_endpoint,
+        agent_id=agent_tool.agent_id,
+        created_at=agent_tool.created_at,
     )
 
 

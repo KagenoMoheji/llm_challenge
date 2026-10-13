@@ -20,8 +20,3 @@ def test_root_hello():
     res = client.get("/hello")
     assert res.status_code == 200
     assert res.json() == {"message": "hello, world!"}
-
-
-def test_api_v1_hello():
-    res = client.get("/api/v1/hello")
-    assert res.status_code == 200

@@ -32,3 +32,13 @@ class DuplicateRegistrationError(ServiceError):
 
     def __init__(self) -> None:
         super().__init__("tool is already registered for the agent")
+
+
+class ToolServerNotApprovedError(ServiceError):
+    """ツールサーバの公開鍵が、CaPassサーバ管理者に承認されていない(403相当)。署名検証済みの相手にのみ返すので、状態を伝える。"""
+
+    def __init__(self, status: str | None) -> None:
+        if status is None:
+            super().__init__("tool server public key is not registered")
+        else:
+            super().__init__(f"tool server is not approved (status: {status})")
