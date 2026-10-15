@@ -14,8 +14,13 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 ED25519_PUBLIC_KEY_LEN = 32
 ED25519_SIGNATURE_LEN = 64
-# registの署名メッセージのプレフィックス(クライアント側と一致させること。変更時はバージョン部分を上げる)
-SIGN_CONTEXT_REGISTER = b"capass-register-v1\n"
+
+# 署名用途ごとのメッセージプレフィックス(クライアント(CLI)側と一致させること。仕様変更時はバージョン部分を上げる)
+SIGN_CONTEXT_TOOLSERVER_REGISTER = b"capass-toolserver-register-v1\n"
+SIGN_CONTEXT_TOOLSERVER_APPROVE = b"capass-toolserver-approve-v1\n"
+SIGN_CONTEXT_AGENT_REGISTER = b"capass-agent-register-v1\n"
+SIGN_CONTEXT_AGENT_APPROVE = b"capass-agent-approve-v1\n"
+SIGN_CONTEXT_AGENT_ADDTOOL = b"capass-agent-addtool-v1\n"
 
 
 def canonical_json_bytes(payload: dict) -> bytes:

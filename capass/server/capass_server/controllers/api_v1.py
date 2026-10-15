@@ -10,31 +10,91 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from capass_server.common.db import get_db
-from capass_server.schemas.register import RegisterRequest, RegisterResponse
-from capass_server.common.errors import DuplicateRegistrationError, SignatureError, ToolServerNotApprovedError
-from capass_server.services.tool_registration import register_tool
+from capass_server.schemas.agent import (
+    AgentAddToolRequest,
+    AgentAddToolResponse,
+    AgentApproveResponse,
+    AgentRegisterRequest,
+    AgentRegisterResponse,
+)
+from capass_server.schemas.approve import ApproveRequest
+from capass_server.schemas.tool_server import (
+    ToolServerApproveResponse,
+    ToolServerRegisterRequest,
+    ToolServerRegisterResponse,
+)
+from capass_server.services.agent import approve_agent, register_agent
+from capass_server.services.agent_tool import add_tool_to_agent
+from capass_server.services.tool_server import approve_tool_server, register_tool_server
 
 router = APIRouter()
 
 
-@router.post("/register", status_code=201, response_model=RegisterResponse)
-def register(req: RegisterRequest, db: Session = Depends(get_db)) -> RegisterResponse:
-    """ツール/AIエージェント/ツールサーバ公開鍵の登録(CaPassクライアントの「regist」から呼ばれる)。初回を含め、登録の都度ツールサーバの署名を検証する。"""
-    try:
-        agent_tool = register_tool(db, req)
-    except SignatureError as e:
-        raise HTTPException(status_code=401, detail=str(e), headers={"WWW-Authenticate": "CaPass-Signature"})
-    except ToolServerNotApprovedError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except DuplicateRegistrationError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    return RegisterResponse(
+# ---------- ツールサーバ(公開鍵)の初回登録と承認 ----------
+@router.post("/toolservers/register", status_code=201, response_model=ToolServerRegisterResponse)
+def toolservers_register(req: ToolServerRegisterRequest, db: Session = Depends(get_db)) -> ToolServerRegisterResponse:
+    """ツールサーバ(公開鍵)の初回登録。承認待ち(pending)で登録され、CaPassサーバ管理者の承認後に利用できる。"""
+    tool_server = register_tool_server(db, req)
+    return ToolServerRegisterResponse(
+        toolserver_id=tool_server.id,
+        tool_server_name=tool_server.tool_server_name,
+        tool_server_public_key=tool_server.tool_server_public_key,
+        status=tool_server.status,
+        created_at=tool_server.created_at,
+    )
+
+
+@router.post("/toolservers/{toolserver_id}/approve", response_model=ToolServerApproveResponse)
+def toolservers_approve(toolserver_id: int, req: ApproveRequest, db: Session = Depends(get_db)) -> ToolServerApproveResponse:
+    """ツールサーバの登録承認(CaPassサーバ管理者のみ)。管理者の秘密鍵で署名したリクエストが必要。"""
+    tool_server = approve_tool_server(db, toolserver_id, req)
+    return ToolServerApproveResponse(
+        toolserver_id=tool_server.id,
+        tool_server_name=tool_server.tool_server_name,
+        tool_server_public_key=tool_server.tool_server_public_key,
+        status=tool_server.status,
+        approved_at=tool_server.approved_at,
+    )
+
+
+# ---------- AIエージェント(公開鍵)の初回登録と承認 ----------
+@router.post("/agents/register", status_code=201, response_model=AgentRegisterResponse)
+def agents_register(req: AgentRegisterRequest, db: Session = Depends(get_db)) -> AgentRegisterResponse:
+    """AIエージェント(公開鍵)の初回登録。承認待ち(pending)で登録され、CaPassサーバ管理者の承認後に利用できる。"""
+    agent = register_agent(db, req)
+    return AgentRegisterResponse(
+        agent_id=agent.agent_id,
+        agent_public_key=agent.agent_public_key,
+        status=agent.status,
+        created_at=agent.created_at,
+    )
+
+
+@router.post("/agents/{agent_id}/approve", response_model=AgentApproveResponse)
+def agents_approve(agent_id: str, req: ApproveRequest, db: Session = Depends(get_db)) -> AgentApproveResponse:
+    """AIエージェントの登録承認(CaPassサーバ管理者のみ)。管理者の秘密鍵で署名したリクエストが必要。"""
+    agent = approve_agent(db, agent_id, req)
+    return AgentApproveResponse(
+        agent_id=agent.agent_id,
+        agent_public_key=agent.agent_public_key,
+        status=agent.status,
+        approved_at=agent.approved_at,
+    )
+
+
+# ---------- AIエージェントへのツール追加 ----------
+@router.post("/agents/{agent_id}/addtool", status_code=201, response_model=AgentAddToolResponse)
+def agents_addtool(agent_id: str, req: AgentAddToolRequest, db: Session = Depends(get_db)) -> AgentAddToolResponse:
+    """AIエージェントにツール(ツール代理トークン)を追加する(旧 register。CaPassクライアントの「regist」から呼ばれる)。承認済みツールサーバの署名を検証する。"""
+    agent_tool = add_tool_to_agent(db, agent_id, req)
+    return AgentAddToolResponse(
         tool_endpoint=agent_tool.tool_endpoint,
         agent_id=agent_tool.agent_id,
         created_at=agent_tool.created_at,
     )
 
 
+# ---------- 以下は未実装 ----------
 @router.get("/agents/{agent_id}/tools")
 def list_agent_tools(agent_id: str) -> None:
     """AIエージェントが使用可能な(ロックされていない)ツール一覧の取得(CaPassクライアントの「list executable」から呼ばれる)。"""

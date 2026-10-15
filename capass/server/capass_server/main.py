@@ -17,6 +17,7 @@ from capass_server import __version__
 from capass_server.common.config import ENV_TYPE, DB_RETRY_COUNT, DB_RETRY_DELAY_SEC
 from capass_server.common.db import Base, engine, get_db, wait_for_db
 from capass_server.models import entities  # noqa: F401  (create_all の対象にするため、テーブル定義をBase.metadataへ登録する)
+from capass_server.controllers.error_handlers import register_error_handlers
 from capass_server.routes import register_routes
 
 
@@ -33,6 +34,7 @@ async def lifespan(_: FastAPI):
 # FastAPI初期化
 app = FastAPI(title="CaPass Server", version=__version__, lifespan=lifespan)
 register_routes(app)
+register_error_handlers(app)
 
 
 def run() -> None:

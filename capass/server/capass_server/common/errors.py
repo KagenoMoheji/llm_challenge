@@ -10,7 +10,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 
 
 class ServiceError(Exception):
-    """service層の業務エラーの基底クラス。controllerでHTTPステータスに変換する。"""
+    """service層の業務エラーの基底クラス。HTTPステータスへの変換は、controllers/error_handlers.pyで一括して行う。"""
 
 
 class SignatureError(ServiceError):
@@ -27,11 +27,11 @@ class InvalidSignatureError(SignatureError):
         super().__init__("invalid signature")
 
 
-class DuplicateRegistrationError(ServiceError):
-    """同一の[ツールエンドポイント/AIエージェント]が登録済み(409相当)。"""
+class NotAdminError(ServiceError):
+    """署名は正当だが、署名した公開鍵がCaPassサーバ管理者のものではない(403相当)。"""
 
     def __init__(self) -> None:
-        super().__init__("tool is already registered for the agent")
+        super().__init__("admin_public_key is not an authorized administrator")
 
 
 class ToolServerNotApprovedError(ServiceError):
@@ -42,3 +42,55 @@ class ToolServerNotApprovedError(ServiceError):
             super().__init__("tool server public key is not registered")
         else:
             super().__init__(f"tool server is not approved (status: {status})")
+
+
+class AgentNotApprovedError(ServiceError):
+    """AIエージェントが、CaPassサーバ管理者に承認されていない(403相当)。"""
+
+    def __init__(self, status: str) -> None:
+        super().__init__(f"agent is not approved (status: {status})")
+
+
+class ToolServerNotFoundError(ServiceError):
+    """指定のツールサーバが存在しない(404相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("tool server not found")
+
+
+class AgentNotFoundError(ServiceError):
+    """指定のAIエージェントが存在しない(404相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("agent not found")
+
+
+class DuplicateToolServerError(ServiceError):
+    """同一の公開鍵のツールサーバが登録済み(409相当)。"""
+
+    def __init__(self, status: str | None = None) -> None:
+        if status is None:
+            super().__init__("tool server public key is already registered")
+        else:
+            super().__init__(f"tool server public key is already registered (status: {status})")
+
+
+class DuplicateAgentError(ServiceError):
+    """同一のagent_idまたは公開鍵のAIエージェントが登録済み(409相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("agent_id or agent public key is already registered")
+
+
+class DuplicateAgentToolError(ServiceError):
+    """同一の[ツールエンドポイント/AIエージェント]が登録済み(409相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("tool is already registered for the agent")
+
+
+class InvalidApprovalStateError(ServiceError):
+    """現在の承認ステータスからは承認できない(409相当)。"""
+
+    def __init__(self, status: str) -> None:
+        super().__init__(f"cannot approve in the current status (status: {status})")
