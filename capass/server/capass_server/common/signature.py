@@ -14,6 +14,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 ED25519_PUBLIC_KEY_LEN = 32
 ED25519_SIGNATURE_LEN = 64
+# registの署名メッセージのプレフィックス(クライアント側と一致させること。変更時はバージョン部分を上げる)
+SIGN_CONTEXT_REGISTER = b"capass-register-v1\n"
 
 
 def canonical_json_bytes(payload: dict) -> bytes:
