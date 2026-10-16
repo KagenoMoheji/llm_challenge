@@ -94,3 +94,11 @@ class InvalidApprovalStateError(ServiceError):
 
     def __init__(self, status: str) -> None:
         super().__init__(f"cannot approve in the current status (status: {status})")
+
+
+class RateLimitExceededError(ServiceError):
+    """リクエストが多すぎる(429相当)。retry_after_secは、再試行までの待ち時間(秒)。"""
+
+    def __init__(self, retry_after_sec: int) -> None:
+        super().__init__("too many requests")
+        self.retry_after_sec = retry_after_sec

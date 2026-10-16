@@ -17,7 +17,7 @@ class ApproveRequest(SignedRequest):
     署名対象: admin_public_key, signed_at + URLパスのパラメータ(toolserver_id または agent_id)
     """
 
-    admin_public_key: str = Field(description="署名した管理者の公開鍵(Base64。Ed25519の生32バイト)。サーバに設定された管理者の公開鍵と一致する必要がある")
+    admin_public_key: str = Field(description="署名した管理者の公開鍵(Base64。Ed25519の生32バイト)。tbl_adminに登録された有効な管理者の公開鍵である必要がある")
 
     @field_validator("admin_public_key")
     @classmethod

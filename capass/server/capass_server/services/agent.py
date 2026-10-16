@@ -32,6 +32,8 @@ def register_agent(db: Session, req: AgentRegisterRequest) -> TblAgent:
     agent = TblAgent(
         agent_id=req.agent_id,
         agent_public_key=req.agent_public_key,
+        applicant_email=req.applicant_email,
+        approver_email=None,
         status=ApprovalStatus.PENDING.value,
         created_at=datetime.now(timezone.utc),
         approved_at=None,
@@ -48,7 +50,8 @@ def register_agent(db: Session, req: AgentRegisterRequest) -> TblAgent:
 def approve_agent(db: Session, agent_id: str, req: ApproveRequest) -> TblAgent:
     """AIエージェントを承認する(CaPassサーバ管理者のみ)。pending→approved。承認済みなら何もせず成功(冪等)。revokedは承認できない。"""
     # 1. 管理者の署名の検証(URLパスのagent_idも署名対象)
-    verify_admin_request(
+    admin = verify_admin_request(
+        db,
         req.admin_public_key,
         SIGN_CONTEXT_AGENT_APPROVE,
         req.signed_payload(agent_id=agent_id),
@@ -66,5 +69,6 @@ def approve_agent(db: Session, agent_id: str, req: ApproveRequest) -> TblAgent:
 
     agent.status = ApprovalStatus.APPROVED.value
     agent.approved_at = datetime.now(timezone.utc)
+    agent.approver_email = admin.admin_email  # 承認した管理者のメアドを記録する
     db.commit()
     return agent

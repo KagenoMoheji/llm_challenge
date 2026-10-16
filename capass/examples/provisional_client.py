@@ -4,20 +4,27 @@ CLIの `keygen` / `regist` などの代わりに、CaPassサーバのRestAPIを�
 秘密鍵は環境変数で渡す(keygenで作ったBase64文字列)。サーバのURLは CAPASS_URL(省略時 http://127.0.0.1:8000)。
 
   python provisional_client.py keygen
-  python provisional_client.py toolserver-register --name "社内ツールサーバA"           # 環境変数 TOOL_SERVER_PRIVATE_KEY
+  python provisional_client.py toolserver-register --name "社内ツールサーバA" --email you@example.com   # 環境変数 TOOL_SERVER_PRIVATE_KEY
   python provisional_client.py toolserver-approve  --toolserver-id 1                   # 環境変数 ADMIN_PRIVATE_KEY
-  python provisional_client.py agent-register      --agent-id agent-1                  # 環境変数 AGENT_PRIVATE_KEY
+  python provisional_client.py agent-register      --agent-id agent-1 --email you@example.com          # 環境変数 AGENT_PRIVATE_KEY
   python provisional_client.py agent-approve       --agent-id agent-1                  # 環境変数 ADMIN_PRIVATE_KEY
   python provisional_client.py agent-addtool       --agent-id agent-1 \
       --endpoint psql_manager --context "..."                                          # 環境変数 TOOL_SERVER_PRIVATE_KEY
 """
+import os
+import inspect
+import sys
+import time
+import traceback
+PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe())))[0]
+
+# その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
+# (このスクリプトはCaPassサーバのコードをimportしない単体スクリプトなので、ROOTPATHは使わない)
 import argparse
 import base64
 import json
-import os
 import secrets
-import sys
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -75,8 +82,8 @@ def cmd_keygen(_: argparse.Namespace) -> None:
     print("PUBLIC :", _public_key_b64(priv))
 
 
-def build_toolserver_register(priv: Ed25519PrivateKey, name: str) -> tuple[str, dict]:
-    fields = {"tool_server_public_key": _public_key_b64(priv), "tool_server_name": name}
+def build_toolserver_register(priv: Ed25519PrivateKey, name: str, email: str) -> tuple[str, dict]:
+    fields = {"tool_server_public_key": _public_key_b64(priv), "tool_server_name": name, "applicant_email": email}
     return "/api/v1/toolservers/register", _signed_body(priv, SIGN_CONTEXT_TOOLSERVER_REGISTER, fields)
 
 
@@ -86,8 +93,8 @@ def build_toolserver_approve(admin: Ed25519PrivateKey, toolserver_id: int) -> tu
     return f"/api/v1/toolservers/{toolserver_id}/approve", body
 
 
-def build_agent_register(priv: Ed25519PrivateKey, agent_id: str) -> tuple[str, dict]:
-    fields = {"agent_id": agent_id, "agent_public_key": _public_key_b64(priv)}
+def build_agent_register(priv: Ed25519PrivateKey, agent_id: str, email: str) -> tuple[str, dict]:
+    fields = {"agent_id": agent_id, "agent_public_key": _public_key_b64(priv), "applicant_email": email}
     return "/api/v1/agents/register", _signed_body(priv, SIGN_CONTEXT_AGENT_REGISTER, fields)
 
 
@@ -109,7 +116,7 @@ def build_agent_addtool(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, c
 
 
 def cmd_toolserver_register(a: argparse.Namespace) -> None:
-    _post(*build_toolserver_register(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.name))
+    _post(*build_toolserver_register(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.name, a.email))
 
 
 def cmd_toolserver_approve(a: argparse.Namespace) -> None:
@@ -117,7 +124,7 @@ def cmd_toolserver_approve(a: argparse.Namespace) -> None:
 
 
 def cmd_agent_register(a: argparse.Namespace) -> None:
-    _post(*build_agent_register(_load_private_key("AGENT_PRIVATE_KEY"), a.agent_id))
+    _post(*build_agent_register(_load_private_key("AGENT_PRIVATE_KEY"), a.agent_id, a.email))
 
 
 def cmd_agent_approve(a: argparse.Namespace) -> None:
@@ -138,6 +145,7 @@ def main() -> None:
 
     p = sub.add_parser("toolserver-register", help="ツールサーバ(公開鍵)の初回登録")
     p.add_argument("--name", required=True, help="ツールサーバの名称(管理者が承認時に識別するため)")
+    p.add_argument("--email", required=True, help="申請者のメールアドレス(管理者が承認前に、申請内容の確認の連絡をするため)")
     p.set_defaults(func=cmd_toolserver_register)
 
     p = sub.add_parser("toolserver-approve", help="ツールサーバの登録承認(管理者)")
@@ -146,6 +154,7 @@ def main() -> None:
 
     p = sub.add_parser("agent-register", help="AIエージェント(公開鍵)の初回登録")
     p.add_argument("--agent-id", required=True)
+    p.add_argument("--email", required=True, help="申請者のメールアドレス(管理者が承認前に、申請内容の確認の連絡をするため)")
     p.set_defaults(func=cmd_agent_register)
 
     p = sub.add_parser("agent-approve", help="AIエージェントの登録承認(管理者)")

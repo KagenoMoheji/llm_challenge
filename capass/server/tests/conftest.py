@@ -18,9 +18,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from capass_server.common.db import Base, get_db
+from capass_server.controllers import dependencies
 from capass_server.main import app
-from capass_server.services import signed_request
-from testlib import pub_b64
+from testlib import seed_admin
 
 # DBはテスト用のインメモリSQLiteに差し替える(PostgreSQLの起動は不要)
 _test_engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
@@ -51,8 +51,14 @@ def client(session_factory):
 
 
 @pytest.fixture
-def admin_priv(monkeypatch):
-    """CaPassサーバ管理者の鍵ペアを作り、その公開鍵を管理者の公開鍵(ADMIN_PUBLIC_KEYS)として差し替える。秘密鍵を返す。"""
+def admin_priv(session_factory):
+    """CaPassサーバ管理者の鍵ペアを作り、tbl_adminに登録する(admin@example.com)。秘密鍵を返す。"""
     priv = Ed25519PrivateKey.generate()
-    monkeypatch.setattr(signed_request, "ADMIN_PUBLIC_KEYS", [pub_b64(priv)])
+    seed_admin(session_factory, priv)
     return priv
+
+
+@pytest.fixture(autouse=True)
+def _disable_rate_limit(monkeypatch):
+    """初回登録APIのレート制限は、既定ではテストで無効にする(レート制限のテストでは、個別に有効化する)。"""
+    monkeypatch.setattr(dependencies, "RATE_LIMIT_ENABLED", False)

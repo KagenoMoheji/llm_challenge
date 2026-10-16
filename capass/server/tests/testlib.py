@@ -15,8 +15,15 @@ import base64
 from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from capass_server.common.signature import build_signing_message
-from capass_server.models.entities import ApprovalStatus, TblAgent, TblToolServer
+from capass_server.common.signature import (
+    SIGN_CONTEXT_AGENT_REGISTER,
+    SIGN_CONTEXT_TOOLSERVER_REGISTER,
+    build_signing_message,
+)
+from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblToolServer
+
+APPLICANT_EMAIL = "applicant@example.com"
+ADMIN_EMAIL = "admin@example.com"
 
 
 def pub_b64(priv: Ed25519PrivateKey) -> str:
@@ -31,16 +38,41 @@ def signed_body(priv: Ed25519PrivateKey, sign_context: bytes, fields: dict, path
     return body
 
 
+def toolserver_register_body(priv: Ed25519PrivateKey, name: str = "社内ツールサーバA", email: str = APPLICANT_EMAIL, signed_at: int | None = None) -> dict:
+    fields = {"tool_server_public_key": pub_b64(priv), "tool_server_name": name, "applicant_email": email}
+    return signed_body(priv, SIGN_CONTEXT_TOOLSERVER_REGISTER, fields, signed_at=signed_at)
+
+
+def agent_register_body(priv: Ed25519PrivateKey, agent_id: str = "agent-1", email: str = APPLICANT_EMAIL, signed_at: int | None = None) -> dict:
+    fields = {"agent_id": agent_id, "agent_public_key": pub_b64(priv), "applicant_email": email}
+    return signed_body(priv, SIGN_CONTEXT_AGENT_REGISTER, fields, signed_at=signed_at)
+
+
+def approve_body(admin_priv: Ed25519PrivateKey, sign_context: bytes, path_params: dict, signed_at: int | None = None) -> dict:
+    fields = {"admin_public_key": pub_b64(admin_priv)}
+    return signed_body(admin_priv, sign_context, fields, path_params=path_params, signed_at=signed_at)
+
+
+def seed_admin(session_factory, priv: Ed25519PrivateKey, email: str = ADMIN_EMAIL, is_active: bool = True) -> None:
+    """tbl_adminに管理者を直接登録する(管理者がSQLクライアントで登録する運用の代わり)。"""
+    with session_factory() as db:
+        db.add(TblAdmin(admin_email=email, admin_public_key=pub_b64(priv), is_active=is_active, created_at=datetime.now(timezone.utc)))
+        db.commit()
+
+
 def seed_tool_server(session_factory, priv: Ed25519PrivateKey, status: ApprovalStatus = ApprovalStatus.APPROVED, name: str = "test-tool-server") -> int:
     """tbl_tool_serverにレコードを直接登録する(登録API/承認APIを経由しない前提データ作成用)。idを返す。"""
     now = datetime.now(timezone.utc)
+    approved = status == ApprovalStatus.APPROVED
     with session_factory() as db:
         row = TblToolServer(
             tool_server_public_key=pub_b64(priv),
             tool_server_name=name,
+            applicant_email=APPLICANT_EMAIL,
+            approver_email=ADMIN_EMAIL if approved else None,
             status=status.value,
             created_at=now,
-            approved_at=now if status == ApprovalStatus.APPROVED else None,
+            approved_at=now if approved else None,
         )
         db.add(row)
         db.commit()
@@ -50,14 +82,17 @@ def seed_tool_server(session_factory, priv: Ed25519PrivateKey, status: ApprovalS
 def seed_agent(session_factory, priv: Ed25519PrivateKey, agent_id: str = "agent-1", status: ApprovalStatus = ApprovalStatus.APPROVED) -> str:
     """tbl_agentにレコードを直接登録する(前提データ作成用)。agent_idを返す。"""
     now = datetime.now(timezone.utc)
+    approved = status == ApprovalStatus.APPROVED
     with session_factory() as db:
         db.add(
             TblAgent(
                 agent_id=agent_id,
                 agent_public_key=pub_b64(priv),
+                applicant_email=APPLICANT_EMAIL,
+                approver_email=ADMIN_EMAIL if approved else None,
                 status=status.value,
                 created_at=now,
-                approved_at=now if status == ApprovalStatus.APPROVED else None,
+                approved_at=now if approved else None,
             )
         )
         db.commit()

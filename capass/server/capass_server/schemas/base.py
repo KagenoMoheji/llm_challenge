@@ -11,6 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
 from capass_server.common.signature import decode_ed25519_public_key, decode_ed25519_signature
 
 
+# メールアドレスの簡易チェック。EmailStrは値を正規化(ドメインの小文字化等)するため、署名したJSONと一致しなくなる恐れがあり、使わない
+EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
+
 def validate_public_key_format(v: str) -> str:
     """Base64(標準)の生32バイトEd25519公開鍵であることを検証する(各スキーマのfield_validatorから使う)。"""
     try:

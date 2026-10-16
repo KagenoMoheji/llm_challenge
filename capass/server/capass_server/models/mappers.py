@@ -9,9 +9,14 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from capass_server.models.entities import TblAgent, TblAgentTool, TblToolServer
+from capass_server.models.entities import TblAdmin, TblAgent, TblAgentTool, TblToolServer
 
 # commit は呼び出し側(service)の責務。insert系はflushまでで、一意制約違反などをこの時点で検出する
+
+
+def find_tbl_admin_by_public_key(db: Session, admin_public_key: str) -> TblAdmin | None:
+    stmt = select(TblAdmin).where(TblAdmin.admin_public_key == admin_public_key)
+    return db.execute(stmt).scalar_one_or_none()
 
 
 def find_tbl_tool_server_by_id(db: Session, tool_server_id: int) -> TblToolServer | None:

@@ -9,18 +9,19 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
-from capass_server.schemas.base import SignedRequest, validate_public_key_format
+from capass_server.schemas.base import EMAIL_PATTERN, SignedRequest, validate_public_key_format
 
 
 class AgentRegisterRequest(SignedRequest):
     """AIエージェント(公開鍵)の初回登録リクエスト。AIエージェント自身の秘密鍵で署名する(鍵の所持証明)。
 
     署名プレフィックス: SIGN_CONTEXT_AGENT_REGISTER
-    署名対象: agent_id, agent_public_key, signed_at
+    署名対象: agent_id, agent_public_key, applicant_email, signed_at
     """
 
     agent_id: str = Field(pattern=r"^[A-Za-z0-9._-]{1,128}$", description="AIエージェントの識別子(英数字と . _ - のみ、128文字まで)")
     agent_public_key: str = Field(description="AIエージェント公開鍵(Base64。Ed25519の生32バイト)")
+    applicant_email: str = Field(max_length=255, pattern=EMAIL_PATTERN, description="申請者のメールアドレス(管理者が承認前に、申請内容の確認の連絡をするため)")
 
     @field_validator("agent_public_key")
     @classmethod
@@ -31,6 +32,7 @@ class AgentRegisterRequest(SignedRequest):
 class AgentRegisterResponse(BaseModel):
     agent_id: str
     agent_public_key: str
+    applicant_email: str
     status: str
     created_at: datetime
 
@@ -38,6 +40,8 @@ class AgentRegisterResponse(BaseModel):
 class AgentApproveResponse(BaseModel):
     agent_id: str
     agent_public_key: str
+    applicant_email: str
+    approver_email: str | None
     status: str
     approved_at: datetime | None
 

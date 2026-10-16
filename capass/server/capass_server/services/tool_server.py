@@ -37,6 +37,8 @@ def register_tool_server(db: Session, req: ToolServerRegisterRequest) -> TblTool
     tool_server = TblToolServer(
         tool_server_public_key=req.tool_server_public_key,
         tool_server_name=req.tool_server_name,
+        applicant_email=req.applicant_email,
+        approver_email=None,
         status=ApprovalStatus.PENDING.value,
         created_at=datetime.now(timezone.utc),
         approved_at=None,
@@ -53,7 +55,8 @@ def register_tool_server(db: Session, req: ToolServerRegisterRequest) -> TblTool
 def approve_tool_server(db: Session, tool_server_id: int, req: ApproveRequest) -> TblToolServer:
     """ツールサーバを承認する(CaPassサーバ管理者のみ)。pending→approved。承認済みなら何もせず成功(冪等)。revokedは承認できない。"""
     # 1. 管理者の署名の検証(URLパスのtoolserver_idも署名対象)
-    verify_admin_request(
+    admin = verify_admin_request(
+        db,
         req.admin_public_key,
         SIGN_CONTEXT_TOOLSERVER_APPROVE,
         req.signed_payload(toolserver_id=tool_server_id),
@@ -71,5 +74,6 @@ def approve_tool_server(db: Session, tool_server_id: int, req: ApproveRequest) -
 
     tool_server.status = ApprovalStatus.APPROVED.value
     tool_server.approved_at = datetime.now(timezone.utc)
+    tool_server.approver_email = admin.admin_email  # 承認した管理者のメアドを記録する
     db.commit()
     return tool_server

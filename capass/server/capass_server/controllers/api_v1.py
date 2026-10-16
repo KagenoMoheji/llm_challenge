@@ -10,6 +10,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from capass_server.common.db import get_db
+from capass_server.controllers.dependencies import rate_limit_register
 from capass_server.schemas.agent import (
     AgentAddToolRequest,
     AgentAddToolResponse,
@@ -31,13 +32,14 @@ router = APIRouter()
 
 
 # ---------- ツールサーバ(公開鍵)の初回登録と承認 ----------
-@router.post("/toolservers/register", status_code=201, response_model=ToolServerRegisterResponse)
+@router.post("/toolservers/register", status_code=201, response_model=ToolServerRegisterResponse, dependencies=[Depends(rate_limit_register)])
 def toolservers_register(req: ToolServerRegisterRequest, db: Session = Depends(get_db)) -> ToolServerRegisterResponse:
-    """ツールサーバ(公開鍵)の初回登録。承認待ち(pending)で登録され、CaPassサーバ管理者の承認後に利用できる。"""
+    """ツールサーバ(公開鍵)の初回登録。承認待ち(pending)で登録され、CaPassサーバ管理者の承認後に利用できる。クライアントIPごとにレート制限がかかる。"""
     tool_server = register_tool_server(db, req)
     return ToolServerRegisterResponse(
         toolserver_id=tool_server.id,
         tool_server_name=tool_server.tool_server_name,
+        applicant_email=tool_server.applicant_email,
         tool_server_public_key=tool_server.tool_server_public_key,
         status=tool_server.status,
         created_at=tool_server.created_at,
@@ -51,6 +53,8 @@ def toolservers_approve(toolserver_id: int, req: ApproveRequest, db: Session = D
     return ToolServerApproveResponse(
         toolserver_id=tool_server.id,
         tool_server_name=tool_server.tool_server_name,
+        applicant_email=tool_server.applicant_email,
+        approver_email=tool_server.approver_email,
         tool_server_public_key=tool_server.tool_server_public_key,
         status=tool_server.status,
         approved_at=tool_server.approved_at,
@@ -58,13 +62,14 @@ def toolservers_approve(toolserver_id: int, req: ApproveRequest, db: Session = D
 
 
 # ---------- AIエージェント(公開鍵)の初回登録と承認 ----------
-@router.post("/agents/register", status_code=201, response_model=AgentRegisterResponse)
+@router.post("/agents/register", status_code=201, response_model=AgentRegisterResponse, dependencies=[Depends(rate_limit_register)])
 def agents_register(req: AgentRegisterRequest, db: Session = Depends(get_db)) -> AgentRegisterResponse:
-    """AIエージェント(公開鍵)の初回登録。承認待ち(pending)で登録され、CaPassサーバ管理者の承認後に利用できる。"""
+    """AIエージェント(公開鍵)の初回登録。承認待ち(pending)で登録され、CaPassサーバ管理者の承認後に利用できる。クライアントIPごとにレート制限がかかる。"""
     agent = register_agent(db, req)
     return AgentRegisterResponse(
         agent_id=agent.agent_id,
         agent_public_key=agent.agent_public_key,
+        applicant_email=agent.applicant_email,
         status=agent.status,
         created_at=agent.created_at,
     )
@@ -77,6 +82,8 @@ def agents_approve(agent_id: str, req: ApproveRequest, db: Session = Depends(get
     return AgentApproveResponse(
         agent_id=agent.agent_id,
         agent_public_key=agent.agent_public_key,
+        applicant_email=agent.applicant_email,
+        approver_email=agent.approver_email,
         status=agent.status,
         approved_at=agent.approved_at,
     )
