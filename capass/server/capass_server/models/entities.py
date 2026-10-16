@@ -14,23 +14,53 @@ from sqlalchemy.orm import Mapped, mapped_column
 from capass_server.common.db import Base
 
 
-class ToolServerStatus(str, enum.Enum):
-    """ツールサーバ(公開鍵)の承認ステータス。"""
+class ApprovalStatus(str, enum.Enum):
+    """ツールサーバ/AIエージェント(公開鍵)の承認ステータス。"""
 
-    PENDING = "pending"  # 承認待ち
-    APPROVED = "approved"  # 承認済み(registが許可される)
+    PENDING = "pending"  # 承認待ち(初回登録直後)
+    APPROVED = "approved"  # 承認済み(CaPassサーバ管理者が承認)
     REVOKED = "revoked"  # 却下・失効
 
 
+class TblAdmin(Base):
+    """CaPassサーバ管理者(公開鍵)。承認系API(approve)は、ここに登録された有効な公開鍵の署名のみ受け付ける。
+    管理者の追加・無効化は、APIを設けず、管理者がSQLクライアントでこのテーブルを直接更新して行う(アプリの再起動は不要)。"""
+
+    __tablename__ = "tbl_admin"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    admin_email: Mapped[str] = mapped_column(String(255), unique=True)  # 承認時に、承認者メアド(approver_email)として記録される
+    admin_public_key: Mapped[str] = mapped_column(String(64), unique=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # Falseにすると、承認できなくなる(レコードは残す)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class TblToolServer(Base):
-    """ツールサーバ(公開鍵)の承認管理レコード。CaPassサーバ管理者が承認した公開鍵のみ、ツール登録(register)が許可される。"""
+    """ツールサーバ(公開鍵)の承認管理レコード。CaPassサーバ管理者が承認した公開鍵のみ、AIエージェントへのツール追加(addtool)が許可される。"""
 
     __tablename__ = "tbl_tool_server"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True)  # APIでは toolserver_id として公開する
     tool_server_public_key: Mapped[str] = mapped_column(String(64), unique=True)
     tool_server_name: Mapped[str] = mapped_column(String(255))  # 管理者が承認時に識別するための名称
-    status: Mapped[str] = mapped_column(String(16), default=ToolServerStatus.PENDING.value)
+    applicant_email: Mapped[str] = mapped_column(String(255))  # 申請者メアド(申請者の自己申告。管理者が確認の連絡をするために使う)
+    approver_email: Mapped[str | None] = mapped_column(String(255), default=None)  # 承認者メアド(承認した管理者のadmin_email)
+    status: Mapped[str] = mapped_column(String(16), default=ApprovalStatus.PENDING.value)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class TblAgent(Base):
+    """AIエージェント(公開鍵)の承認管理レコード。CaPassサーバ管理者が承認したAIエージェントのみ、ツールを追加(addtool)できる。"""
+
+    __tablename__ = "tbl_agent"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(128), unique=True)  # AIエージェント提供者が決める識別子
+    agent_public_key: Mapped[str] = mapped_column(String(64), unique=True)
+    applicant_email: Mapped[str] = mapped_column(String(255))  # 申請者メアド(申請者の自己申告。管理者が確認の連絡をするために使う)
+    approver_email: Mapped[str | None] = mapped_column(String(255), default=None)  # 承認者メアド(承認した管理者のadmin_email)
+    status: Mapped[str] = mapped_column(String(16), default=ApprovalStatus.PENDING.value)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
@@ -46,7 +76,10 @@ class TblAgentTool(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     tool_endpoint: Mapped[str] = mapped_column(String(512))
     context: Mapped[str] = mapped_column(Text)
-    agent_id: Mapped[str] = mapped_column(String(128))
+    # tbl_agentで承認済みのAIエージェントのみ登録できる
+    agent_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("tbl_agent.agent_id", onupdate="CASCADE"), index=True
+    )
     # 暗号化(Fernet)したツール代理トークン。平文は保存しない。ツールサーバへの中継時にcommon/crypto.pyで復号する
     tool_proxy_token_encrypted: Mapped[str] = mapped_column(Text)
     tool_proxy_token_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
