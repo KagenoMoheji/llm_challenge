@@ -16,7 +16,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
 from capass_server.common.signature import SIGN_CONTEXT_TOOLSERVER_APPROVE
 from capass_server.models.entities import ApprovalStatus, TblToolServer
-from testlib import ADMIN_EMAIL, APPLICANT_EMAIL, approve_body, pub_b64, seed_admin, seed_tool_server, toolserver_register_body
+from capass_server.services import tool_server as tool_server_service
+from testlib import ADMIN_EMAIL, APPLICANT_EMAIL, EXEC_URL, approve_body, pub_b64, seed_admin, seed_tool_server, toolserver_register_body
 
 REGISTER_PATH = "/api/v1/toolservers/register"
 
@@ -38,9 +39,11 @@ def test_register_ok_is_pending(client, session_factory):
     assert data["status"] == "pending"
     assert data["tool_server_name"] == "社内ツールサーバA"
     assert data["applicant_email"] == APPLICANT_EMAIL
+    assert data["tool_server_exec_url"] == EXEC_URL
     assert data["tool_server_public_key"] == pub_b64(priv)
     with session_factory() as db:
         row = db.get(TblToolServer, data["toolserver_id"])
+        assert row.exec_url == EXEC_URL
         assert row.status == ApprovalStatus.PENDING
         assert row.applicant_email == APPLICANT_EMAIL
         assert row.approver_email is None
@@ -60,6 +63,9 @@ def test_register_tampered_body_is_unauthorized(client):
     assert client.post(REGISTER_PATH, json=body).status_code == 401
     body = toolserver_register_body(priv)
     body["applicant_email"] = "evil@example.com"  # メアドも署名対象
+    assert client.post(REGISTER_PATH, json=body).status_code == 401
+    body = toolserver_register_body(priv)
+    body["tool_server_exec_url"] = "https://evil.example.com/exec"  # 実行URLも署名対象(承認後に差し替えられない)
     assert client.post(REGISTER_PATH, json=body).status_code == 401
 
 
@@ -87,12 +93,31 @@ def test_register_invalid_input_is_unprocessable(client):
     body = toolserver_register_body(priv)
     del body["applicant_email"]  # 申請者メアドは必須
     assert client.post(REGISTER_PATH, json=body).status_code == 422
+    body = toolserver_register_body(priv)
+    del body["tool_server_exec_url"]  # 実行URLも必須
+    assert client.post(REGISTER_PATH, json=body).status_code == 422
 
 
 def test_register_invalid_email_is_unprocessable(client):
     priv = Ed25519PrivateKey.generate()
     for bad in ("not-an-email", "a@b", "a b@example.com", "@example.com", ""):
         assert client.post(REGISTER_PATH, json=toolserver_register_body(priv, email=bad)).status_code == 422, bad
+
+
+def test_register_invalid_exec_url_is_unprocessable(client):
+    priv = Ed25519PrivateKey.generate()
+    for bad in ("ftp://example.com/exec", "example.com/exec", "https://exa mple.com", "file:///etc/passwd", ""):
+        assert client.post(REGISTER_PATH, json=toolserver_register_body(priv, exec_url=bad)).status_code == 422, bad
+
+
+def test_register_http_exec_url_is_rejected_unless_allowed(client, monkeypatch):
+    priv = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(tool_server_service, "TOOL_SERVER_ALLOW_HTTP", False)
+    res = client.post(REGISTER_PATH, json=toolserver_register_body(priv, exec_url="http://localhost:9000/capass/exec"))
+    assert res.status_code == 422
+    assert "https" in res.json()["detail"]
+    monkeypatch.setattr(tool_server_service, "TOOL_SERVER_ALLOW_HTTP", True)  # ローカル開発用の設定
+    assert client.post(REGISTER_PATH, json=toolserver_register_body(priv, exec_url="http://localhost:9000/capass/exec")).status_code == 201
 
 
 # ---------- toolservers/{toolserver_id}/approve ----------

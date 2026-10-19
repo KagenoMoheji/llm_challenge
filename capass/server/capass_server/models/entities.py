@@ -12,6 +12,16 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from capass_server.common.db import Base
+from capass_server.common.globals import (
+    AGENT_ID_MAX_LEN,
+    EMAIL_MAX_LEN,
+    EXEC_URL_MAX_LEN,
+    NONCE_MAX_LEN,
+    PUBLIC_KEY_MAX_LEN,
+    STATUS_MAX_LEN,
+    TOOL_ENDPOINT_MAX_LEN,
+    TOOL_SERVER_NAME_MAX_LEN,
+)
 
 
 class ApprovalStatus(str, enum.Enum):
@@ -29,8 +39,8 @@ class TblAdmin(Base):
     __tablename__ = "tbl_admin"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    admin_email: Mapped[str] = mapped_column(String(255), unique=True)  # 承認時に、承認者メアド(approver_email)として記録される
-    admin_public_key: Mapped[str] = mapped_column(String(64), unique=True)
+    admin_email: Mapped[str] = mapped_column(String(EMAIL_MAX_LEN), unique=True)  # 承認時に、承認者メアド(approver_email)として記録される
+    admin_public_key: Mapped[str] = mapped_column(String(PUBLIC_KEY_MAX_LEN), unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # Falseにすると、承認できなくなる(レコードは残す)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -41,11 +51,13 @@ class TblToolServer(Base):
     __tablename__ = "tbl_tool_server"
 
     id: Mapped[int] = mapped_column(primary_key=True)  # APIでは toolserver_id として公開する
-    tool_server_public_key: Mapped[str] = mapped_column(String(64), unique=True)
-    tool_server_name: Mapped[str] = mapped_column(String(255))  # 管理者が承認時に識別するための名称
-    applicant_email: Mapped[str] = mapped_column(String(255))  # 申請者メアド(申請者の自己申告。管理者が確認の連絡をするために使う)
-    approver_email: Mapped[str | None] = mapped_column(String(255), default=None)  # 承認者メアド(承認した管理者のadmin_email)
-    status: Mapped[str] = mapped_column(String(16), default=ApprovalStatus.PENDING.value)
+    tool_server_public_key: Mapped[str] = mapped_column(String(PUBLIC_KEY_MAX_LEN), unique=True)
+    tool_server_name: Mapped[str] = mapped_column(String(TOOL_SERVER_NAME_MAX_LEN))  # 管理者が承認時に識別するための名称
+    # ツール実行の依頼先URL。CaPassサーバは、ここへツール代理トークン付きでPOSTする。管理者が承認時にURLを確認する
+    exec_url: Mapped[str] = mapped_column(String(EXEC_URL_MAX_LEN))
+    applicant_email: Mapped[str] = mapped_column(String(EMAIL_MAX_LEN))  # 申請者メアド(申請者の自己申告。管理者が確認の連絡をするために使う)
+    approver_email: Mapped[str | None] = mapped_column(String(EMAIL_MAX_LEN), default=None)  # 承認者メアド(承認した管理者のadmin_email)
+    status: Mapped[str] = mapped_column(String(STATUS_MAX_LEN), default=ApprovalStatus.PENDING.value)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
@@ -56,11 +68,11 @@ class TblAgent(Base):
     __tablename__ = "tbl_agent"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    agent_id: Mapped[str] = mapped_column(String(128), unique=True)  # AIエージェント提供者が決める識別子
-    agent_public_key: Mapped[str] = mapped_column(String(64), unique=True)
-    applicant_email: Mapped[str] = mapped_column(String(255))  # 申請者メアド(申請者の自己申告。管理者が確認の連絡をするために使う)
-    approver_email: Mapped[str | None] = mapped_column(String(255), default=None)  # 承認者メアド(承認した管理者のadmin_email)
-    status: Mapped[str] = mapped_column(String(16), default=ApprovalStatus.PENDING.value)
+    agent_id: Mapped[str] = mapped_column(String(AGENT_ID_MAX_LEN), unique=True)  # AIエージェント提供者が決める識別子
+    agent_public_key: Mapped[str] = mapped_column(String(PUBLIC_KEY_MAX_LEN), unique=True)
+    applicant_email: Mapped[str] = mapped_column(String(EMAIL_MAX_LEN))  # 申請者メアド(申請者の自己申告。管理者が確認の連絡をするために使う)
+    approver_email: Mapped[str | None] = mapped_column(String(EMAIL_MAX_LEN), default=None)  # 承認者メアド(承認した管理者のadmin_email)
+    status: Mapped[str] = mapped_column(String(STATUS_MAX_LEN), default=ApprovalStatus.PENDING.value)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
@@ -74,11 +86,11 @@ class TblAgentTool(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    tool_endpoint: Mapped[str] = mapped_column(String(512))
+    tool_endpoint: Mapped[str] = mapped_column(String(TOOL_ENDPOINT_MAX_LEN))
     context: Mapped[str] = mapped_column(Text)
     # tbl_agentで承認済みのAIエージェントのみ登録できる
     agent_id: Mapped[str] = mapped_column(
-        String(128), ForeignKey("tbl_agent.agent_id", onupdate="CASCADE"), index=True
+        String(AGENT_ID_MAX_LEN), ForeignKey("tbl_agent.agent_id", onupdate="CASCADE"), index=True
     )
     # 暗号化(Fernet)したツール代理トークン。平文は保存しない。ツールサーバへの中継時にcommon/crypto.pyで復号する
     tool_proxy_token_encrypted: Mapped[str] = mapped_column(Text)
@@ -87,6 +99,21 @@ class TblAgentTool(Base):
     locked: Mapped[bool] = mapped_column(Boolean, default=False)
     # tbl_tool_serverで承認済みの公開鍵のみ登録できる。公開鍵の更新(chkey)は、onupdate=CASCADEでこの列にも伝播する
     tool_server_public_key: Mapped[str] = mapped_column(
-        String(64), ForeignKey("tbl_tool_server.tool_server_public_key", onupdate="CASCADE"), index=True
+        String(PUBLIC_KEY_MAX_LEN), ForeignKey("tbl_tool_server.tool_server_public_key", onupdate="CASCADE"), index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class TblRequestNonce(Base):
+    """署名付きリクエストのnonce(リプレイ防止)。同じ[agent_id, nonce]のリクエストは、2回目以降を拒否する。
+    nonceは、署名時刻が許容範囲を過ぎたら(expires_at)、使われても拒否できる(署名時刻で拒否される)ので、期限切れのレコードは削除する。"""
+
+    __tablename__ = "tbl_request_nonce"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "nonce", name="uq_tbl_request_nonce_agent_nonce"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(AGENT_ID_MAX_LEN))
+    nonce: Mapped[str] = mapped_column(String(NONCE_MAX_LEN))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

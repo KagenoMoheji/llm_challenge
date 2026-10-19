@@ -23,7 +23,7 @@ from testlib import pub_b64, seed_agent, seed_tool_server, signed_body
 
 def _body(tool_server_priv, agent_id="agent-1", signed_at=None, **overrides):
     fields = {
-        "tool_endpoint": "cli://db/query",
+        "tool_endpoint": "db_query",
         "context": "DBに対してSELECTを実行する",
         "tool_proxy_token": "proxy-token-1",
         "tool_server_public_key": pub_b64(tool_server_priv),
@@ -49,7 +49,7 @@ def test_addtool_ok(client, session_factory):
     res = _post(client, "agent-1", _body(ts_priv))
     assert res.status_code == 201
     data = res.json()
-    assert data["tool_endpoint"] == "cli://db/query"
+    assert data["tool_endpoint"] == "db_query"
     assert data["agent_id"] == "agent-1"
     assert "tool_proxy_token" not in data  # トークンはレスポンスに含めない
 
@@ -169,3 +169,10 @@ def test_addtool_invalid_input_is_unprocessable(client, session_factory):
     body = _body(ts_priv)
     body["agent_id"] = "agent-1"  # agent_idはURLパスで指定する(ボディでは受け付けない)
     assert _post(client, "agent-1", body).status_code == 422
+    for bad_endpoint in ("cli://db/query", "has space", "a/b"):  # URLパス exec/{tool_endpoint} に使えない文字(スラッシュ・空白)
+        assert _post(client, "agent-1", _body(ts_priv, tool_endpoint=bad_endpoint)).status_code == 422, bad_endpoint
+
+
+def test_addtool_japanese_endpoint_is_ok(client, session_factory):
+    ts_priv = _setup(session_factory)
+    assert _post(client, "agent-1", _body(ts_priv, tool_endpoint="psql_部長ロール")).status_code == 201

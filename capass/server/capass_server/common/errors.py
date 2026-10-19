@@ -102,3 +102,52 @@ class RateLimitExceededError(ServiceError):
     def __init__(self, retry_after_sec: int) -> None:
         super().__init__("too many requests")
         self.retry_after_sec = retry_after_sec
+
+
+class PermissionDeniedError(ServiceError):
+    """実行できるツールが無い(未登録/ロック中/ツールサーバが未承認を区別せず、まとめて返す)(403相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("permission denied")
+
+
+class ReplayedRequestError(SignatureError):
+    """同じnonceのリクエストを、すでに受け付けている(リプレイ)(401相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("nonce has already been used")
+
+
+class InvalidToolServerUrlError(ServiceError):
+    """ツールサーバの実行URLが、許可されていない形式(422相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("tool_server_exec_url must be an https URL")
+
+
+class ToolServerUnavailableError(ServiceError):
+    """ツールサーバに接続できない(502相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("tool server is unavailable")
+
+
+class ToolServerTimeoutError(ServiceError):
+    """ツールサーバの応答がタイムアウトした(504相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("tool server timed out")
+
+
+class ToolServerBadResponseError(ServiceError):
+    """ツールサーバの応答を中継できない(5xx/3xxの応答、サイズ超過など)(502相当)。"""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"tool server returned an unusable response ({reason})")
+
+
+class ToolTokenDecryptionError(ServiceError):
+    """保存されたツール代理トークンを復号できない(暗号化鍵の設定ミスなど。500相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("tool proxy token cannot be decrypted")

@@ -63,10 +63,10 @@ server/capass_server/
   services/          業務ロジック。トランザクション(commit/rollback)の境界
   models/            entities.py(テーブル定義)と mappers.py(DBアクセス)
   schemas/           Pydanticのリクエスト/レスポンス
-  common/            横断的な部品(config, db, errors, crypto, signature, rate_limit)
+  common/            横断的な部品(config, globals, db, errors, crypto, signature, rate_limit, tool_client)
 server/tests/        ut_*.py(単体)、it_*.py(結合)、conftest.py、testlib.py
 cli/capass_cli/      CaPassクライアント(未実装)
-examples/            暫定クライアント。skills/ AI向けスキル
+examples/            暫定クライアントと、ツールサーバの見本。skills/ AI向けスキル
 ```
 
 依存の向きは `controllers → services → models → common`(`schemas` は controllers と services から使う)。**下の層から上の層をimportしない**(例: `common` は `services` をimportしない)。
@@ -74,7 +74,7 @@ examples/            暫定クライアント。skills/ AI向けスキル
 - **controllers:** ルート関数は同期 `def`(DBが同期のSQLAlchemyのため)。`Depends(get_db)` でセッションを受け取り、serviceを呼んで、レスポンススキーマに詰めて返すだけ。業務エラーの `try/except` はルート関数に書かない(`error_handlers.py` に集約)。ボディ検証より前に実行したい共通処理(レート制限など)は、`dependencies.py` の関数を `dependencies=[Depends(...)]` で適用する。
 - **services:** 業務ルールを書く。`commit()` はここで呼ぶ。業務エラーは `common/errors.py` の例外を `raise` する。
 - **models:** `mappers.py` はクエリと `flush()` までで、`commit()` しない。
-- **common:** 他の層に依存しない。
+- **common:** 他の層に依存しない。ツールサーバなど外部へのHTTP呼び出しは、`common/tool_client.py` だけで行う(リダイレクトを追わない、環境変数のプロキシを使わない、制限時間と応答サイズに上限を付ける、を守るため)。
 
 ## 3. 命名規則
 
@@ -92,7 +92,21 @@ examples/            暫定クライアント。skills/ AI向けスキル
 - 型ヒントは Python 3.10 以降の書き方(`str | None`, `list[str]`)。
 - HTTPレスポンスの `detail` と識別子は英語。コメントとdocstringは日本語。
 
-## 4. 設定(環境変数)
+## 4. 定数と設定
+
+固定値と環境変数由来の値は、置き場所を分ける。
+
+| 置き場所 | 入れるもの | 例 |
+|---|---|---|
+| `common/globals.py` | アプリ全体で共有する**固定値**(文字列長の上限、入力の正規表現、HTTPのヘッダー名・プレフィックス) | `EMAIL_PATTERN`, `AGENT_ID_MAX_LEN`, `API_V1_PREFIX` |
+| `common/signature.py` | 署名の規則に属する固定値 | `SIGN_CONTEXT_*`, `ED25519_*` |
+| `common/config.py` | **環境変数**から読む値 | `SIGNATURE_MAX_SKEW_SEC`, `TOOL_SERVER_ALLOW_HTTP` |
+
+- 文字列長の上限は、スキーマの `max_length` とエンティティの `String(...)` で**同じ定数を使う**(食い違いを防ぐ)。数値を直接書かない。
+- 2か所以上で使う、または使い回す可能性のある固定値は、`globals.py` に置く。1つのモジュールの中だけで意味を持つ値は、そのモジュールに置いてよい。
+- `globals.py` は他のモジュールに依存しない。**`from capass_server.common.globals import X` と名前を指定してimportする**(`from capass_server.common import globals` とすると、組み込みの `globals()` を隠してしまう)。
+
+### 設定(環境変数)
 
 - 環境変数は **`common/config.py` だけ**で読む(他のモジュールで `os.environ` を使わない)。必須は `os.environ["..."]`、任意は `os.environ.get("...", デフォルト)`。
 - 他のモジュールは `from capass_server.common.config import X` で使う。
@@ -102,7 +116,7 @@ examples/            暫定クライアント。skills/ AI向けスキル
 
 - serviceは `common/errors.py` の `ServiceError` のサブクラスを `raise` する。
 - HTTPステータスへの変換は `controllers/error_handlers.py` の `_STATUS_BY_ERROR` に追加する(サブクラスを先に書く)。
-- 目安: 署名不正=401、権限なし/未承認=403、存在しない=404、重複・状態不正=409、形式不正=422(Pydanticが自動)、レート制限=429。
+- 目安: 署名不正=401、権限なし/未承認=403、存在しない=404、重複・状態不正=409、形式不正=422(Pydanticが自動)、レート制限=429、ツールサーバの不達・不正応答=502、ツールサーバのタイムアウト=504。
 
 ## 6. 署名付きリクエストのAPI
 
@@ -113,7 +127,10 @@ examples/            暫定クライアント。skills/ AI向けスキル
 - メールアドレスは `EMAIL_PATTERN` で検証する。`EmailStr` は値を正規化して署名とずれるので使わない。
 - 署名の検証は `services/signed_request.py` の `verify_signed_request` / `verify_admin_request` を使い、**DB参照より先に**行う(未認証の相手に、登録の有無などを知らせない)。
 - プレフィックスは `common/signature.py` に定義する。新しい署名付きAPIを足したら、`QUICKSTART.md` の署名仕様の表と `examples/provisional_client.py` も更新する。
-- ツール代理トークンは、平文でDBに保存・ログ出力・レスポンスしない(`common/crypto.py` で暗号化して保存する)。
+- **AIエージェントの署名付きAPI**(`tools` と `exec`)は、`services/signed_request.py` の `verify_agent_request` で認証する(`tbl_agent` に登録された公開鍵で検証する)。存在しない `agent_id` は、署名不正と同じ401にする(AIエージェントの有無を知らせない)。ボディが無いGETの署名は、ヘッダー(`HEADER_SIGNED_AT` / `HEADER_SIGNATURE`)で受ける。
+- **副作用のあるリクエスト(ツール実行など)には `nonce` を付け**、`consume_request_nonce` で使用済みにしてから処理する(再送対策)。認証に失敗したリクエストのnonceは記録しない。
+- ツールサーバへの中継中は、DBのトランザクション(接続)を保持しない(呼び出しの前に `commit()` する)。
+- ツール代理トークンは、平文でDBに保存・ログ出力・レスポンスしない(`common/crypto.py` で暗号化して保存する)。ツールサーバへ渡すときだけ復号する。
 
 ## 7. DB
 
@@ -124,21 +141,22 @@ examples/            暫定クライアント。skills/ AI向けスキル
 ## 8. テスト
 
 - 命名: `ut_*.py` は単体テスト(外部依存なし)、`it_*.py` は結合テスト(`TestClient` + インメモリSQLite)。pytestの設定は `pyproject.toml` の `python_files`。
-- 共通のfixtureは `conftest.py`(`session_factory` `client` `admin_priv`)、署名付きボディの作成やDBへの前提データ登録は `testlib.py` に置く。PostgreSQLやネットワークは使わない。
+- 共通のfixtureは `conftest.py`(`session_factory` `client` `admin_priv` `fake_tool_server`)、署名付きボディの作成やDBへの前提データ登録は `testlib.py` に置く。PostgreSQLやネットワークは使わない。
 - 新しいAPIには、正常系に加えて、401 / 403 / 404 / 409 / 422 の異常系のテストを書く。署名付きAPIは、改ざん・期限切れ・別リソースへの使い回しも確認する。
 - 実行時に差し替えたいモジュール変数は、`monkeypatch.setattr` で、**その値を使っているモジュール**に対して差し替える。
+- ツールサーバへのHTTP呼び出しは、結合テストでは `fake_tool_server` で差し替え、実際のHTTP通信の挙動は、ローカルのHTTPサーバを立てた単体テスト(`ut_tool_client.py`)で確認する。
 - 実行できなかったテストがある場合(環境にFastAPI等が無いなど)は、その旨を利用者に明記する。
 
 ## 9. バージョンと成果物
 
 - バージョンは `capass_server/__init__.py` の `__version__` だけに書く(`pyproject.toml` は動的に読む)。**利用者から指示がない限り変えない。**
-- 成果物は、同名のトップディレクトリを持つzip(`capass-v0.1.2-5.zip` など)で渡し、**変更したファイルの一覧**も示す。
+- 成果物は、同名のトップディレクトリを持つzip(`capass-v0.1.3-1.zip` など)で渡し、**変更したファイルの一覧**も示す。
 - 利用者が依頼していない変更をした場合は、その旨と理由を伝える。
 
 ## 10. 新しいPythonファイルを足すときのチェックリスト
 
 1. `__init__.py` 以外なら、冒頭に定型ヘッダ(1.)を書いた。エントリポイント(`main.py` / `tests/`)だけ `ROOTPATH` を書いた。
 2. 置き場所が、層の責務(2.)に合っている。依存の向きを逆転させていない。
-3. 命名が規則(3.)に合っている。環境変数は `config.py` 経由。
+3. 命名が規則(3.)に合っている。固定値は `globals.py`(長さの上限は、スキーマとエンティティで同じ定数)、環境変数は `config.py` 経由。
 4. 新しい業務エラーは `errors.py` と `_STATUS_BY_ERROR` に追加した。
 5. テストを足し、`QUICKSTART.md` など関連するドキュメントを更新した。
