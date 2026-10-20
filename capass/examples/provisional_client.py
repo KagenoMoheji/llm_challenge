@@ -4,12 +4,16 @@ CLIの `keygen` / `regist` などの代わりに、CaPassサーバのRestAPIを�
 秘密鍵は環境変数で渡す(keygenで作ったBase64文字列)。サーバのURLは CAPASS_URL(省略時 http://127.0.0.1:8000)。
 
   python provisional_client.py keygen
-  python provisional_client.py toolserver-register --name "社内ツールサーバA" --email you@example.com   # 環境変数 TOOL_SERVER_PRIVATE_KEY
+  python provisional_client.py toolserver-register --name "社内ツールサーバA" \
+      --exec-url https://toolserver.example.com/capass/exec --email you@example.com      # 環境変数 TOOL_SERVER_PRIVATE_KEY
   python provisional_client.py toolserver-approve  --toolserver-id 1                   # 環境変数 ADMIN_PRIVATE_KEY
   python provisional_client.py agent-register      --agent-id agent-1 --email you@example.com          # 環境変数 AGENT_PRIVATE_KEY
   python provisional_client.py agent-approve       --agent-id agent-1                  # 環境変数 ADMIN_PRIVATE_KEY
   python provisional_client.py agent-addtool       --agent-id agent-1 \
-      --endpoint psql_manager --context "..."                                          # 環境変数 TOOL_SERVER_PRIVATE_KEY
+      --endpoint psql_manager --context "..." --params-schema @schema.json             # 環境変数 TOOL_SERVER_PRIVATE_KEY
+  python provisional_client.py agent-tools         --agent-id agent-1                  # 環境変数 AGENT_PRIVATE_KEY(list executable の代用)
+  python provisional_client.py agent-exec          --agent-id agent-1 \
+      --endpoint psql_manager --params '{"sql": "SELECT 1"}'                           # 環境変数 AGENT_PRIVATE_KEY(exec の代用)
 """
 import os
 import inspect
@@ -40,6 +44,8 @@ SIGN_CONTEXT_TOOLSERVER_APPROVE = b"capass-toolserver-approve-v1\n"
 SIGN_CONTEXT_AGENT_REGISTER = b"capass-agent-register-v1\n"
 SIGN_CONTEXT_AGENT_APPROVE = b"capass-agent-approve-v1\n"
 SIGN_CONTEXT_AGENT_ADDTOOL = b"capass-agent-addtool-v1\n"
+SIGN_CONTEXT_AGENT_LISTTOOLS = b"capass-agent-listtools-v1\n"
+SIGN_CONTEXT_AGENT_EXEC = b"capass-agent-exec-v1\n"
 
 
 def _load_private_key(env_name: str) -> Ed25519PrivateKey:
@@ -76,14 +82,32 @@ def _post(path: str, body: dict) -> None:
         print(e.code, e.read().decode("utf-8"))
 
 
+def _get(path: str, headers: dict) -> None:
+    req = urllib.request.Request(f"{CAPASS_URL}{path}", headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req) as res:
+            print(res.status, res.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        print(e.code, e.read().decode("utf-8"))
+
+
+def _load_json_object(value: str, option: str) -> dict:
+    """JSONオブジェクトの文字列、または @ファイルパス(ファイルの中身がJSON)を読み込む。"""
+    text = open(value[1:], encoding="utf-8").read() if value.startswith("@") else value
+    obj = json.loads(text)
+    if not isinstance(obj, dict):
+        sys.exit(f"{option} はJSONオブジェクトで指定してください")
+    return obj
+
+
 def cmd_keygen(_: argparse.Namespace) -> None:
     priv = Ed25519PrivateKey.generate()
     print("PRIVATE:", base64.b64encode(priv.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())).decode())
     print("PUBLIC :", _public_key_b64(priv))
 
 
-def build_toolserver_register(priv: Ed25519PrivateKey, name: str, email: str) -> tuple[str, dict]:
-    fields = {"tool_server_public_key": _public_key_b64(priv), "tool_server_name": name, "applicant_email": email}
+def build_toolserver_register(priv: Ed25519PrivateKey, name: str, exec_url: str, email: str) -> tuple[str, dict]:
+    fields = {"tool_server_public_key": _public_key_b64(priv), "tool_server_name": name, "tool_server_exec_url": exec_url, "applicant_email": email}
     return "/api/v1/toolservers/register", _signed_body(priv, SIGN_CONTEXT_TOOLSERVER_REGISTER, fields)
 
 
@@ -104,10 +128,11 @@ def build_agent_approve(admin: Ed25519PrivateKey, agent_id: str) -> tuple[str, d
     return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/approve", body
 
 
-def build_agent_addtool(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, context: str, token: str) -> tuple[str, dict]:
+def build_agent_addtool(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, context: str, token: str, params_schema: dict) -> tuple[str, dict]:
     fields = {
         "tool_endpoint": endpoint,
         "context": context,
+        "params_schema": params_schema,
         "tool_proxy_token": token,
         "tool_server_public_key": _public_key_b64(priv),
     }
@@ -115,8 +140,23 @@ def build_agent_addtool(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, c
     return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/addtool", body
 
 
+def build_agent_tools(priv: Ed25519PrivateKey, agent_id: str) -> tuple[str, dict]:
+    """GETの署名はヘッダーで送る。署名対象は agent_id と signed_at。"""
+    signed_at = int(time.time())
+    canonical = json.dumps({"agent_id": agent_id, "signed_at": signed_at}, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    signature = base64.b64encode(priv.sign(SIGN_CONTEXT_AGENT_LISTTOOLS + canonical)).decode()
+    headers = {"X-CaPass-Signed-At": str(signed_at), "X-CaPass-Signature": signature}
+    return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/tools", headers
+
+
+def build_agent_exec(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, params: dict) -> tuple[str, dict]:
+    fields = {"params": params, "nonce": secrets.token_urlsafe(16)}  # nonceは、リクエストごとに必ず新しく作る(使い回すとリプレイとして拒否される)
+    body = _signed_body(priv, SIGN_CONTEXT_AGENT_EXEC, fields, {"agent_id": agent_id, "tool_endpoint": endpoint})
+    return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/exec/{urllib.parse.quote(endpoint, safe='')}", body
+
+
 def cmd_toolserver_register(a: argparse.Namespace) -> None:
-    _post(*build_toolserver_register(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.name, a.email))
+    _post(*build_toolserver_register(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.name, a.exec_url, a.email))
 
 
 def cmd_toolserver_approve(a: argparse.Namespace) -> None:
@@ -134,7 +174,18 @@ def cmd_agent_approve(a: argparse.Namespace) -> None:
 def cmd_agent_addtool(a: argparse.Namespace) -> None:
     token = a.token or secrets.token_urlsafe(32)  # ツール代理トークン。省略時は自動発行する
     print("tool_proxy_token(ツールサーバ側のDBにも [認証情報/トークン/エージェント] として保存すること):", token)
-    _post(*build_agent_addtool(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.agent_id, a.endpoint, a.context, token))
+    _post(*build_agent_addtool(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.agent_id, a.endpoint, a.context, token, _load_json_object(a.params_schema, "--params-schema")))
+
+
+def cmd_agent_tools(a: argparse.Namespace) -> None:
+    _get(*build_agent_tools(_load_private_key("AGENT_PRIVATE_KEY"), a.agent_id))
+
+
+def cmd_agent_exec(a: argparse.Namespace) -> None:
+    params = json.loads(a.params)
+    if not isinstance(params, dict):
+        sys.exit("--params はJSONオブジェクトで指定してください")
+    _post(*build_agent_exec(_load_private_key("AGENT_PRIVATE_KEY"), a.agent_id, a.endpoint, params))
 
 
 def main() -> None:
@@ -145,6 +196,7 @@ def main() -> None:
 
     p = sub.add_parser("toolserver-register", help="ツールサーバ(公開鍵)の初回登録")
     p.add_argument("--name", required=True, help="ツールサーバの名称(管理者が承認時に識別するため)")
+    p.add_argument("--exec-url", required=True, help="ツール実行の依頼先URL。CaPassサーバがここへ中継する(既定ではhttpsのみ)")
     p.add_argument("--email", required=True, help="申請者のメールアドレス(管理者が承認前に、申請内容の確認の連絡をするため)")
     p.set_defaults(func=cmd_toolserver_register)
 
@@ -165,8 +217,19 @@ def main() -> None:
     p.add_argument("--agent-id", required=True)
     p.add_argument("--endpoint", required=True, help="ツールエンドポイント")
     p.add_argument("--context", required=True, help="ツールのコンテキスト(説明)")
+    p.add_argument("--params-schema", required=True, help="ツールのparamsのスキーマ(JSON Schema)。JSON文字列、または @ファイルパス。各パラメータに description が必要")
     p.add_argument("--token", help="ツール代理トークン(省略時は自動発行)")
     p.set_defaults(func=cmd_agent_addtool)
+
+    p = sub.add_parser("agent-tools", help="使用できるツールの一覧を取得する(AIエージェント)")
+    p.add_argument("--agent-id", required=True)
+    p.set_defaults(func=cmd_agent_tools)
+
+    p = sub.add_parser("agent-exec", help="ツールを実行する(AIエージェント)")
+    p.add_argument("--agent-id", required=True)
+    p.add_argument("--endpoint", required=True, help="ツールエンドポイント")
+    p.add_argument("--params", default="{}", help='ツールパラメータ(JSONオブジェクト)。例: \'{"sql": "SELECT 1"}\'')
+    p.set_defaults(func=cmd_agent_exec)
 
     args = parser.parse_args()
     args.func(args)

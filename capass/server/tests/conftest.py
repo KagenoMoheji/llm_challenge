@@ -18,8 +18,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from capass_server.common.db import Base, get_db
+from capass_server.common.tool_client import ToolServerResponse
 from capass_server.controllers import dependencies
 from capass_server.main import app
+from capass_server.services import agent_tool
 from testlib import seed_admin
 
 # DBはテスト用のインメモリSQLiteに差し替える(PostgreSQLの起動は不要)
@@ -62,3 +64,25 @@ def admin_priv(session_factory):
 def _disable_rate_limit(monkeypatch):
     """初回登録APIのレート制限は、既定ではテストで無効にする(レート制限のテストでは、個別に有効化する)。"""
     monkeypatch.setattr(dependencies, "RATE_LIMIT_ENABLED", False)
+
+
+class FakeToolServer:
+    """ツールサーバへの実際のHTTP通信の代わりに使う。呼び出しを記録し、responseに設定した応答を返す(例外を設定すれば、それを送出する)。"""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+        self.response: ToolServerResponse | Exception = ToolServerResponse(200, b'{"result": "ok"}', "application/json")
+
+    def __call__(self, url, token, payload, timeout_sec, max_response_bytes, user_agent="CaPass") -> ToolServerResponse:
+        self.calls.append({"url": url, "token": token, "payload": payload, "timeout_sec": timeout_sec, "max_response_bytes": max_response_bytes, "user_agent": user_agent})
+        if isinstance(self.response, Exception):
+            raise self.response
+        return self.response
+
+
+@pytest.fixture
+def fake_tool_server(monkeypatch):
+    """agent_toolがツールサーバを呼ぶ処理(call_tool_server)を、FakeToolServerに差し替える。"""
+    fake = FakeToolServer()
+    monkeypatch.setattr(agent_tool, "call_tool_server", fake)
+    return fake

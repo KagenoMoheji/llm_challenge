@@ -10,9 +10,11 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from capass_server.common.config import TOOL_SERVER_ALLOW_HTTP
 from capass_server.common.errors import (
     DuplicateToolServerError,
     InvalidApprovalStateError,
+    InvalidToolServerUrlError,
     ToolServerNotFoundError,
 )
 from capass_server.common.signature import SIGN_CONTEXT_TOOLSERVER_APPROVE, SIGN_CONTEXT_TOOLSERVER_REGISTER
@@ -28,15 +30,20 @@ def register_tool_server(db: Session, req: ToolServerRegisterRequest) -> TblTool
     # 1. 署名の検証
     verify_signed_request(req.tool_server_public_key, SIGN_CONTEXT_TOOLSERVER_REGISTER, req.signed_payload(), req.signature)
 
-    # 2. 重複チェック(同一公開鍵は、承認ステータスによらず再登録できない)
+    # 2. 実行URLの確認(既定ではhttpsのみ。ローカル開発などでhttpを使う場合は、設定 TOOL_SERVER_ALLOW_HTTP で許可する)
+    if not TOOL_SERVER_ALLOW_HTTP and not req.tool_server_exec_url.lower().startswith("https://"):
+        raise InvalidToolServerUrlError()
+
+    # 3. 重複チェック(同一公開鍵は、承認ステータスによらず再登録できない)
     existing = mappers.find_tbl_tool_server_by_public_key(db, req.tool_server_public_key)
     if existing is not None:
         raise DuplicateToolServerError(existing.status)
 
-    # 3. 登録(同時リクエストによる重複は、一意制約違反として検出する)
+    # 4. 登録(同時リクエストによる重複は、一意制約違反として検出する)
     tool_server = TblToolServer(
         tool_server_public_key=req.tool_server_public_key,
         tool_server_name=req.tool_server_name,
+        exec_url=req.tool_server_exec_url,
         applicant_email=req.applicant_email,
         approver_email=None,
         status=ApprovalStatus.PENDING.value,

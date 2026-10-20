@@ -1,7 +1,7 @@
 # CaPass QUICKSTART(暫定版)
 
 > **この文書は暫定版です。** CaPassクライアント(CLI)がまだ未実装のため、キー作成(`keygen`)や各API呼び出しは、暫定クライアント [`examples/provisional_client.py`](examples/provisional_client.py) で代用しています。CLIの実装後に置き換えます。
-> 現時点で動作するAPIは、下表の登録・承認・ツール追加の5つです(`list executable` と `exec` は未実装)。
+> 動作するAPIは、下表の7つです(登録・承認・ツール追加と、AIエージェントによるツール一覧の取得・実行)。
 
 ## 1. 全体像
 
@@ -14,6 +14,8 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 | AIエージェント提供者 | `POST /api/v1/agents/register` | AIエージェント(公開鍵)の初回登録(承認待ち) |
 | CaPassサーバ管理者 | `POST /api/v1/agents/{agent_id}/approve` | AIエージェントの承認 |
 | ツールサーバ提供者 | `POST /api/v1/agents/{agent_id}/addtool` | 承認済みAIエージェントへのツール追加(承認済みツールサーバのみ) |
+| AIエージェント | `GET /api/v1/agents/{agent_id}/tools` | 使用できるツールの一覧(ツールエンドポイントとコンテキスト)の取得 |
+| AIエージェント | `POST /api/v1/agents/{agent_id}/exec/{tool_endpoint}` | ツールの実行(CaPassサーバがツールサーバへ中継する) |
 
 登録の順序は次のとおりです。
 
@@ -21,6 +23,7 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 2. ツールサーバとAIエージェントが、それぞれキーペアを作り、自分の公開鍵と申請者のメールアドレスを初回登録する(`pending`)
 3. 管理者が、申請者に確認の連絡をしたうえで承認する(`approved`。承認した管理者のメールアドレスが記録される)
 4. 承認済みのツールサーバが、承認済みのAIエージェントにツールを追加する
+5. AIエージェントが、使用できるツールの一覧を取得し、ツールを選んで実行する(CaPassサーバが、ツールサーバへ中継する)
 
 ## 2. 署名の仕様
 
@@ -33,11 +36,19 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 
 | API | プレフィックス | 署名する鍵 | ボディのフィールド(`signature` を除く) | URLパスのパラメータ |
 |---|---|---|---|---|
-| `toolservers/register` | `capass-toolserver-register-v1\n` | ツールサーバの秘密鍵 | `tool_server_public_key` `tool_server_name` `applicant_email` `signed_at` | なし |
+| `toolservers/register` | `capass-toolserver-register-v1\n` | ツールサーバの秘密鍵 | `tool_server_public_key` `tool_server_name` `tool_server_exec_url` `applicant_email` `signed_at` | なし |
 | `toolservers/{toolserver_id}/approve` | `capass-toolserver-approve-v1\n` | 管理者の秘密鍵 | `admin_public_key` `signed_at` | `toolserver_id`(整数) |
 | `agents/register` | `capass-agent-register-v1\n` | AIエージェントの秘密鍵 | `agent_id` `agent_public_key` `applicant_email` `signed_at` | なし |
 | `agents/{agent_id}/approve` | `capass-agent-approve-v1\n` | 管理者の秘密鍵 | `admin_public_key` `signed_at` | `agent_id`(文字列) |
-| `agents/{agent_id}/addtool` | `capass-agent-addtool-v1\n` | ツールサーバの秘密鍵 | `tool_endpoint` `context` `tool_proxy_token` `tool_server_public_key` `signed_at` | `agent_id`(文字列) |
+| `agents/{agent_id}/addtool` | `capass-agent-addtool-v1\n` | ツールサーバの秘密鍵 | `tool_endpoint` `context` `params_schema` `tool_proxy_token` `tool_server_public_key` `signed_at` | `agent_id`(文字列) |
+| `agents/{agent_id}/tools`(GET) | `capass-agent-listtools-v1\n` | AIエージェントの秘密鍵 | なし(ボディが無いので、`signed_at` をヘッダーで送る) | `agent_id`(文字列) |
+| `agents/{agent_id}/exec/{tool_endpoint}` | `capass-agent-exec-v1\n` | AIエージェントの秘密鍵 | `params` `nonce` `signed_at` | `agent_id`、`tool_endpoint`(文字列) |
+
+**AIエージェントの署名(`tools` と `exec`):** AIエージェントは、`agents/register` で登録して承認された公開鍵に対応する秘密鍵で署名します。サーバは、`tbl_agent` に登録された公開鍵で検証するので、リクエストに公開鍵は含めません。`agent_id` を知っているだけでは、ツールの一覧も実行もできません。
+
+- **`GET .../tools` は、ボディが無いので、署名をヘッダーで送ります。** `X-CaPass-Signed-At`(署名時刻)と `X-CaPass-Signature`(署名)です。署名対象は `{"agent_id": ..., "signed_at": ...}` です。
+- **`exec` は、`nonce` をリクエストごとに新しく作ってください**(16〜128文字の英数字と `-` `_`)。ツール実行は副作用があるので、同じ `[agent_id, nonce]` のリクエストは、2回目以降を `401` で拒否します(盗聴した署名付きリクエストの再送対策)。`params` は、ツールパラメータのJSONオブジェクトです(無い場合は `{}`)。ネストしたオブジェクトや配列も、正規化JSONの規則で署名されます。
+- **存在しない `agent_id` は、署名不正と区別せず、どちらも `401` です**(AIエージェントの有無を、未認証の相手に知らせないため)。
 
 **管理者の本人確認の流れ:** 管理者は、`approve` のリクエストに、自分の公開鍵(`admin_public_key`)と、秘密鍵で作った署名を付けます。サーバは、①署名がその公開鍵で検証できること(=秘密鍵の持ち主であり、内容が改ざんされていないこと)、②その公開鍵が `tbl_admin` に登録された**有効な管理者**のものであることを確認します。署名は暗号化ではなく、サーバが復号するわけではありません。
 
@@ -67,6 +78,9 @@ pip install -e ".[dev]"
 | `CAPASS_SERVER_RATE_LIMIT_REGISTER_MAX_REQUESTS` | 初回登録APIの、1つのIPあたりの上限回数 | 10 |
 | `CAPASS_SERVER_RATE_LIMIT_REGISTER_WINDOW_SEC` | 上記の上限を数える時間幅(秒) | 60 |
 | `CAPASS_SERVER_TRUSTED_PROXY_COUNT` | `X-Forwarded-For` を付ける、信頼できるリバースプロキシの段数 | 0 |
+| `CAPASS_SERVER_TOOL_SERVER_TIMEOUT_SEC` | ツールサーバへの中継の制限時間(秒。接続から応答の受信完了まで) | 60 |
+| `CAPASS_SERVER_TOOL_SERVER_MAX_RESPONSE_BYTES` | ツールサーバの応答の最大サイズ(バイト)。超えると502 | 10485760(10MiB) |
+| `CAPASS_SERVER_TOOL_SERVER_ALLOW_HTTP` | ツールサーバの実行URLに、`http://` を許可するか(`true` / `false`)。ローカル開発だけ `true` にする | `false` |
 
 暗号化鍵の作り方:
 
@@ -74,7 +88,7 @@ pip install -e ".[dev]"
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-> **既存のDBがある場合:** `tbl_admin` が新設され、`tbl_tool_server` / `tbl_agent` に `applicant_email` / `approver_email` が追加されました。`create_all` は既存のテーブルを変更しないので、開発用DBは作り直してください。
+> **既存のDBがある場合:** `tbl_request_nonce` が新設され、`tbl_tool_server` に `exec_url` が、`tbl_agent_tool` に `params_schema` が追加され、`tbl_agent_tool.tool_endpoint` の長さが128文字になりました。`create_all` は既存のテーブルを変更しないので、開発用DBは作り直してください。
 
 ### レート制限について
 
@@ -142,8 +156,9 @@ GRANT SELECT, INSERT, UPDATE ON terminals TO psql_terminal_admin;
 # ツールサーバ提供者
 python provisional_client.py keygen        # PRIVATE はツールサーバ上だけで保管する
 export TOOL_SERVER_PRIVATE_KEY='<ツールサーバのPRIVATE>'
-python provisional_client.py toolserver-register --name "社内ツールサーバA" --email toolserver-owner@example.com
-# 201 {"toolserver_id": 1, ..., "applicant_email": "toolserver-owner@example.com", "status": "pending", ...}
+python provisional_client.py toolserver-register --name "社内ツールサーバA" \
+  --exec-url https://toolserver.example.com/capass/exec --email toolserver-owner@example.com
+# 201 {"toolserver_id": 1, ..., "tool_server_exec_url": "https://toolserver.example.com/capass/exec", "status": "pending", ...}
 
 # AIエージェント提供者
 python provisional_client.py keygen        # PRIVATE はAIエージェントの作業環境だけで保管する
@@ -154,18 +169,20 @@ python provisional_client.py agent-register --agent-id agent-1 --email agent-own
 
 秘密鍵は、ツールサーバ/AIエージェント上だけで保管します。CaPassにも管理者にも渡しません。
 
+`--exec-url` は、**CaPassサーバがツール実行を中継する先のURL**です(既定ではhttpsのみ。ローカル開発で `http://localhost` を使う場合は、サーバの `CAPASS_SERVER_TOOL_SERVER_ALLOW_HTTP=true` が必要)。署名の対象で、登録後に変更できません。
+
 ### 5.3 管理者が申請内容を確認して承認する
 
 承認待ちの申請は、DBで確認します(承認待ち一覧のAPIは未実装です)。
 
 ```sql
-SELECT id, tool_server_name, applicant_email, tool_server_public_key, created_at
+SELECT id, tool_server_name, exec_url, applicant_email, tool_server_public_key, created_at
   FROM tbl_tool_server WHERE status = 'pending';
 SELECT agent_id, applicant_email, agent_public_key, created_at
   FROM tbl_agent WHERE status = 'pending';
 ```
 
-管理者は、**申請者にメールで連絡して、申請した本人であること・申請内容(名称、`agent_id`、公開鍵)に間違いがないことを確認**してから承認します。
+管理者は、**申請者にメールで連絡して、申請した本人であること・申請内容(名称、**実行URL**、`agent_id`、公開鍵)に間違いがないことを確認**してから承認します。
 
 > **申請者メールアドレスは、申請者の自己申告で、確認されていません。** 悪意のある人が、自分のアドレスを書いて申請することもできます。申請に書かれたアドレスへの返信だけで判断せず、**社内の名簿や組織図など、申請とは別の経路で調べたアドレス**に確認の連絡をしてください。
 
@@ -180,15 +197,27 @@ python provisional_client.py agent-approve --agent-id agent-1
 
 ### 5.4 ツールを追加する
 
-ツールごとに別のツール代理トークンを発行して、`addtool` します(トークンは省略すると自動発行され、画面に表示されます)。
+ツールごとに、**説明(`context`)、paramsのスキーマ(`params_schema`)、別のツール代理トークン**を指定して、`addtool` します(トークンは省略すると自動発行され、画面に表示されます)。paramsのスキーマの書き方は、5.8 を参照してください。
 
 ```bash
+# psql_schema.json: ツールのparamsのスキーマ(JSON Schema)
+cat > psql_schema.json <<'EOF'
+{
+  "type": "object",
+  "properties": {
+    "sql": {"type": "string", "description": "実行するSQL文。1文だけ指定する。例: SELECT id, name FROM employees LIMIT 10"}
+  },
+  "required": ["sql"],
+  "additionalProperties": false
+}
+EOF
+
 export TOOL_SERVER_PRIVATE_KEY='<ツールサーバのPRIVATE>'
 python provisional_client.py agent-addtool --agent-id agent-1 \
-  --endpoint psql_manager \
+  --endpoint psql_manager --params-schema @psql_schema.json \
   --context "PostgreSQLに部長ロール(psql_manager)で接続し、SQLを実行する。社員・売上など全社データの参照が可能。"
 python provisional_client.py agent-addtool --agent-id agent-1 \
-  --endpoint psql_terminal_admin \
+  --endpoint psql_terminal_admin --params-schema @psql_schema.json \
   --context "PostgreSQLに端末管理者ロール(psql_terminal_admin)で接続し、SQLを実行する。端末台帳の参照・更新が可能。"
 # 201 {"tool_endpoint": "psql_manager", "agent_id": "agent-1", ...}
 ```
@@ -205,24 +234,120 @@ SELECT tool_endpoint, agent_id, locked FROM tbl_agent_tool;
 
 `tbl_agent_tool` に、`psql_manager` と `psql_terminal_admin` の2行が `agent-1` に対して登録されていれば成功です。
 
+### 5.6 AIエージェントが、ツールの一覧を取得して、実行する
+
+```bash
+export AGENT_PRIVATE_KEY='<AIエージェントのPRIVATE>'
+
+# 使用できるツールの一覧(CLIの list executable の代用)
+python provisional_client.py agent-tools --agent-id agent-1
+# 200 {"agent_id": "agent-1", "tools": [{"tool_endpoint": "psql_manager", "context": "...", "params_schema": {...}}, {"tool_endpoint": "psql_terminal_admin", ...}]}
+
+# ツールの実行(CLIの exec の代用)。nonceは、実行のたびに自動で新しく作られる
+python provisional_client.py agent-exec --agent-id agent-1 --endpoint psql_manager --params '{"sql": "SELECT 1"}'
+# 200 <ツールサーバの応答がそのまま返る>
+```
+
+AIエージェントは、一覧の `context`(ツールの説明)を見て使うツールを選び、`params_schema`(paramsのスキーマ)を見てparamsを組み立て、`tool_endpoint` を指定して実行します。
+
+- **使用できるツールが1件も無い場合(ツールが無い、すべてロックされている、ツールサーバの承認が取り消されている)、一覧は、エラーではなく空のリスト(`"tools": []`)です。**
+- **`exec` は、paramsがスキーマに合っていないと、ツールサーバへ中継せずに `422` を返します。** `errors` に、問題の場所と内容が入るので、AIエージェントはそれを見てparamsを直せます。
+  ```
+  422 {"detail": "params does not match the params_schema of the tool", "errors": ["$: 'sql' is a required property"]}
+  ```
+- 使用できない(未登録・ロック中・ツールサーバが未承認の)ツールを `exec` した場合は、`403`(権限ありません)です。理由は区別されません。
+
+### 5.7 ツールサーバが実装する仕様(CaPassサーバからの呼び出し)
+
+`exec` のとき、CaPassサーバは、ツールサーバの**実行URL**(`toolservers/register` で登録したURL)へ、次のリクエストを送ります。
+
+```
+POST <実行URL>
+Authorization: Bearer <ツール代理トークン(平文)>
+Content-Type: application/json
+
+{"agent_id": "agent-1", "tool_endpoint": "psql_manager", "params": {"sql": "SELECT 1"}}
+```
+
+ツールサーバは、ツール代理トークンから認証情報(DBロールなど)を引き、`agent_id` と `tool_endpoint` がそのトークンに紐づくものと一致することを確認して、ツールを実行します。認証情報の権限(スコープ)の範囲外なら、**`403`** を返してください。
+
+- `params` は、CaPassサーバが、登録された `params_schema` で検証してから送ります。**ツールサーバ側でも、`params` を必ず検証してください**(CaPassサーバを経由しない呼び出しや、スキーマの検証でカバーできない値(SQLの中身など)があるため)。
+- **CaPassサーバがツールサーバへ接続する方法は、HTTPS(REST)のみです。** ツール自体の種別(CLI、REST API、A2Aなど)は制限されませんが、種別ごとに、実行URLで待ち受けて、ツールへ変換する「受け口」(アダプタ)が、ツールサーバ側に必要です。受け口は、今はツール提供者が実装します(見本: `examples/fake_tool_server.py`)。CaPassクライアントに、この受け口の機能を持たせる構想は、[`docs/TODO.md`](docs/TODO.md) にあります。
+
+CaPassサーバは、ツールサーバの応答を、次のように扱います。
+
+| ツールサーバの応答 | AIエージェントへ返すもの |
+|---|---|
+| `2xx` | そのまま中継(ボディとContent-Type)。ツール利用日時を更新する |
+| `401` | `403` にして中継(AIエージェント自身の認証失敗と紛らわしいため) |
+| その他の `4xx` | そのまま中継 |
+| `3xx` / `5xx` | `502`(ツールサーバの内部情報は中継しない)。リダイレクトは追わない |
+| 接続できない / 応答サイズ超過 | `502` |
+| 制限時間内に応答が無い | `504` |
+
+動作確認には、見本のツールサーバ [`examples/fake_tool_server.py`](examples/fake_tool_server.py) が使えます(`addtool` で登録したトークンを、環境変数で渡して起動します。使い方はファイルの先頭に書いてあります)。
+
+### 5.8 paramsのスキーマ(`params_schema`)の書き方
+
+`params_schema` は、**JSON Schema** で書きます。AIエージェントが、ツールの呼び出しに必要なparamsの組み立て方を理解するための説明であり、CaPassサーバが `exec` のときにparamsを検証する基準にもなります。
+
+JSON Schemaを使う理由は、次のとおりです。
+
+- **AIエージェント向けのツール定義の標準形式です。** MCP(`inputSchema`)、Anthropic(`input_schema`)、OpenAI(`parameters`)が、どれもJSON Schemaを使うので、AIエージェントは、一覧の `params_schema` を、そのままツール定義として扱えます。
+- **型・必須・選択肢・範囲を、機械で検証できます。** `{"sql": "実行するSQL文をstring型で格納"}` のような独自の形式は、型や必須かどうかが曖昧で、検証できません。
+
+登録のときに、CaPassサーバが確認するのは、次の点です。
+
+- JSON Schemaとして正しいこと
+- ルートが `{"type": "object", "properties": {...}}` であること(パラメータが無いツールは `"properties": {}`)
+- **各パラメータに、空でない `description` があること**(AIエージェントが、何を渡すべきか分かるようにするため)
+- `$ref` は、スキーマ内の参照(`#` から始まるもの)のみ。外部のスキーマは参照できないこと
+- サイズが16KiB以下であること
+
+AIエージェントが読みやすいスキーマにするコツ:
+
+- `description` に、**何を渡すか、どんな形式か、例**を書く(「SQL文」だけでなく「1文だけ指定する。例: `SELECT ...`」など)。単位や、使ってはいけない値もここに書く。
+- 選択肢が決まっているものは `enum`、数値の範囲は `minimum` / `maximum`、必須のパラメータは `required` を使う(`description` に書くだけにしない)。
+- **`"additionalProperties": false` を付ける**と、AIエージェントが存在しないパラメータを付けたときに、`422` で気づける。
+- ツール全体の説明は、スキーマではなく `context` に書く。`context` には、「どんなときに使うか」「何ができて何ができないか」を書く。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "sql":    {"type": "string",  "description": "実行するSQL文。1文だけ指定する。例: SELECT id, name FROM employees LIMIT 10"},
+    "limit":  {"type": "integer", "description": "取得する最大行数(1〜1000)", "minimum": 1, "maximum": 1000, "default": 100},
+    "format": {"type": "string",  "description": "出力形式", "enum": ["json", "csv"], "default": "json"}
+  },
+  "required": ["sql"],
+  "additionalProperties": false
+}
+```
+
+`default` は、AIエージェントへの説明です。CaPassサーバは、省略されたパラメータにデフォルト値を補いません(ツールサーバが補います)。
+
 ## 6. レスポンスの意味
 
 | ステータス | 原因 |
 |---|---|
 | 200 / 201 | 成功(承認は200、登録・追加は201)。承認済みへの再承認も200(冪等で、最初の承認者は書き換わりません) |
-| 401 | 署名が不正、または `signed_at` が許容範囲を超えてずれている(時刻同期を確認) |
-| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録) |
+| 401 | 署名が不正、または `signed_at` が許容範囲を超えてずれている(時刻同期を確認)。`tools` / `exec`: 存在しない `agent_id` も同じ。`exec`: 同じ `nonce` を再利用した |
+| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録)。`tools` / `exec`: AIエージェントが未承認。`exec`: 使用できないツール(権限ありません)、またはツールサーバが403/401を返した |
 | 404 | `toolserver_id` / `agent_id` が存在しない |
 | 409 | すでに登録済み(同じ公開鍵、同じ `agent_id`、同じ `[ツールエンドポイント, AIエージェント]`)、または `revoked` を承認しようとした |
-| 422 | リクエストの形式が不正(公開鍵や署名のBase64が不正、メールアドレスの形式が不正、項目の過不足、`agent_id` に使えない文字など) |
+| 422 | リクエストの形式が不正(公開鍵や署名のBase64が不正、メールアドレスの形式が不正、項目の過不足、`agent_id` に使えない文字、`params_schema` が不正など)。`exec`: paramsが、ツールの `params_schema` に合っていない(`errors` に詳細) |
 | 429 | 初回登録APIのレート制限を超えた。`Retry-After` の秒数が経ってから再試行する |
+| 502 | `exec`: ツールサーバに接続できない、5xx/3xxを返した、応答が大きすぎる |
+| 504 | `exec`: ツールサーバが制限時間内に応答しなかった |
 
 ## 7. 考え方と注意点
 
 - **ロールごとに別のツールエンドポイントとして登録します。** ツールエンドポイントはツールサーバで実際にコマンドを起動する受け口なので、`psql_manager` はツールサーバ側で部長ロールの認証情報、`psql_terminal_admin` は端末管理者ロールの認証情報に対応づけます。AIエージェントはツール一覧の `context`(説明)を見てツールを選ぶので、ロールでできること・できないことを具体的に書いてください。
 - **初回登録のAPIは、誰でも呼べます。** 承認待ちになるだけで権限は付きませんが、悪意のある登録を承認してしまうと、その鍵を持つ相手にツールやAIエージェントとしての権限を与えてしまいます。承認前に、5.3 の確認を必ず行ってください。
 - **承認済みのツールサーバは、承認済みの任意のAIエージェントにツールを追加できます。** 現状は、AIエージェント提供者の同意を確認する仕組みはありません。
-- **`revoked` は、現時点では新規の登録・ツール追加にだけ効きます。** 登録済みのツールの `list executable` / `exec` への反映は、それらの実装時に対応します。`revoked` にするAPIはまだ無く、SQLで更新します(`UPDATE tbl_tool_server SET status = 'revoked' WHERE id = 1;`)。
+- **`revoked` は、直ちに効きます。** ツールサーバが `revoked` になると、そのツールサーバのツールは、`addtool` だけでなく、一覧にも出なくなり、実行もできなくなります。AIエージェントが `revoked` になった場合も、一覧・実行ができなくなります。`revoked` にするAPIはまだ無く、SQLで更新します(`UPDATE tbl_tool_server SET status = 'revoked' WHERE id = 1;`)。
+- **ツールサーバの実行URLは、管理者が承認時に確認します。** CaPassサーバは、承認されたURLへ、ツール代理トークン付きでリクエストを送ります。URLが正しいツールサーバのものか(別のホストや、内部の管理用URLを指していないか)を、承認前に必ず確認してください。リダイレクトは追いません。
+- **ツール実行は、nonceで再送を防いでいますが、署名時刻の許容範囲内では、nonceの記録がDBに残ります。** 期限切れの記録は、次の `exec` のときに削除されます。
 
 ## 8. 今後置き換わる箇所
 
@@ -230,6 +355,7 @@ SELECT tool_endpoint, agent_id, locked FROM tbl_agent_tool;
 |---|---|
 | `provisional_client.py keygen` | CaPassクライアントの `keygen` |
 | `provisional_client.py *-register` / `agent-addtool` | CaPassクライアントの `regist` など |
+| `provisional_client.py agent-tools` / `agent-exec` | CaPassクライアントの `list executable` / `exec` |
 | `provisional_client.py *-approve` | 管理者用のCLI |
 | 承認待ちの確認(SQL) | 承認待ち一覧のAPI |
 | 管理者の追加・無効化(SQL) | 当面はSQLのまま |

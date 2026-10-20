@@ -12,18 +12,30 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import base64
+import secrets
 from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from capass_server.common.crypto import encrypt_token
 from capass_server.common.signature import (
+    SIGN_CONTEXT_AGENT_EXEC,
+    SIGN_CONTEXT_AGENT_LISTTOOLS,
     SIGN_CONTEXT_AGENT_REGISTER,
     SIGN_CONTEXT_TOOLSERVER_REGISTER,
     build_signing_message,
 )
-from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblToolServer
+from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblAgentTool, TblToolServer
 
 APPLICANT_EMAIL = "applicant@example.com"
 ADMIN_EMAIL = "admin@example.com"
+EXEC_URL = "https://toolserver.example.com/capass/exec"
+# テスト用のparamsのスキーマ(JSON Schema)。sqlパラメータ(文字列、必須)だけを受け付ける
+PARAMS_SCHEMA = {
+    "type": "object",
+    "properties": {"sql": {"type": "string", "description": "実行するSQL文(string)"}},
+    "required": ["sql"],
+    "additionalProperties": False,
+}
 
 
 def pub_b64(priv: Ed25519PrivateKey) -> str:
@@ -38,14 +50,26 @@ def signed_body(priv: Ed25519PrivateKey, sign_context: bytes, fields: dict, path
     return body
 
 
-def toolserver_register_body(priv: Ed25519PrivateKey, name: str = "社内ツールサーバA", email: str = APPLICANT_EMAIL, signed_at: int | None = None) -> dict:
-    fields = {"tool_server_public_key": pub_b64(priv), "tool_server_name": name, "applicant_email": email}
+def toolserver_register_body(priv: Ed25519PrivateKey, name: str = "社内ツールサーバA", email: str = APPLICANT_EMAIL, exec_url: str = EXEC_URL, signed_at: int | None = None) -> dict:
+    fields = {"tool_server_public_key": pub_b64(priv), "tool_server_name": name, "tool_server_exec_url": exec_url, "applicant_email": email}
     return signed_body(priv, SIGN_CONTEXT_TOOLSERVER_REGISTER, fields, signed_at=signed_at)
 
 
 def agent_register_body(priv: Ed25519PrivateKey, agent_id: str = "agent-1", email: str = APPLICANT_EMAIL, signed_at: int | None = None) -> dict:
     fields = {"agent_id": agent_id, "agent_public_key": pub_b64(priv), "applicant_email": email}
     return signed_body(priv, SIGN_CONTEXT_AGENT_REGISTER, fields, signed_at=signed_at)
+
+
+def list_tools_headers(agent_priv: Ed25519PrivateKey, agent_id: str, signed_at: int | None = None) -> dict:
+    """GET agents/{agent_id}/tools の署名ヘッダーを作る。署名対象は agent_id と signed_at。"""
+    at = int(time.time()) if signed_at is None else signed_at
+    message = build_signing_message(SIGN_CONTEXT_AGENT_LISTTOOLS, {"agent_id": agent_id, "signed_at": at})
+    return {"X-CaPass-Signed-At": str(at), "X-CaPass-Signature": base64.b64encode(agent_priv.sign(message)).decode()}
+
+
+def exec_body(agent_priv: Ed25519PrivateKey, agent_id: str, tool_endpoint: str, params: dict | None = None, nonce: str | None = None, signed_at: int | None = None) -> dict:
+    fields = {"params": {"sql": "SELECT 1"} if params is None else params, "nonce": secrets.token_urlsafe(16) if nonce is None else nonce}
+    return signed_body(agent_priv, SIGN_CONTEXT_AGENT_EXEC, fields, path_params={"agent_id": agent_id, "tool_endpoint": tool_endpoint}, signed_at=signed_at)
 
 
 def approve_body(admin_priv: Ed25519PrivateKey, sign_context: bytes, path_params: dict, signed_at: int | None = None) -> dict:
@@ -68,6 +92,7 @@ def seed_tool_server(session_factory, priv: Ed25519PrivateKey, status: ApprovalS
         row = TblToolServer(
             tool_server_public_key=pub_b64(priv),
             tool_server_name=name,
+            exec_url=EXEC_URL,
             applicant_email=APPLICANT_EMAIL,
             approver_email=ADMIN_EMAIL if approved else None,
             status=status.value,
@@ -97,3 +122,24 @@ def seed_agent(session_factory, priv: Ed25519PrivateKey, agent_id: str = "agent-
         )
         db.commit()
     return agent_id
+
+
+def seed_agent_tool(session_factory, agent_id: str, tool_endpoint: str, tool_server_priv: Ed25519PrivateKey, token: str = "proxy-token-1", context: str = "テスト用のツール", locked: bool = False, params_schema: dict | None = None) -> None:
+    """tbl_agent_toolにレコードを直接登録する(addtool APIを経由しない前提データ作成用)。トークンは暗号化して保存する。"""
+    now = datetime.now(timezone.utc)
+    with session_factory() as db:
+        db.add(
+            TblAgentTool(
+                tool_endpoint=tool_endpoint,
+                context=context,
+                params_schema=PARAMS_SCHEMA if params_schema is None else params_schema,
+                agent_id=agent_id,
+                tool_proxy_token_encrypted=encrypt_token(token),
+                tool_proxy_token_updated_at=now,
+                tool_used_at=None,
+                locked=locked,
+                tool_server_public_key=pub_b64(tool_server_priv),
+                created_at=now,
+            )
+        )
+        db.commit()

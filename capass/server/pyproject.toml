@@ -12,6 +12,7 @@ dependencies = [
   "sqlalchemy>=2.0",
   "psycopg[binary]",
   "cryptography",
+  "jsonschema>=4.18",
 ]
 
 [project.optional-dependencies]

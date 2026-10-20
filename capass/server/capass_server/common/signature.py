@@ -21,6 +21,8 @@ SIGN_CONTEXT_TOOLSERVER_APPROVE = b"capass-toolserver-approve-v1\n"
 SIGN_CONTEXT_AGENT_REGISTER = b"capass-agent-register-v1\n"
 SIGN_CONTEXT_AGENT_APPROVE = b"capass-agent-approve-v1\n"
 SIGN_CONTEXT_AGENT_ADDTOOL = b"capass-agent-addtool-v1\n"
+SIGN_CONTEXT_AGENT_LISTTOOLS = b"capass-agent-listtools-v1\n"
+SIGN_CONTEXT_AGENT_EXEC = b"capass-agent-exec-v1\n"
 
 
 def canonical_json_bytes(payload: dict) -> bytes:

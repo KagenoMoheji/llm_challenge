@@ -36,4 +36,8 @@ TRUSTED_PROXY_COUNT = int(os.environ.get("CAPASS_SERVER_TRUSTED_PROXY_COUNT", "0
 
 # ツールサーバ呼び出しのタイムアウト(秒)
 TOOL_SERVER_TIMEOUT_SEC = float(os.environ.get("CAPASS_SERVER_TOOL_SERVER_TIMEOUT_SEC", "60"))
+# ツールサーバの応答の最大サイズ(バイト)。超えた場合は502を返す
+TOOL_SERVER_MAX_RESPONSE_BYTES = int(os.environ.get("CAPASS_SERVER_TOOL_SERVER_MAX_RESPONSE_BYTES", str(10 * 1024 * 1024)))
+# ツールサーバの実行URLに、httpを許可するか(既定はhttpsのみ。ローカル開発など、http://localhost のツールサーバを使う場合だけtrueにする)
+TOOL_SERVER_ALLOW_HTTP = os.environ.get("CAPASS_SERVER_TOOL_SERVER_ALLOW_HTTP", "false").lower() in ("1", "true", "yes")
 
