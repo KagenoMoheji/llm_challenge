@@ -21,7 +21,7 @@ from capass_server.common.db import Base, get_db
 from capass_server.common.tool_client import ToolServerResponse
 from capass_server.controllers import dependencies
 from capass_server.main import app
-from capass_server.services import agent_exec
+from capass_server.services import agent_tool
 from testlib import seed_admin
 
 # DBはテスト用のインメモリSQLiteに差し替える(PostgreSQLの起動は不要)
@@ -82,7 +82,7 @@ class FakeToolServer:
 
 @pytest.fixture
 def fake_tool_server(monkeypatch):
-    """agent_execがツールサーバを呼ぶ処理(call_tool_server)を、FakeToolServerに差し替える。"""
+    """agent_toolがツールサーバを呼ぶ処理(call_tool_server)を、FakeToolServerに差し替える。"""
     fake = FakeToolServer()
-    monkeypatch.setattr(agent_exec, "call_tool_server", fake)
+    monkeypatch.setattr(agent_tool, "call_tool_server", fake)
     return fake

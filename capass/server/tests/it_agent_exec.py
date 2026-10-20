@@ -18,19 +18,19 @@ from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
 from capass_server.common.errors import ToolServerTimeoutError, ToolServerUnavailableError
 from capass_server.common.tool_client import ToolServerResponse
 from capass_server.models.entities import ApprovalStatus, TblAgentTool, TblRequestNonce
-from testlib import EXEC_URL, exec_body, seed_agent, seed_agent_tool, seed_tool_server
+from testlib import EXEC_URL, PARAMS_SCHEMA, exec_body, seed_agent, seed_agent_tool, seed_tool_server
 
 
 def _post(client, agent_id, tool_endpoint, body):
     return client.post(f"/api/v1/agents/{agent_id}/exec/{tool_endpoint}", json=body)
 
 
-def _setup(session_factory, agent_id="agent-1", tool_endpoint="psql_manager", token="proxy-token-1"):
+def _setup(session_factory, agent_id="agent-1", tool_endpoint="psql_manager", token="proxy-token-1", params_schema=None):
     """承認済みのAIエージェントとツールサーバ、実行できるツールを用意し、AIエージェントの秘密鍵を返す。"""
     agent_priv, ts_priv = Ed25519PrivateKey.generate(), Ed25519PrivateKey.generate()
     seed_agent(session_factory, agent_priv, agent_id)
     seed_tool_server(session_factory, ts_priv)
-    seed_agent_tool(session_factory, agent_id, tool_endpoint, ts_priv, token=token)
+    seed_agent_tool(session_factory, agent_id, tool_endpoint, ts_priv, token=token, params_schema=params_schema)
     return agent_priv, ts_priv
 
 
@@ -65,7 +65,7 @@ def test_exec_updates_tool_used_at_on_success(client, session_factory, fake_tool
 
 
 def test_exec_with_japanese_endpoint_and_empty_params(client, session_factory, fake_tool_server):
-    agent_priv, _ = _setup(session_factory, tool_endpoint="psql_部長ロール")
+    agent_priv, _ = _setup(session_factory, tool_endpoint="psql_部長ロール", params_schema={"type": "object", "properties": {}})  # パラメータが無いツール
     body = exec_body(agent_priv, "agent-1", "psql_部長ロール", params={})
     assert _post(client, "agent-1", "psql_部長ロール", body).status_code == 200
     assert fake_tool_server.calls[0]["payload"]["tool_endpoint"] == "psql_部長ロール"
@@ -105,6 +105,77 @@ def test_exec_maps_tool_server_connection_errors(client, session_factory, fake_t
     assert _post(client, "agent-1", "psql_manager", exec_body(agent_priv, "agent-1", "psql_manager")).status_code == 502
     fake_tool_server.response = ToolServerTimeoutError()
     assert _post(client, "agent-1", "psql_manager", exec_body(agent_priv, "agent-1", "psql_manager")).status_code == 504
+
+
+# ---------- paramsのスキーマ検証 ----------
+def test_exec_rejects_params_that_do_not_match_schema(client, session_factory, fake_tool_server):
+    agent_priv, _ = _setup(session_factory)
+    cases = {
+        "required missing": {},
+        "wrong type": {"sql": 123},
+        "additional property": {"sql": "SELECT 1", "unknown": 1},
+    }
+    for label, params in cases.items():
+        res = _post(client, "agent-1", "psql_manager", exec_body(agent_priv, "agent-1", "psql_manager", params=params))
+        assert res.status_code == 422, label
+        data = res.json()
+        assert data["detail"] == "params does not match the params_schema of the tool"
+        assert data["errors"], label  # AIエージェントが直せるよう、問題の場所と内容を返す
+    assert fake_tool_server.calls == []  # ツールサーバへは中継しない
+    assert _used_at(session_factory) is None
+
+
+def test_exec_validation_errors_tell_where_and_what(client, session_factory, fake_tool_server):
+    agent_priv, ts_priv = _setup(session_factory)
+    schema = {
+        "type": "object",
+        "properties": {
+            "sql": {"type": "string", "description": "SQL文"},
+            "limit": {"type": "integer", "description": "最大行数", "minimum": 1},
+            "options": {"type": "object", "description": "オプション", "properties": {"tags": {"type": "array", "items": {"type": "string"}, "description": "タグ"}}},
+        },
+        "required": ["sql"],
+    }
+    seed_agent_tool(session_factory, "agent-1", "tool_rich", ts_priv, params_schema=schema)
+    params = {"limit": 0, "options": {"tags": ["ok", 5]}}
+    res = _post(client, "agent-1", "tool_rich", exec_body(agent_priv, "agent-1", "tool_rich", params=params))
+    assert res.status_code == 422
+    errors = res.json()["errors"]
+    assert any(e.startswith("$: ") and "'sql' is a required property" in e for e in errors)
+    assert any(e.startswith("$.limit: ") for e in errors)
+    assert any(e.startswith("$.options.tags[1]: ") for e in errors)
+
+
+def test_exec_limits_number_of_returned_errors(client, session_factory, fake_tool_server):
+    agent_priv, ts_priv = _setup(session_factory)
+    schema = {"type": "object", "properties": {f"p{i}": {"type": "integer", "description": "数値"} for i in range(30)}}
+    seed_agent_tool(session_factory, "agent-1", "tool_many", ts_priv, params_schema=schema)
+    params = {f"p{i}": "not-a-number" for i in range(30)}
+    res = _post(client, "agent-1", "tool_many", exec_body(agent_priv, "agent-1", "tool_many", params=params))
+    assert res.status_code == 422
+    assert len(res.json()["errors"]) == 10  # 返すエラーは10件まで
+
+
+def test_exec_uses_each_tools_own_schema(client, session_factory, fake_tool_server):
+    agent_priv, ts_priv = _setup(session_factory)
+    seed_agent_tool(session_factory, "agent-1", "tool_no_params", ts_priv, params_schema={"type": "object", "properties": {}, "additionalProperties": False})
+    assert _post(client, "agent-1", "tool_no_params", exec_body(agent_priv, "agent-1", "tool_no_params", params={})).status_code == 200
+    assert _post(client, "agent-1", "tool_no_params", exec_body(agent_priv, "agent-1", "tool_no_params", params={"sql": "x"})).status_code == 422
+    assert _post(client, "agent-1", "psql_manager", exec_body(agent_priv, "agent-1", "psql_manager", params={"sql": "SELECT 1"})).status_code == 200
+
+
+def test_exec_params_are_validated_after_permission_check(client, session_factory, fake_tool_server):
+    agent_priv, ts_priv = _setup(session_factory)
+    seed_agent_tool(session_factory, "agent-1", "tool_locked", ts_priv, locked=True)
+    body = exec_body(agent_priv, "agent-1", "tool_locked", params={"bad": "params"})
+    assert _post(client, "agent-1", "tool_locked", body).status_code == 403  # スキーマは、実行できるツールにだけ使う(ロック中のツールのスキーマは教えない)
+
+
+def test_exec_invalid_params_consume_the_nonce(client, session_factory, fake_tool_server):
+    agent_priv, _ = _setup(session_factory)
+    body = exec_body(agent_priv, "agent-1", "psql_manager", params={"wrong": 1})
+    assert _post(client, "agent-1", "psql_manager", body).status_code == 422
+    assert _post(client, "agent-1", "psql_manager", body).status_code == 401  # 同じnonceの再送は、リプレイとして拒否される
 
 
 # ---------- 権限ありません(ツールが無い/ロック/ツールサーバ未承認) ----------

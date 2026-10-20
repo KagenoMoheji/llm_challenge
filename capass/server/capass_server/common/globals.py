@@ -20,7 +20,12 @@ TOOL_PROXY_TOKEN_MAX_LEN = 1024  # 平文の上限。DBには暗号化して(Tex
 EXEC_URL_MAX_LEN = 2048
 NONCE_MAX_LEN = 128
 NONCE_MIN_LEN = 16
+PARAMS_SCHEMA_MAX_BYTES = 16 * 1024  # ツールのparamsのスキーマ(JSON Schema)の最大サイズ(JSON化したバイト数)
 STATUS_MAX_LEN = 16
+
+# ---------- paramsのスキーマ検証の結果(AIエージェントへ返すエラーの上限) ----------
+PARAMS_ERROR_MAX_COUNT = 10  # 返すエラーの最大件数
+PARAMS_ERROR_MAX_LEN = 300  # エラー1件の最大文字数(長い値をそのまま返さないため)
 
 # ---------- 入力の形式(正規表現。pydanticのRust製エンジンで使えるよう、先読み等は使わない) ----------
 # メールアドレスの簡易チェック。EmailStrは値を正規化(ドメインの小文字化等)するため、署名したJSONと一致しなくなる恐れがあり、使わない

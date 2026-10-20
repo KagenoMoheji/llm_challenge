@@ -40,7 +40,7 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 | `toolservers/{toolserver_id}/approve` | `capass-toolserver-approve-v1\n` | 管理者の秘密鍵 | `admin_public_key` `signed_at` | `toolserver_id`(整数) |
 | `agents/register` | `capass-agent-register-v1\n` | AIエージェントの秘密鍵 | `agent_id` `agent_public_key` `applicant_email` `signed_at` | なし |
 | `agents/{agent_id}/approve` | `capass-agent-approve-v1\n` | 管理者の秘密鍵 | `admin_public_key` `signed_at` | `agent_id`(文字列) |
-| `agents/{agent_id}/addtool` | `capass-agent-addtool-v1\n` | ツールサーバの秘密鍵 | `tool_endpoint` `context` `tool_proxy_token` `tool_server_public_key` `signed_at` | `agent_id`(文字列) |
+| `agents/{agent_id}/addtool` | `capass-agent-addtool-v1\n` | ツールサーバの秘密鍵 | `tool_endpoint` `context` `params_schema` `tool_proxy_token` `tool_server_public_key` `signed_at` | `agent_id`(文字列) |
 | `agents/{agent_id}/tools`(GET) | `capass-agent-listtools-v1\n` | AIエージェントの秘密鍵 | なし(ボディが無いので、`signed_at` をヘッダーで送る) | `agent_id`(文字列) |
 | `agents/{agent_id}/exec/{tool_endpoint}` | `capass-agent-exec-v1\n` | AIエージェントの秘密鍵 | `params` `nonce` `signed_at` | `agent_id`、`tool_endpoint`(文字列) |
 
@@ -88,7 +88,7 @@ pip install -e ".[dev]"
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-> **既存のDBがある場合:** `tbl_request_nonce` が新設され、`tbl_tool_server` に `exec_url` が追加され、`tbl_agent_tool.tool_endpoint` の長さが128文字になりました。`create_all` は既存のテーブルを変更しないので、開発用DBは作り直してください。
+> **既存のDBがある場合:** `tbl_request_nonce` が新設され、`tbl_tool_server` に `exec_url` が、`tbl_agent_tool` に `params_schema` が追加され、`tbl_agent_tool.tool_endpoint` の長さが128文字になりました。`create_all` は既存のテーブルを変更しないので、開発用DBは作り直してください。
 
 ### レート制限について
 
@@ -197,15 +197,27 @@ python provisional_client.py agent-approve --agent-id agent-1
 
 ### 5.4 ツールを追加する
 
-ツールごとに別のツール代理トークンを発行して、`addtool` します(トークンは省略すると自動発行され、画面に表示されます)。
+ツールごとに、**説明(`context`)、paramsのスキーマ(`params_schema`)、別のツール代理トークン**を指定して、`addtool` します(トークンは省略すると自動発行され、画面に表示されます)。paramsのスキーマの書き方は、5.8 を参照してください。
 
 ```bash
+# psql_schema.json: ツールのparamsのスキーマ(JSON Schema)
+cat > psql_schema.json <<'EOF'
+{
+  "type": "object",
+  "properties": {
+    "sql": {"type": "string", "description": "実行するSQL文。1文だけ指定する。例: SELECT id, name FROM employees LIMIT 10"}
+  },
+  "required": ["sql"],
+  "additionalProperties": false
+}
+EOF
+
 export TOOL_SERVER_PRIVATE_KEY='<ツールサーバのPRIVATE>'
 python provisional_client.py agent-addtool --agent-id agent-1 \
-  --endpoint psql_manager \
+  --endpoint psql_manager --params-schema @psql_schema.json \
   --context "PostgreSQLに部長ロール(psql_manager)で接続し、SQLを実行する。社員・売上など全社データの参照が可能。"
 python provisional_client.py agent-addtool --agent-id agent-1 \
-  --endpoint psql_terminal_admin \
+  --endpoint psql_terminal_admin --params-schema @psql_schema.json \
   --context "PostgreSQLに端末管理者ロール(psql_terminal_admin)で接続し、SQLを実行する。端末台帳の参照・更新が可能。"
 # 201 {"tool_endpoint": "psql_manager", "agent_id": "agent-1", ...}
 ```
@@ -229,14 +241,21 @@ export AGENT_PRIVATE_KEY='<AIエージェントのPRIVATE>'
 
 # 使用できるツールの一覧(CLIの list executable の代用)
 python provisional_client.py agent-tools --agent-id agent-1
-# 200 {"agent_id": "agent-1", "tools": [{"tool_endpoint": "psql_manager", "context": "..."}, {"tool_endpoint": "psql_terminal_admin", "context": "..."}]}
+# 200 {"agent_id": "agent-1", "tools": [{"tool_endpoint": "psql_manager", "context": "...", "params_schema": {...}}, {"tool_endpoint": "psql_terminal_admin", ...}]}
 
 # ツールの実行(CLIの exec の代用)。nonceは、実行のたびに自動で新しく作られる
 python provisional_client.py agent-exec --agent-id agent-1 --endpoint psql_manager --params '{"sql": "SELECT 1"}'
 # 200 <ツールサーバの応答がそのまま返る>
 ```
 
-AIエージェントは、一覧の `context` を見て使うツールを選び、`tool_endpoint` を指定して実行します。使用できるツールが1件も無い場合(ツールが無い、すべてロックされている、ツールサーバの承認が取り消されている)は、一覧も実行も `403`(権限ありません)で、理由は区別されません。
+AIエージェントは、一覧の `context`(ツールの説明)を見て使うツールを選び、`params_schema`(paramsのスキーマ)を見てparamsを組み立て、`tool_endpoint` を指定して実行します。
+
+- **使用できるツールが1件も無い場合(ツールが無い、すべてロックされている、ツールサーバの承認が取り消されている)、一覧は、エラーではなく空のリスト(`"tools": []`)です。**
+- **`exec` は、paramsがスキーマに合っていないと、ツールサーバへ中継せずに `422` を返します。** `errors` に、問題の場所と内容が入るので、AIエージェントはそれを見てparamsを直せます。
+  ```
+  422 {"detail": "params does not match the params_schema of the tool", "errors": ["$: 'sql' is a required property"]}
+  ```
+- 使用できない(未登録・ロック中・ツールサーバが未承認の)ツールを `exec` した場合は、`403`(権限ありません)です。理由は区別されません。
 
 ### 5.7 ツールサーバが実装する仕様(CaPassサーバからの呼び出し)
 
@@ -252,6 +271,9 @@ Content-Type: application/json
 
 ツールサーバは、ツール代理トークンから認証情報(DBロールなど)を引き、`agent_id` と `tool_endpoint` がそのトークンに紐づくものと一致することを確認して、ツールを実行します。認証情報の権限(スコープ)の範囲外なら、**`403`** を返してください。
 
+- `params` は、CaPassサーバが、登録された `params_schema` で検証してから送ります。**ツールサーバ側でも、`params` を必ず検証してください**(CaPassサーバを経由しない呼び出しや、スキーマの検証でカバーできない値(SQLの中身など)があるため)。
+- **CaPassサーバがツールサーバへ接続する方法は、HTTPS(REST)のみです。** ツール自体の種別(CLI、REST API、A2Aなど)は制限されませんが、種別ごとに、実行URLで待ち受けて、ツールへ変換する「受け口」(アダプタ)が、ツールサーバ側に必要です。受け口は、今はツール提供者が実装します(見本: `examples/fake_tool_server.py`)。CaPassクライアントに、この受け口の機能を持たせる構想は、[`docs/TODO.md`](docs/TODO.md) にあります。
+
 CaPassサーバは、ツールサーバの応答を、次のように扱います。
 
 | ツールサーバの応答 | AIエージェントへ返すもの |
@@ -265,16 +287,55 @@ CaPassサーバは、ツールサーバの応答を、次のように扱いま�
 
 動作確認には、見本のツールサーバ [`examples/fake_tool_server.py`](examples/fake_tool_server.py) が使えます(`addtool` で登録したトークンを、環境変数で渡して起動します。使い方はファイルの先頭に書いてあります)。
 
+### 5.8 paramsのスキーマ(`params_schema`)の書き方
+
+`params_schema` は、**JSON Schema** で書きます。AIエージェントが、ツールの呼び出しに必要なparamsの組み立て方を理解するための説明であり、CaPassサーバが `exec` のときにparamsを検証する基準にもなります。
+
+JSON Schemaを使う理由は、次のとおりです。
+
+- **AIエージェント向けのツール定義の標準形式です。** MCP(`inputSchema`)、Anthropic(`input_schema`)、OpenAI(`parameters`)が、どれもJSON Schemaを使うので、AIエージェントは、一覧の `params_schema` を、そのままツール定義として扱えます。
+- **型・必須・選択肢・範囲を、機械で検証できます。** `{"sql": "実行するSQL文をstring型で格納"}` のような独自の形式は、型や必須かどうかが曖昧で、検証できません。
+
+登録のときに、CaPassサーバが確認するのは、次の点です。
+
+- JSON Schemaとして正しいこと
+- ルートが `{"type": "object", "properties": {...}}` であること(パラメータが無いツールは `"properties": {}`)
+- **各パラメータに、空でない `description` があること**(AIエージェントが、何を渡すべきか分かるようにするため)
+- `$ref` は、スキーマ内の参照(`#` から始まるもの)のみ。外部のスキーマは参照できないこと
+- サイズが16KiB以下であること
+
+AIエージェントが読みやすいスキーマにするコツ:
+
+- `description` に、**何を渡すか、どんな形式か、例**を書く(「SQL文」だけでなく「1文だけ指定する。例: `SELECT ...`」など)。単位や、使ってはいけない値もここに書く。
+- 選択肢が決まっているものは `enum`、数値の範囲は `minimum` / `maximum`、必須のパラメータは `required` を使う(`description` に書くだけにしない)。
+- **`"additionalProperties": false` を付ける**と、AIエージェントが存在しないパラメータを付けたときに、`422` で気づける。
+- ツール全体の説明は、スキーマではなく `context` に書く。`context` には、「どんなときに使うか」「何ができて何ができないか」を書く。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "sql":    {"type": "string",  "description": "実行するSQL文。1文だけ指定する。例: SELECT id, name FROM employees LIMIT 10"},
+    "limit":  {"type": "integer", "description": "取得する最大行数(1〜1000)", "minimum": 1, "maximum": 1000, "default": 100},
+    "format": {"type": "string",  "description": "出力形式", "enum": ["json", "csv"], "default": "json"}
+  },
+  "required": ["sql"],
+  "additionalProperties": false
+}
+```
+
+`default` は、AIエージェントへの説明です。CaPassサーバは、省略されたパラメータにデフォルト値を補いません(ツールサーバが補います)。
+
 ## 6. レスポンスの意味
 
 | ステータス | 原因 |
 |---|---|
 | 200 / 201 | 成功(承認は200、登録・追加は201)。承認済みへの再承認も200(冪等で、最初の承認者は書き換わりません) |
 | 401 | 署名が不正、または `signed_at` が許容範囲を超えてずれている(時刻同期を確認)。`tools` / `exec`: 存在しない `agent_id` も同じ。`exec`: 同じ `nonce` を再利用した |
-| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録)。`tools` / `exec`: AIエージェントが未承認、または使用できるツールが無い(権限ありません)。`exec`: ツールサーバが403/401を返した |
+| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録)。`tools` / `exec`: AIエージェントが未承認。`exec`: 使用できないツール(権限ありません)、またはツールサーバが403/401を返した |
 | 404 | `toolserver_id` / `agent_id` が存在しない |
 | 409 | すでに登録済み(同じ公開鍵、同じ `agent_id`、同じ `[ツールエンドポイント, AIエージェント]`)、または `revoked` を承認しようとした |
-| 422 | リクエストの形式が不正(公開鍵や署名のBase64が不正、メールアドレスの形式が不正、項目の過不足、`agent_id` に使えない文字など) |
+| 422 | リクエストの形式が不正(公開鍵や署名のBase64が不正、メールアドレスの形式が不正、項目の過不足、`agent_id` に使えない文字、`params_schema` が不正など)。`exec`: paramsが、ツールの `params_schema` に合っていない(`errors` に詳細) |
 | 429 | 初回登録APIのレート制限を超えた。`Retry-After` の秒数が経ってから再試行する |
 | 502 | `exec`: ツールサーバに接続できない、5xx/3xxを返した、応答が大きすぎる |
 | 504 | `exec`: ツールサーバが制限時間内に応答しなかった |

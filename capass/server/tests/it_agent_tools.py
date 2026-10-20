@@ -15,7 +15,7 @@ import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
 from capass_server.models.entities import ApprovalStatus
-from testlib import list_tools_headers, seed_agent, seed_agent_tool, seed_tool_server
+from testlib import PARAMS_SCHEMA, list_tools_headers, seed_agent, seed_agent_tool, seed_tool_server
 
 
 def _get(client, agent_id, headers):
@@ -39,9 +39,9 @@ def test_list_tools_ok_sorted_by_endpoint(client, session_factory):
     data = res.json()
     assert data["agent_id"] == "agent-1"
     assert data["tools"] == [
-        {"tool_endpoint": "psql_manager", "context": "部長ロールでpsql"},
-        {"tool_endpoint": "psql_terminal_admin", "context": "端末管理者ロールでpsql"},
-    ]
+        {"tool_endpoint": "psql_manager", "context": "部長ロールでpsql", "params_schema": PARAMS_SCHEMA},
+        {"tool_endpoint": "psql_terminal_admin", "context": "端末管理者ロールでpsql", "params_schema": PARAMS_SCHEMA},
+    ]  # AIエージェントが、実行時のparamsの組み立て方を分かるよう、paramsのスキーマも返す
     assert "tool_proxy_token" not in res.text  # トークンは返さない
 
 
@@ -72,12 +72,22 @@ def test_list_tools_only_returns_own_tools(client, session_factory):
     assert [t["tool_endpoint"] for t in tools] == ["tool_1"]
 
 
-def test_list_tools_without_executable_tools_is_forbidden(client, session_factory):
+def test_list_tools_without_executable_tools_returns_empty_list(client, session_factory):
     agent_priv, ts_priv = _setup(session_factory)
-    res = _get(client, "agent-1", list_tools_headers(agent_priv, "agent-1"))  # ツールが1件も無い(シーケンス図の「権限ありませんエラー」)
-    assert res.status_code == 403
+    res = _get(client, "agent-1", list_tools_headers(agent_priv, "agent-1"))  # ツールが1件も無い場合は、エラーではなく空のリスト
+    assert res.status_code == 200
+    assert res.json() == {"agent_id": "agent-1", "tools": []}
     seed_agent_tool(session_factory, "agent-1", "tool_locked", ts_priv, locked=True)
-    assert _get(client, "agent-1", list_tools_headers(agent_priv, "agent-1")).status_code == 403  # ロックされたものだけでも同様
+    assert _get(client, "agent-1", list_tools_headers(agent_priv, "agent-1")).json()["tools"] == []  # ロックされたものだけでも同様
+
+
+def test_list_tools_returns_each_tools_own_params_schema(client, session_factory):
+    agent_priv, ts_priv = _setup(session_factory)
+    no_params = {"type": "object", "properties": {}}
+    seed_agent_tool(session_factory, "agent-1", "tool_a", ts_priv, params_schema=PARAMS_SCHEMA)
+    seed_agent_tool(session_factory, "agent-1", "tool_b", ts_priv, params_schema=no_params)
+    tools = {t["tool_endpoint"]: t["params_schema"] for t in _get(client, "agent-1", list_tools_headers(agent_priv, "agent-1")).json()["tools"]}
+    assert tools == {"tool_a": PARAMS_SCHEMA, "tool_b": no_params}
 
 
 def test_list_tools_unknown_agent_is_unauthorized(client, session_factory):

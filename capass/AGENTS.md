@@ -7,6 +7,7 @@ CaPass(AIエージェントのツール利用を判定・管理するCapability 
 
 - 構成: `server/`(RestAPIサーバ。Python3 / FastAPI / SQLAlchemy)、`cli/`(CaPassクライアント。未実装)、`examples/`(暫定クライアント)
 - 使い方と登録の手順: [`QUICKSTART.md`](QUICKSTART.md)
+- 未実装・検討事項: [`docs/TODO.md`](docs/TODO.md)
 - テスト: `cd server && pip install -e ".[dev]" && pytest`(必要な環境変数は QUICKSTART を参照)
 
 > Claude Code に自動で読み込ませる場合は、スキルを `.claude/skills/` に置いてください(`mkdir -p .claude/skills && cp -r skills/capass-coding-conventions .claude/skills/`)。

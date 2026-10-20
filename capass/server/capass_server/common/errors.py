@@ -105,7 +105,7 @@ class RateLimitExceededError(ServiceError):
 
 
 class PermissionDeniedError(ServiceError):
-    """実行できるツールが無い(未登録/ロック中/ツールサーバが未承認を区別せず、まとめて返す)(403相当)。"""
+    """実行できるツールが無い(エンドポイントが未登録/ロック中/ツールサーバが未承認を区別せず、まとめて返す)(403相当)。ツール実行(exec)で使う。"""
 
     def __init__(self) -> None:
         super().__init__("permission denied")
@@ -151,3 +151,19 @@ class ToolTokenDecryptionError(ServiceError):
 
     def __init__(self) -> None:
         super().__init__("tool proxy token cannot be decrypted")
+
+
+class InvalidToolParamsError(ServiceError):
+    """ツールパラメータ(params)が、ツールに登録されたスキーマに合っていない(422相当)。
+    errorsには、AIエージェントが修正できるよう、問題の場所と内容を入れる。"""
+
+    def __init__(self, errors: list[str]) -> None:
+        super().__init__("params does not match the params_schema of the tool")
+        self.errors = errors
+
+
+class ToolParamsSchemaError(ServiceError):
+    """保存されたparamsのスキーマが不正で、検証できない(500相当。登録時に検証しているので、通常は起きない)。"""
+
+    def __init__(self) -> None:
+        super().__init__("stored params_schema is invalid")

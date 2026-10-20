@@ -10,7 +10,7 @@ CLIの `keygen` / `regist` などの代わりに、CaPassサーバのRestAPIを�
   python provisional_client.py agent-register      --agent-id agent-1 --email you@example.com          # 環境変数 AGENT_PRIVATE_KEY
   python provisional_client.py agent-approve       --agent-id agent-1                  # 環境変数 ADMIN_PRIVATE_KEY
   python provisional_client.py agent-addtool       --agent-id agent-1 \
-      --endpoint psql_manager --context "..."                                          # 環境変数 TOOL_SERVER_PRIVATE_KEY
+      --endpoint psql_manager --context "..." --params-schema @schema.json             # 環境変数 TOOL_SERVER_PRIVATE_KEY
   python provisional_client.py agent-tools         --agent-id agent-1                  # 環境変数 AGENT_PRIVATE_KEY(list executable の代用)
   python provisional_client.py agent-exec          --agent-id agent-1 \
       --endpoint psql_manager --params '{"sql": "SELECT 1"}'                           # 環境変数 AGENT_PRIVATE_KEY(exec の代用)
@@ -91,6 +91,15 @@ def _get(path: str, headers: dict) -> None:
         print(e.code, e.read().decode("utf-8"))
 
 
+def _load_json_object(value: str, option: str) -> dict:
+    """JSONオブジェクトの文字列、または @ファイルパス(ファイルの中身がJSON)を読み込む。"""
+    text = open(value[1:], encoding="utf-8").read() if value.startswith("@") else value
+    obj = json.loads(text)
+    if not isinstance(obj, dict):
+        sys.exit(f"{option} はJSONオブジェクトで指定してください")
+    return obj
+
+
 def cmd_keygen(_: argparse.Namespace) -> None:
     priv = Ed25519PrivateKey.generate()
     print("PRIVATE:", base64.b64encode(priv.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())).decode())
@@ -119,10 +128,11 @@ def build_agent_approve(admin: Ed25519PrivateKey, agent_id: str) -> tuple[str, d
     return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/approve", body
 
 
-def build_agent_addtool(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, context: str, token: str) -> tuple[str, dict]:
+def build_agent_addtool(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, context: str, token: str, params_schema: dict) -> tuple[str, dict]:
     fields = {
         "tool_endpoint": endpoint,
         "context": context,
+        "params_schema": params_schema,
         "tool_proxy_token": token,
         "tool_server_public_key": _public_key_b64(priv),
     }
@@ -164,7 +174,7 @@ def cmd_agent_approve(a: argparse.Namespace) -> None:
 def cmd_agent_addtool(a: argparse.Namespace) -> None:
     token = a.token or secrets.token_urlsafe(32)  # ツール代理トークン。省略時は自動発行する
     print("tool_proxy_token(ツールサーバ側のDBにも [認証情報/トークン/エージェント] として保存すること):", token)
-    _post(*build_agent_addtool(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.agent_id, a.endpoint, a.context, token))
+    _post(*build_agent_addtool(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.agent_id, a.endpoint, a.context, token, _load_json_object(a.params_schema, "--params-schema")))
 
 
 def cmd_agent_tools(a: argparse.Namespace) -> None:
@@ -207,6 +217,7 @@ def main() -> None:
     p.add_argument("--agent-id", required=True)
     p.add_argument("--endpoint", required=True, help="ツールエンドポイント")
     p.add_argument("--context", required=True, help="ツールのコンテキスト(説明)")
+    p.add_argument("--params-schema", required=True, help="ツールのparamsのスキーマ(JSON Schema)。JSON文字列、または @ファイルパス。各パラメータに description が必要")
     p.add_argument("--token", help="ツール代理トークン(省略時は自動発行)")
     p.set_defaults(func=cmd_agent_addtool)
 

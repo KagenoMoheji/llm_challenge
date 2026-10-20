@@ -29,6 +29,13 @@ from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, Tb
 APPLICANT_EMAIL = "applicant@example.com"
 ADMIN_EMAIL = "admin@example.com"
 EXEC_URL = "https://toolserver.example.com/capass/exec"
+# テスト用のparamsのスキーマ(JSON Schema)。sqlパラメータ(文字列、必須)だけを受け付ける
+PARAMS_SCHEMA = {
+    "type": "object",
+    "properties": {"sql": {"type": "string", "description": "実行するSQL文(string)"}},
+    "required": ["sql"],
+    "additionalProperties": False,
+}
 
 
 def pub_b64(priv: Ed25519PrivateKey) -> str:
@@ -117,7 +124,7 @@ def seed_agent(session_factory, priv: Ed25519PrivateKey, agent_id: str = "agent-
     return agent_id
 
 
-def seed_agent_tool(session_factory, agent_id: str, tool_endpoint: str, tool_server_priv: Ed25519PrivateKey, token: str = "proxy-token-1", context: str = "テスト用のツール", locked: bool = False) -> None:
+def seed_agent_tool(session_factory, agent_id: str, tool_endpoint: str, tool_server_priv: Ed25519PrivateKey, token: str = "proxy-token-1", context: str = "テスト用のツール", locked: bool = False, params_schema: dict | None = None) -> None:
     """tbl_agent_toolにレコードを直接登録する(addtool APIを経由しない前提データ作成用)。トークンは暗号化して保存する。"""
     now = datetime.now(timezone.utc)
     with session_factory() as db:
@@ -125,6 +132,7 @@ def seed_agent_tool(session_factory, agent_id: str, tool_endpoint: str, tool_ser
             TblAgentTool(
                 tool_endpoint=tool_endpoint,
                 context=context,
+                params_schema=PARAMS_SCHEMA if params_schema is None else params_schema,
                 agent_id=agent_id,
                 tool_proxy_token_encrypted=encrypt_token(token),
                 tool_proxy_token_updated_at=now,

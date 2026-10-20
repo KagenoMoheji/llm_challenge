@@ -9,7 +9,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import enum
 from datetime import datetime
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from capass_server.common.db import Base
 from capass_server.common.globals import (
@@ -88,6 +88,8 @@ class TblAgentTool(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     tool_endpoint: Mapped[str] = mapped_column(String(TOOL_ENDPOINT_MAX_LEN))
     context: Mapped[str] = mapped_column(Text)
+    # ツールのparamsのスキーマ(JSON Schema)。AIエージェントへの一覧に含め、実行時にCaPassサーバがparamsを検証する
+    params_schema: Mapped[dict] = mapped_column(JSON)
     # tbl_agentで承認済みのAIエージェントのみ登録できる
     agent_id: Mapped[str] = mapped_column(
         String(AGENT_ID_MAX_LEN), ForeignKey("tbl_agent.agent_id", onupdate="CASCADE"), index=True

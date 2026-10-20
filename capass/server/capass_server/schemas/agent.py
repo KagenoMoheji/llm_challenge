@@ -22,6 +22,7 @@ from capass_server.common.globals import (
     TOOL_ENDPOINT_PATTERN,
     TOOL_PROXY_TOKEN_MAX_LEN,
 )
+from capass_server.common.params_schema import validate_params_schema_definition
 from capass_server.schemas.base import SignedRequest, validate_public_key_format
 
 
@@ -63,7 +64,7 @@ class AgentAddToolRequest(SignedRequest):
     """AIエージェントへのツール追加リクエスト(agents/{agent_id}/addtool)。承認済みツールサーバの秘密鍵で署名する。
 
     署名プレフィックス: SIGN_CONTEXT_AGENT_ADDTOOL
-    署名対象: tool_endpoint, context, tool_proxy_token, tool_server_public_key, signed_at + URLパスのagent_id
+    署名対象: tool_endpoint, context, params_schema, tool_proxy_token, tool_server_public_key, signed_at + URLパスのagent_id
     """
 
     tool_endpoint: str = Field(
@@ -73,6 +74,12 @@ class AgentAddToolRequest(SignedRequest):
         description="ツールエンドポイント(URLパス exec/{tool_endpoint} に使うため、スラッシュ・空白・制御文字は不可)",
     )
     context: str = Field(min_length=1, description="ツールのコンテキスト(説明)")
+    params_schema: dict[str, Any] = Field(
+        description=(
+            "ツールパラメータ(params)のスキーマ(JSON Schema)。AIエージェントへの一覧に含まれ、実行時にCaPassサーバがparamsを検証する。"
+            '{"type": "object", "properties": {...}} の形で、各パラメータに "description" が必要(パラメータが無い場合は "properties": {} )'
+        )
+    )
     tool_proxy_token: str = Field(min_length=1, max_length=TOOL_PROXY_TOKEN_MAX_LEN, description="ツール代理トークン")
     tool_server_public_key: str = Field(description="ツールサーバ公開鍵(Base64。Ed25519の生32バイト)。承認済みである必要がある")
 
@@ -80,6 +87,12 @@ class AgentAddToolRequest(SignedRequest):
     @classmethod
     def _validate_tool_server_public_key(cls, v: str) -> str:
         return validate_public_key_format(v)
+
+    @field_validator("params_schema")
+    @classmethod
+    def _validate_params_schema(cls, v: dict[str, Any]) -> dict[str, Any]:
+        validate_params_schema_definition(v)
+        return v
 
 
 class AgentAddToolResponse(BaseModel):
@@ -91,6 +104,7 @@ class AgentAddToolResponse(BaseModel):
 class AgentToolItem(BaseModel):
     tool_endpoint: str
     context: str
+    params_schema: dict[str, Any]
 
 
 class AgentToolListResponse(BaseModel):

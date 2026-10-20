@@ -72,7 +72,7 @@ examples/            暫定クライアントと、ツールサーバの見本�
 依存の向きは `controllers → services → models → common`(`schemas` は controllers と services から使う)。**下の層から上の層をimportしない**(例: `common` は `services` をimportしない)。
 
 - **controllers:** ルート関数は同期 `def`(DBが同期のSQLAlchemyのため)。`Depends(get_db)` でセッションを受け取り、serviceを呼んで、レスポンススキーマに詰めて返すだけ。業務エラーの `try/except` はルート関数に書かない(`error_handlers.py` に集約)。ボディ検証より前に実行したい共通処理(レート制限など)は、`dependencies.py` の関数を `dependencies=[Depends(...)]` で適用する。
-- **services:** 業務ルールを書く。`commit()` はここで呼ぶ。業務エラーは `common/errors.py` の例外を `raise` する。
+- **services:** 業務ルールを書く。`commit()` はここで呼ぶ。業務エラーは `common/errors.py` の例外を `raise` する。**1つのテーブル/リソースに関わる処理は、1つのモジュールにまとめる**(例: `tbl_agent_tool` の追加・一覧・実行は `services/agent_tool.py`)。
 - **models:** `mappers.py` はクエリと `flush()` までで、`commit()` しない。
 - **common:** 他の層に依存しない。ツールサーバなど外部へのHTTP呼び出しは、`common/tool_client.py` だけで行う(リダイレクトを追わない、環境変数のプロキシを使わない、制限時間と応答サイズに上限を付ける、を守るため)。
 
@@ -130,6 +130,7 @@ examples/            暫定クライアントと、ツールサーバの見本�
 - **AIエージェントの署名付きAPI**(`tools` と `exec`)は、`services/signed_request.py` の `verify_agent_request` で認証する(`tbl_agent` に登録された公開鍵で検証する)。存在しない `agent_id` は、署名不正と同じ401にする(AIエージェントの有無を知らせない)。ボディが無いGETの署名は、ヘッダー(`HEADER_SIGNED_AT` / `HEADER_SIGNATURE`)で受ける。
 - **副作用のあるリクエスト(ツール実行など)には `nonce` を付け**、`consume_request_nonce` で使用済みにしてから処理する(再送対策)。認証に失敗したリクエストのnonceは記録しない。
 - ツールサーバへの中継中は、DBのトランザクション(接続)を保持しない(呼び出しの前に `commit()` する)。
+- **ツールのparamsは、JSON Schema(`params_schema`)で定義する。** 登録時の検証と、実行時のparamsの検証は `common/params_schema.py` に集約する。スキーマは、AIエージェントへの一覧にも含め、各パラメータに `description` を必須にする。
 - ツール代理トークンは、平文でDBに保存・ログ出力・レスポンスしない(`common/crypto.py` で暗号化して保存する)。ツールサーバへ渡すときだけ復号する。
 
 ## 7. DB

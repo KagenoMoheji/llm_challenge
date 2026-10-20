@@ -18,13 +18,14 @@ from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
 from capass_server.common.crypto import decrypt_token
 from capass_server.common.signature import SIGN_CONTEXT_AGENT_ADDTOOL
 from capass_server.models.entities import ApprovalStatus, TblAgentTool
-from testlib import pub_b64, seed_agent, seed_tool_server, signed_body
+from testlib import PARAMS_SCHEMA, pub_b64, seed_agent, seed_tool_server, signed_body
 
 
 def _body(tool_server_priv, agent_id="agent-1", signed_at=None, **overrides):
     fields = {
         "tool_endpoint": "db_query",
         "context": "DBに対してSELECTを実行する",
+        "params_schema": PARAMS_SCHEMA,
         "tool_proxy_token": "proxy-token-1",
         "tool_server_public_key": pub_b64(tool_server_priv),
     }
@@ -58,6 +59,7 @@ def test_addtool_ok(client, session_factory):
         assert row.locked is False
         assert row.tool_used_at is None
         assert row.tool_server_public_key == pub_b64(ts_priv)
+        assert row.params_schema == PARAMS_SCHEMA  # paramsのスキーマも保存される
         # トークンは暗号化して保存され、復号すると元の平文に戻る
         assert row.tool_proxy_token_encrypted != "proxy-token-1"
         assert "proxy-token-1" not in row.tool_proxy_token_encrypted
@@ -176,3 +178,69 @@ def test_addtool_invalid_input_is_unprocessable(client, session_factory):
 def test_addtool_japanese_endpoint_is_ok(client, session_factory):
     ts_priv = _setup(session_factory)
     assert _post(client, "agent-1", _body(ts_priv, tool_endpoint="psql_部長ロール")).status_code == 201
+
+
+def test_addtool_tampered_params_schema_is_unauthorized(client, session_factory):
+    ts_priv = _setup(session_factory)
+    body = _body(ts_priv)
+    body["params_schema"] = {"type": "object", "properties": {"sql": {"type": "string", "description": "改ざん"}}}  # 署名後にスキーマを改ざん
+    assert _post(client, "agent-1", body).status_code == 401
+
+
+def test_addtool_params_schema_is_required(client, session_factory):
+    ts_priv = _setup(session_factory)
+    fields = {"tool_endpoint": "db_query", "context": "x", "tool_proxy_token": "t", "tool_server_public_key": pub_b64(ts_priv)}
+    body = signed_body(ts_priv, SIGN_CONTEXT_AGENT_ADDTOOL, fields, path_params={"agent_id": "agent-1"})  # params_schemaが無い
+    assert _post(client, "agent-1", body).status_code == 422
+
+
+def test_addtool_tool_without_parameters_is_ok(client, session_factory):
+    ts_priv = _setup(session_factory)
+    schema = {"type": "object", "properties": {}}  # パラメータが無いツール
+    assert _post(client, "agent-1", _body(ts_priv, params_schema=schema)).status_code == 201
+
+
+def test_addtool_rich_params_schema_is_ok(client, session_factory):
+    ts_priv = _setup(session_factory)
+    schema = {
+        "type": "object",
+        "properties": {
+            "sql": {"type": "string", "description": "実行するSQL文", "minLength": 1, "examples": ["SELECT 1"]},
+            "limit": {"type": "integer", "description": "取得する最大行数(1〜1000)", "minimum": 1, "maximum": 1000, "default": 100},
+            "format": {"type": "string", "description": "出力形式", "enum": ["json", "csv"]},
+        },
+        "required": ["sql"],
+        "additionalProperties": False,
+    }
+    assert _post(client, "agent-1", _body(ts_priv, params_schema=schema)).status_code == 201
+
+
+def test_addtool_invalid_params_schema_is_unprocessable(client, session_factory):
+    ts_priv = _setup(session_factory)
+    described = {"type": "string", "description": "説明"}
+    invalid_schemas = {
+        "root is not object": {"type": "array", "items": {}},
+        "no type": {"properties": {"a": described}},
+        "no properties": {"type": "object"},
+        "properties is not an object": {"type": "object", "properties": ["a"]},
+        "property without description": {"type": "object", "properties": {"a": {"type": "string"}}},
+        "property with empty description": {"type": "object", "properties": {"a": {"type": "string", "description": "  "}}},
+        "property is not an object": {"type": "object", "properties": {"a": True}},
+        "not a valid JSON Schema": {"type": "object", "properties": {"a": {"type": "no-such-type", "description": "x"}}},
+        "invalid keyword value": {"type": "object", "properties": {"a": described}, "required": "a"},
+        "external ref": {"type": "object", "properties": {"a": {"$ref": "https://evil.example.com/schema.json", "description": "x"}}},
+        "external ref in nested list": {"type": "object", "properties": {"a": {"anyOf": [{"$ref": "http://evil.example.com/s"}], "description": "x"}}},
+        "too large": {"type": "object", "properties": {"a": {"type": "string", "description": "x" * 20000}}},
+    }
+    for label, schema in invalid_schemas.items():
+        assert _post(client, "agent-1", _body(ts_priv, params_schema=schema)).status_code == 422, label
+
+
+def test_addtool_local_ref_in_params_schema_is_ok(client, session_factory):
+    ts_priv = _setup(session_factory)
+    schema = {
+        "type": "object",
+        "properties": {"user": {"$ref": "#/$defs/user", "description": "対象のユーザ"}},
+        "$defs": {"user": {"type": "object", "properties": {"id": {"type": "integer", "description": "ユーザID"}}}},
+    }
+    assert _post(client, "agent-1", _body(ts_priv, params_schema=schema)).status_code == 201  # スキーマ内の参照("#"から始まる)は使える

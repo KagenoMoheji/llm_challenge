@@ -30,8 +30,7 @@ from capass_server.schemas.tool_server import (
     ToolServerRegisterResponse,
 )
 from capass_server.services.agent import approve_agent, register_agent
-from capass_server.services.agent_exec import exec_agent_tool, list_executable_tools
-from capass_server.services.agent_tool import add_tool_to_agent
+from capass_server.services.agent_tool import add_tool_to_agent, exec_agent_tool, list_executable_tools
 from capass_server.services.tool_server import approve_tool_server, register_tool_server
 
 router = APIRouter()
@@ -118,17 +117,19 @@ def agents_tools(
     db: Session = Depends(get_db),
 ) -> AgentToolListResponse:
     """AIエージェントが使用できる(ロックされていない)ツールの一覧を取得する(CaPassクライアントの「list executable」から呼ばれる)。
-    AIエージェントの署名が必要。使用できるツールが無い場合は403(権限ありません)。"""
+    各ツールの、エンドポイント・コンテキスト(説明)・paramsのスキーマ(JSON Schema)を返す。AIエージェントの署名が必要。
+    使用できるツールが無い場合は、空のリストを返す。"""
     tools = list_executable_tools(db, agent_id, signed_at, signature)
     return AgentToolListResponse(
         agent_id=agent_id,
-        tools=[AgentToolItem(tool_endpoint=t.tool_endpoint, context=t.context) for t in tools],
+        tools=[AgentToolItem(tool_endpoint=t.tool_endpoint, context=t.context, params_schema=t.params_schema) for t in tools],
     )
 
 
 @router.post("/agents/{agent_id}/exec/{tool_endpoint}")
 def agents_exec(agent_id: str, tool_endpoint: str, req: AgentExecRequest, db: Session = Depends(get_db)) -> Response:
     """AIエージェントのツール実行を、ツールサーバへ中継する(CaPassクライアントの「exec」から呼ばれる)。AIエージェントの署名が必要。
+    paramsは、ツールに登録されたスキーマで検証し、合わない場合は422(errorsに、問題の場所と内容)を返す。
     ツールサーバの2xx/4xxの応答は、そのまま中継する(401のみ403にする)。ツールサーバが5xxなどの場合は502、応答が無い場合は504。"""
     result = exec_agent_tool(db, agent_id, tool_endpoint, req)
     return Response(content=result.body, status_code=result.status_code, media_type=result.content_type)
