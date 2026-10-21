@@ -18,6 +18,9 @@ ED25519_SIGNATURE_LEN = 64
 # 署名用途ごとのメッセージプレフィックス(クライアント(CLI)側と一致させること。仕様変更時はバージョン部分を上げる)
 SIGN_CONTEXT_TOOLSERVER_REGISTER = b"capass-toolserver-register-v1\n"
 SIGN_CONTEXT_TOOLSERVER_APPROVE = b"capass-toolserver-approve-v1\n"
+# ツールサーバのリプレース(公開鍵の更新)。旧・新の鍵が、同じ内容に対して署名するので、役割ごとにプレフィックスを分け、署名の使い回しを防ぐ
+SIGN_CONTEXT_TOOLSERVER_CHKEY_OLD = b"capass-toolserver-chkey-old-v1\n"
+SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW = b"capass-toolserver-chkey-new-v1\n"
 SIGN_CONTEXT_AGENT_REGISTER = b"capass-agent-register-v1\n"
 SIGN_CONTEXT_AGENT_APPROVE = b"capass-agent-approve-v1\n"
 SIGN_CONTEXT_AGENT_ADDTOOL = b"capass-agent-addtool-v1\n"

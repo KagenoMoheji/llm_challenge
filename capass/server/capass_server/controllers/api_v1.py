@@ -26,12 +26,14 @@ from capass_server.schemas.agent import (
 from capass_server.schemas.approve import ApproveRequest
 from capass_server.schemas.tool_server import (
     ToolServerApproveResponse,
+    ToolServerChangeKeyRequest,
+    ToolServerChangeKeyResponse,
     ToolServerRegisterRequest,
     ToolServerRegisterResponse,
 )
 from capass_server.services.agent import approve_agent, register_agent
 from capass_server.services.agent_tool import add_tool_to_agent, exec_agent_tool, list_executable_tools
-from capass_server.services.tool_server import approve_tool_server, register_tool_server
+from capass_server.services.tool_server import approve_tool_server, change_tool_server_key, register_tool_server
 
 router = APIRouter()
 
@@ -65,6 +67,19 @@ def toolservers_approve(toolserver_id: int, req: ApproveRequest, db: Session = D
         tool_server_public_key=tool_server.tool_server_public_key,
         status=tool_server.status,
         approved_at=tool_server.approved_at,
+    )
+
+
+@router.post("/toolservers/{toolserver_id}/chkey", response_model=ToolServerChangeKeyResponse)
+def toolservers_chkey(toolserver_id: int, req: ToolServerChangeKeyRequest, db: Session = Depends(get_db)) -> ToolServerChangeKeyResponse:
+    """ツールサーバのリプレース(公開鍵の更新)。旧ツールサーバと新ツールサーバの、両方の署名が必要(CaPassクライアントの「chkey」から呼ばれる)。
+    承認済みのツールサーバの公開鍵を、新しい公開鍵に更新する。管理者の承認のやり直しは不要。実行URLは変わらない。"""
+    tool_server = change_tool_server_key(db, toolserver_id, req)
+    return ToolServerChangeKeyResponse(
+        toolserver_id=tool_server.id,
+        tool_server_name=tool_server.tool_server_name,
+        tool_server_public_key=tool_server.tool_server_public_key,
+        status=tool_server.status,
     )
 
 

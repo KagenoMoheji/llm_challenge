@@ -7,6 +7,7 @@ PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())
 MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe())))[0]
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
+from typing import ClassVar
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
 from capass_server.common.signature import decode_ed25519_public_key, decode_ed25519_signature
 
@@ -31,6 +32,9 @@ class SignedRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    # 署名対象から除くフィールド(署名そのもの)。署名を複数持つリクエスト(ツールサーバのリプレース)は、サブクラスで増やす
+    SIGNATURE_FIELDS: ClassVar[tuple[str, ...]] = ("signature",)
+
     signed_at: StrictInt = Field(description="署名時刻(UNIX秒)。サーバ時刻との差が許容範囲を超えると拒否される")
     signature: str = Field(description="署名(Base64。Ed25519の64バイト)")
 
@@ -44,8 +48,8 @@ class SignedRequest(BaseModel):
         return v
 
     def signed_payload(self, **path_params) -> dict:
-        """署名対象のペイロード(signature以外の全フィールド + URLパスのパラメータ)。"""
-        payload = self.model_dump(exclude={"signature"})
+        """署名対象のペイロード(署名のフィールド(SIGNATURE_FIELDS)以外の全フィールド + URLパスのパラメータ)。"""
+        payload = self.model_dump(exclude=set(self.SIGNATURE_FIELDS))
         overlap = payload.keys() & path_params.keys()
         if overlap:
             raise ValueError(f"path params overlap with body fields: {sorted(overlap)}")

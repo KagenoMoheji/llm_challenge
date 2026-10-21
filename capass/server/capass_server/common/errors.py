@@ -167,3 +167,10 @@ class ToolParamsSchemaError(ServiceError):
 
     def __init__(self) -> None:
         super().__init__("stored params_schema is invalid")
+
+
+class InvalidNewKeySignatureError(SignatureError):
+    """新しい公開鍵の署名が不正(401相当)。旧公開鍵の署名の検証後(鍵の持ち主と確認できた相手)にだけ返すので、どちらの署名が不正かを伝える。"""
+
+    def __init__(self) -> None:
+        super().__init__("invalid signature of the new public key")

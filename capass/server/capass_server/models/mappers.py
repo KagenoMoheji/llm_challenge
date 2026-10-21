@@ -8,7 +8,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from datetime import datetime
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblAgentTool, TblRequestNonce, TblToolServer
 
@@ -33,6 +33,17 @@ def insert_tbl_tool_server(db: Session, tool_server: TblToolServer) -> TblToolSe
     db.add(tool_server)
     db.flush()
     return tool_server
+
+
+def update_tbl_tool_server_public_key(db: Session, tool_server_id: int, old_public_key: str, new_public_key: str) -> bool:
+    """ツールサーバの公開鍵を更新する。現在の公開鍵がold_public_keyのままの場合だけ更新し、更新したらTrue(並行して別の更新があった場合はFalse)。
+    tbl_agent_toolの公開鍵は、外部キー(ON UPDATE CASCADE)でデータベースが追従させる。"""
+    stmt = (
+        update(TblToolServer)
+        .where(TblToolServer.id == tool_server_id, TblToolServer.tool_server_public_key == old_public_key)
+        .values(tool_server_public_key=new_public_key)
+    )
+    return db.execute(stmt).rowcount == 1
 
 
 def find_tbl_agent_by_agent_id(db: Session, agent_id: str) -> TblAgent | None:

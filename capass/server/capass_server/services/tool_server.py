@@ -14,14 +14,22 @@ from capass_server.common.config import TOOL_SERVER_ALLOW_HTTP
 from capass_server.common.errors import (
     DuplicateToolServerError,
     InvalidApprovalStateError,
+    InvalidNewKeySignatureError,
+    InvalidSignatureError,
     InvalidToolServerUrlError,
+    ToolServerNotApprovedError,
     ToolServerNotFoundError,
 )
-from capass_server.common.signature import SIGN_CONTEXT_TOOLSERVER_APPROVE, SIGN_CONTEXT_TOOLSERVER_REGISTER
+from capass_server.common.signature import (
+    SIGN_CONTEXT_TOOLSERVER_APPROVE,
+    SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW,
+    SIGN_CONTEXT_TOOLSERVER_CHKEY_OLD,
+    SIGN_CONTEXT_TOOLSERVER_REGISTER,
+)
 from capass_server.models import mappers
 from capass_server.models.entities import ApprovalStatus, TblToolServer
 from capass_server.schemas.approve import ApproveRequest
-from capass_server.schemas.tool_server import ToolServerRegisterRequest
+from capass_server.schemas.tool_server import ToolServerChangeKeyRequest, ToolServerRegisterRequest
 from capass_server.services.signed_request import verify_admin_request, verify_signed_request
 
 
@@ -83,4 +91,48 @@ def approve_tool_server(db: Session, tool_server_id: int, req: ApproveRequest) -
     tool_server.approved_at = datetime.now(timezone.utc)
     tool_server.approver_email = admin.admin_email  # 承認した管理者のメアドを記録する
     db.commit()
+    return tool_server
+
+
+def change_tool_server_key(db: Session, tool_server_id: int, req: ToolServerChangeKeyRequest) -> TblToolServer:
+    """ツールサーバのリプレース: 登録されているツールサーバの公開鍵を、新しい公開鍵に更新する(承認のやり直しは不要)。
+
+    旧ツールサーバ(現在登録されている鍵)と、新ツールサーバ(新しい鍵)の、両方の署名が必要。
+    ツールサーバのレコード(ステータス、名称、実行URL)は引き継がれ、そのツールサーバのツール(tbl_agent_tool)の公開鍵も、新しい鍵に更新される。
+    実行URLは変わらないので、新ツールサーバは、同じURLで受け付けること(DNSやロードバランサの切り替えなど)。
+    """
+    # 1. 対象の取得。存在しないtoolserver_idは、署名不正と区別しない(未認証の相手に、IDの有無を知らせないため)
+    tool_server = mappers.find_tbl_tool_server_by_id(db, tool_server_id)
+    if tool_server is None:
+        raise InvalidSignatureError()
+    old_public_key = tool_server.tool_server_public_key
+
+    # 2. 署名の検証。旧→新の順(旧の署名で、まず登録元ツールサーバと確認できてから、新の署名を検証する)。
+    #    署名対象は、旧・新で同じ内容(旧公開鍵は、サーバに登録されている値を使う)
+    payload = req.signed_payload(toolserver_id=tool_server_id, old_tool_server_public_key=old_public_key)
+    verify_signed_request(old_public_key, SIGN_CONTEXT_TOOLSERVER_CHKEY_OLD, payload, req.signature)
+    try:
+        verify_signed_request(req.new_tool_server_public_key, SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW, payload, req.new_key_signature)
+    except InvalidSignatureError:
+        raise InvalidNewKeySignatureError()
+
+    # 3. 承認済みのツールサーバだけが、リプレースできる
+    if tool_server.status != ApprovalStatus.APPROVED:
+        raise ToolServerNotApprovedError(tool_server.status)
+
+    # 4. 新しい公開鍵が、すでに登録されていない(現在の公開鍵と同じ場合を含む)
+    existing = mappers.find_tbl_tool_server_by_public_key(db, req.new_tool_server_public_key)
+    if existing is not None:
+        raise DuplicateToolServerError(existing.status)
+
+    # 5. 更新(公開鍵が、検証した旧公開鍵のままの場合だけ)。tbl_agent_toolの公開鍵は、外部キーのON UPDATE CASCADEで追従する
+    try:
+        if not mappers.update_tbl_tool_server_public_key(db, tool_server_id, old_public_key, req.new_tool_server_public_key):
+            db.rollback()
+            raise InvalidSignatureError()  # 検証してから更新するまでの間に、別のリクエストが公開鍵を更新した
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise DuplicateToolServerError()
+    db.refresh(tool_server)
     return tool_server

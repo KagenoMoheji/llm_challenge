@@ -21,6 +21,8 @@ from capass_server.common.signature import (
     SIGN_CONTEXT_AGENT_EXEC,
     SIGN_CONTEXT_AGENT_LISTTOOLS,
     SIGN_CONTEXT_AGENT_REGISTER,
+    SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW,
+    SIGN_CONTEXT_TOOLSERVER_CHKEY_OLD,
     SIGN_CONTEXT_TOOLSERVER_REGISTER,
     build_signing_message,
 )
@@ -70,6 +72,18 @@ def list_tools_headers(agent_priv: Ed25519PrivateKey, agent_id: str, signed_at: 
 def exec_body(agent_priv: Ed25519PrivateKey, agent_id: str, tool_endpoint: str, params: dict | None = None, nonce: str | None = None, signed_at: int | None = None) -> dict:
     fields = {"params": {"sql": "SELECT 1"} if params is None else params, "nonce": secrets.token_urlsafe(16) if nonce is None else nonce}
     return signed_body(agent_priv, SIGN_CONTEXT_AGENT_EXEC, fields, path_params={"agent_id": agent_id, "tool_endpoint": tool_endpoint}, signed_at=signed_at)
+
+
+def chkey_body(old_priv: Ed25519PrivateKey, new_priv: Ed25519PrivateKey, toolserver_id: int, signed_at: int | None = None, old_context: bytes = SIGN_CONTEXT_TOOLSERVER_CHKEY_OLD, new_context: bytes = SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW) -> dict:
+    """ツールサーバのリプレース(chkey)のボディを作る。旧・新の鍵が、同じ内容(旧公開鍵・新公開鍵・toolserver_id・signed_at)に、それぞれ署名する。"""
+    at = int(time.time()) if signed_at is None else signed_at
+    payload = {"toolserver_id": toolserver_id, "old_tool_server_public_key": pub_b64(old_priv), "new_tool_server_public_key": pub_b64(new_priv), "signed_at": at}
+    return {
+        "new_tool_server_public_key": pub_b64(new_priv),
+        "signed_at": at,
+        "signature": base64.b64encode(old_priv.sign(build_signing_message(old_context, payload))).decode(),
+        "new_key_signature": base64.b64encode(new_priv.sign(build_signing_message(new_context, payload))).decode(),
+    }
 
 
 def approve_body(admin_priv: Ed25519PrivateKey, sign_context: bytes, path_params: dict, signed_at: int | None = None) -> dict:
