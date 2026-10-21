@@ -14,7 +14,7 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from capass_server.common.db import Base, get_db
@@ -26,6 +26,16 @@ from testlib import seed_admin
 
 # DBはテスト用のインメモリSQLiteに差し替える(PostgreSQLの起動は不要)
 _test_engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+
+
+@event.listens_for(_test_engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, _):
+    """SQLiteは、既定では外部キー制約を有効にしない。PostgreSQLと同じく、外部キー(ON UPDATE CASCADEを含む)を有効にする。"""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
 _TestSession = sessionmaker(bind=_test_engine, autoflush=False, expire_on_commit=False)
 
 

@@ -1,7 +1,7 @@
 # CaPass QUICKSTART(暫定版)
 
 > **この文書は暫定版です。** CaPassクライアント(CLI)がまだ未実装のため、キー作成(`keygen`)や各API呼び出しは、暫定クライアント [`examples/provisional_client.py`](examples/provisional_client.py) で代用しています。CLIの実装後に置き換えます。
-> 動作するAPIは、下表の7つです(登録・承認・ツール追加と、AIエージェントによるツール一覧の取得・実行)。
+> 動作するAPIは、下表の8つです(登録・承認・ツール追加、AIエージェントによるツール一覧の取得・実行、ツールサーバのリプレース)。
 
 ## 1. 全体像
 
@@ -16,6 +16,7 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 | ツールサーバ提供者 | `POST /api/v1/agents/{agent_id}/addtool` | 承認済みAIエージェントへのツール追加(承認済みツールサーバのみ) |
 | AIエージェント | `GET /api/v1/agents/{agent_id}/tools` | 使用できるツールの一覧(ツールエンドポイントとコンテキスト)の取得 |
 | AIエージェント | `POST /api/v1/agents/{agent_id}/exec/{tool_endpoint}` | ツールの実行(CaPassサーバがツールサーバへ中継する) |
+| ツールサーバ提供者 | `POST /api/v1/toolservers/{toolserver_id}/chkey` | ツールサーバのリプレース(公開鍵の更新。旧・新の両方の署名) |
 
 登録の順序は次のとおりです。
 
@@ -24,6 +25,7 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 3. 管理者が、申請者に確認の連絡をしたうえで承認する(`approved`。承認した管理者のメールアドレスが記録される)
 4. 承認済みのツールサーバが、承認済みのAIエージェントにツールを追加する
 5. AIエージェントが、使用できるツールの一覧を取得し、ツールを選んで実行する(CaPassサーバが、ツールサーバへ中継する)
+6. (ツールサーバを新しいサーバに置き換えるとき)登録済みの公開鍵を、新しいサーバの公開鍵に更新する(5.9)
 
 ## 2. 署名の仕様
 
@@ -41,8 +43,11 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 | `agents/register` | `capass-agent-register-v1\n` | AIエージェントの秘密鍵 | `agent_id` `agent_public_key` `applicant_email` `signed_at` | なし |
 | `agents/{agent_id}/approve` | `capass-agent-approve-v1\n` | 管理者の秘密鍵 | `admin_public_key` `signed_at` | `agent_id`(文字列) |
 | `agents/{agent_id}/addtool` | `capass-agent-addtool-v1\n` | ツールサーバの秘密鍵 | `tool_endpoint` `context` `params_schema` `tool_proxy_token` `tool_server_public_key` `signed_at` | `agent_id`(文字列) |
+| `toolservers/{toolserver_id}/chkey` | 旧: `capass-toolserver-chkey-old-v1\n`、新: `capass-toolserver-chkey-new-v1\n` | 旧ツールサーバと新ツールサーバの、両方の秘密鍵 | `new_tool_server_public_key` `signed_at`(署名は、旧が `signature`、新が `new_key_signature`) | `toolserver_id`(整数) |
 | `agents/{agent_id}/tools`(GET) | `capass-agent-listtools-v1\n` | AIエージェントの秘密鍵 | なし(ボディが無いので、`signed_at` をヘッダーで送る) | `agent_id`(文字列) |
 | `agents/{agent_id}/exec/{tool_endpoint}` | `capass-agent-exec-v1\n` | AIエージェントの秘密鍵 | `params` `nonce` `signed_at` | `agent_id`、`tool_endpoint`(文字列) |
+
+**ツールサーバのリプレース(`chkey`)の署名:** 旧ツールサーバと新ツールサーバが、**同じ内容**に、それぞれの秘密鍵で署名します(プレフィックスは役割ごとに違うので、一方の署名を、もう一方として使い回すことはできません)。署名対象は、`new_tool_server_public_key`、`signed_at`、URLパスの `toolserver_id`、そして**サーバに登録されている旧公開鍵 `old_tool_server_public_key`**(リクエストには含めません)です。
 
 **AIエージェントの署名(`tools` と `exec`):** AIエージェントは、`agents/register` で登録して承認された公開鍵に対応する秘密鍵で署名します。サーバは、`tbl_agent` に登録された公開鍵で検証するので、リクエストに公開鍵は含めません。`agent_id` を知っているだけでは、ツールの一覧も実行もできません。
 
@@ -140,7 +145,21 @@ UPDATE tbl_admin SET is_active = false WHERE admin_email = 'admin@example.com';
 
 ### 5.1 ツールサーバ側のDBロールを作る(ツールサーバが接続するPostgreSQL)
 
-ツールが何をできるかは、**DBロールの権限(GRANT)で決まります**。CaPassは「どのAIエージェントがどのツールエンドポイントを使ってよいか」を管理するだけです。
+ツールが何をできるかは、**DBロールの権限で決まります**。CaPassは「どのAIエージェントがどのツールエンドポイントを使ってよいか」を管理するだけです。DBの権限は、2つの仕組みで絞ります。
+
+| 仕組み | 決めること | SQL |
+|---|---|---|
+| GRANT | どのテーブルに、何(SELECT / INSERT / UPDATE など)ができるか | `GRANT` |
+| 行レベルセキュリティ(RLS) | そのテーブルの、**どの行**に対してできるか | `CREATE POLICY` |
+
+以下の例は、次のテーブルがある前提です(説明用)。
+
+```sql
+-- terminals(id, hostname, owner_dept, status)   owner_dept: 端末を所有する部署
+-- employees(id, name, dept, salary)
+```
+
+**(1) ロールの作成と、GRANT(テーブル単位の権限)**
 
 ```sql
 CREATE ROLE psql_manager LOGIN PASSWORD '<パスワード>';
@@ -149,6 +168,58 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO psql_manager;
 CREATE ROLE psql_terminal_admin LOGIN PASSWORD '<パスワード>';
 GRANT SELECT, INSERT, UPDATE ON terminals TO psql_terminal_admin;
 ```
+
+**(2) CREATE POLICY(行単位の制限)**
+
+GRANTだけだと、許可したテーブルの**全ての行**が対象になります。行を絞りたいテーブルは、RLSを有効にして、ロールごとにポリシーを作ります。
+
+```sql
+ALTER TABLE terminals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE terminals FORCE ROW LEVEL SECURITY;  -- テーブルの所有者にも適用する(任意)
+
+-- 端末管理者ロール: 情報システム部(IT)の端末だけ、参照・更新できる。新しく登録できるのも、ITの端末だけ
+CREATE POLICY terminals_admin_select ON terminals FOR SELECT TO psql_terminal_admin
+  USING (owner_dept = 'IT');
+CREATE POLICY terminals_admin_update ON terminals FOR UPDATE TO psql_terminal_admin
+  USING (owner_dept = 'IT')          -- 更新できる行(今ある行)
+  WITH CHECK (owner_dept = 'IT');    -- 更新後の行(他の部署の端末に、付け替えられない)
+CREATE POLICY terminals_admin_insert ON terminals FOR INSERT TO psql_terminal_admin
+  WITH CHECK (owner_dept = 'IT');
+
+-- 部長ロール: 全ての端末を参照できる
+-- (RLSを有効にしたテーブルは、ポリシーが無いロールには、1行も見えなくなる。そのため、このポリシーが必要)
+CREATE POLICY terminals_manager_select ON terminals FOR SELECT TO psql_manager
+  USING (true);
+```
+
+部署ごとに見せる行を変えたい場合は、**部署ごとにDBロールを分けて**、ロールごとに別のツールエンドポイントとして登録します(例: `psql_sales_manager`)。列を隠したい場合は、列単位のGRANTも使えます。
+
+```sql
+-- 営業部の部長ロール: 営業部の社員だけ参照でき、給与(salary)の列は見えない
+CREATE ROLE psql_sales_manager LOGIN PASSWORD '<パスワード>';
+GRANT SELECT (id, name, dept) ON employees TO psql_sales_manager;
+
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+CREATE POLICY employees_sales_select ON employees FOR SELECT TO psql_sales_manager
+  USING (dept = '営業部');
+CREATE POLICY employees_manager_select ON employees FOR SELECT TO psql_manager
+  USING (true);
+```
+
+**(3) 確認**(スーパーユーザなどで接続して、ロールを切り替えて確認します)
+
+```sql
+SET ROLE psql_terminal_admin;
+SELECT owner_dept, count(*) FROM terminals GROUP BY owner_dept;  -- IT だけが見える
+INSERT INTO terminals (hostname, owner_dept) VALUES ('pc-001', 'sales');  -- エラー(行レベルセキュリティのポリシーに違反)
+RESET ROLE;
+```
+
+注意点:
+
+- **テーブルの所有者、スーパーユーザ、`BYPASSRLS` 属性を持つロールには、RLSが適用されません**(所有者は、`FORCE ROW LEVEL SECURITY` で適用できます)。ツールが使うロールは、スーパーユーザや `BYPASSRLS` にしないでください。
+- **ポリシーの条件に、セッション変数(`SET app.xxx = ...`)を使うのは避けてください。** AIエージェントが任意のSQLを実行できるツールでは、そのSQLで変数を書き換えて、条件を回避できてしまいます。条件ごとにロールを分けるほうが安全です。
+- 上のSQLは、説明用の例です(PostgreSQLの実機では確認していません)。実際のテーブルとロールに合わせて、確認してから使ってください。
 
 ### 5.2 ツールサーバ・AIエージェントの鍵を作って、初回登録する
 
@@ -326,15 +397,38 @@ AIエージェントが読みやすいスキーマにするコツ:
 
 `default` は、AIエージェントへの説明です。CaPassサーバは、省略されたパラメータにデフォルト値を補いません(ツールサーバが補います)。
 
+### 5.9 ツールサーバをリプレースする(公開鍵の更新)
+
+ツールサーバを新しいサーバに置き換えるときは、登録済みの公開鍵を、新しいサーバの公開鍵に更新します(`chkey`)。**ステータス(承認済み)、名称、実行URL、登録済みのツールは引き継がれ、管理者の承認のやり直しは不要**です。その代わり、**旧ツールサーバと新ツールサーバの、両方の署名**が必要です(旧: 登録元であることの証明、新: 新しい鍵を持っていることの証明)。
+
+```bash
+# 1. 新ツールサーバで、キーペアを作り、新しい鍵の所持を証明する署名(handoff)を作る
+python provisional_client.py keygen        # PRIVATE は新ツールサーバ上だけで保管する
+export TOOL_SERVER_PRIVATE_KEY='<新ツールサーバのPRIVATE>'
+python provisional_client.py toolserver-chkey-prepare --toolserver-id 1 \
+  --old-public-key '<旧ツールサーバの公開鍵>' > handoff.json
+
+# 2. handoff.json を旧ツールサーバへ渡して、旧ツールサーバで chkey を実行する
+export TOOL_SERVER_PRIVATE_KEY='<旧ツールサーバのPRIVATE>'
+python provisional_client.py toolserver-chkey --toolserver-id 1 --handoff @handoff.json
+# 200 {"toolserver_id": 1, ..., "tool_server_public_key": "<新ツールサーバの公開鍵>", "status": "approved"}
+```
+
+- **署名時刻から数分以内(既定は5分)に、`chkey` を実行してください。** handoff の署名時刻は、旧ツールサーバの署名にも使われます。
+- **実行URLは変わりません。** CaPassサーバは、同じURLへ中継を続けるので、新ツールサーバが、**同じURLで待ち受けられる**ようにしてください(DNSやロードバランサの切り替えなど)。実行URLを変える必要がある場合は、管理者が内容を確認して、SQLで更新します(`UPDATE tbl_tool_server SET exec_url = '<新しいURL>' WHERE id = 1;`)。
+- **ツールサーバ付きDB(`[認証情報/ツール代理トークン/AIエージェント情報]`)は、新ツールサーバへ移行しておいてください。** CaPassサーバが保存しているツール代理トークンは、そのまま使われます。
+- **承認済み(`approved`)のツールサーバだけが、リプレースできます。** `pending` や `revoked` は、`403` です(承認が取り消されたツールサーバが、鍵を更新して復帰することはできません)。
+- **更新後は、旧公開鍵は使えません。** 旧ツールサーバからの `addtool` などは、できなくなります。AIエージェントの一覧と実行は、更新後もそのまま使えます。
+
 ## 6. レスポンスの意味
 
 | ステータス | 原因 |
 |---|---|
 | 200 / 201 | 成功(承認は200、登録・追加は201)。承認済みへの再承認も200(冪等で、最初の承認者は書き換わりません) |
-| 401 | 署名が不正、または `signed_at` が許容範囲を超えてずれている(時刻同期を確認)。`tools` / `exec`: 存在しない `agent_id` も同じ。`exec`: 同じ `nonce` を再利用した |
-| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録)。`tools` / `exec`: AIエージェントが未承認。`exec`: 使用できないツール(権限ありません)、またはツールサーバが403/401を返した |
+| 401 | 署名が不正、または `signed_at` が許容範囲を超えてずれている(時刻同期を確認)。`tools` / `exec`: 存在しない `agent_id` も同じ。`exec`: 同じ `nonce` を再利用した。`chkey`: 旧ツールサーバの署名が不正(存在しない `toolserver_id` も同じ)、または、新しい公開鍵の署名が不正(この場合は、`detail` が `invalid signature of the new public key`) |
+| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録)。`tools` / `exec`: AIエージェントが未承認。`exec`: 使用できないツール(権限ありません)、またはツールサーバが403/401を返した。`chkey`: ツールサーバが承認済みではない |
 | 404 | `toolserver_id` / `agent_id` が存在しない |
-| 409 | すでに登録済み(同じ公開鍵、同じ `agent_id`、同じ `[ツールエンドポイント, AIエージェント]`)、または `revoked` を承認しようとした |
+| 409 | すでに登録済み(同じ公開鍵、同じ `agent_id`、同じ `[ツールエンドポイント, AIエージェント]`)、または `revoked` を承認しようとした。`chkey`: 新しい公開鍵が、すでに登録されている(現在の公開鍵と同じ場合を含む) |
 | 422 | リクエストの形式が不正(公開鍵や署名のBase64が不正、メールアドレスの形式が不正、項目の過不足、`agent_id` に使えない文字、`params_schema` が不正など)。`exec`: paramsが、ツールの `params_schema` に合っていない(`errors` に詳細) |
 | 429 | 初回登録APIのレート制限を超えた。`Retry-After` の秒数が経ってから再試行する |
 | 502 | `exec`: ツールサーバに接続できない、5xx/3xxを返した、応答が大きすぎる |
@@ -345,6 +439,7 @@ AIエージェントが読みやすいスキーマにするコツ:
 - **ロールごとに別のツールエンドポイントとして登録します。** ツールエンドポイントはツールサーバで実際にコマンドを起動する受け口なので、`psql_manager` はツールサーバ側で部長ロールの認証情報、`psql_terminal_admin` は端末管理者ロールの認証情報に対応づけます。AIエージェントはツール一覧の `context`(説明)を見てツールを選ぶので、ロールでできること・できないことを具体的に書いてください。
 - **初回登録のAPIは、誰でも呼べます。** 承認待ちになるだけで権限は付きませんが、悪意のある登録を承認してしまうと、その鍵を持つ相手にツールやAIエージェントとしての権限を与えてしまいます。承認前に、5.3 の確認を必ず行ってください。
 - **承認済みのツールサーバは、承認済みの任意のAIエージェントにツールを追加できます。** 現状は、AIエージェント提供者の同意を確認する仕組みはありません。
+- **`chkey` は、管理者の承認なしに、公開鍵を更新できます。** そのため、**旧ツールサーバの秘密鍵が漏れると、攻撃者は、自分の鍵に更新して、そのツールサーバのツールを乗っ取れます**(新ツールサーバの署名は、攻撃者が自分の鍵で作れるため)。旧ツールサーバの秘密鍵の保管には、注意してください。乗っ取りが分かった場合は、管理者が `revoked` にします(`chkey` で `revoked` から復帰することはできません)。
 - **`revoked` は、直ちに効きます。** ツールサーバが `revoked` になると、そのツールサーバのツールは、`addtool` だけでなく、一覧にも出なくなり、実行もできなくなります。AIエージェントが `revoked` になった場合も、一覧・実行ができなくなります。`revoked` にするAPIはまだ無く、SQLで更新します(`UPDATE tbl_tool_server SET status = 'revoked' WHERE id = 1;`)。
 - **ツールサーバの実行URLは、管理者が承認時に確認します。** CaPassサーバは、承認されたURLへ、ツール代理トークン付きでリクエストを送ります。URLが正しいツールサーバのものか(別のホストや、内部の管理用URLを指していないか)を、承認前に必ず確認してください。リダイレクトは追いません。
 - **ツール実行は、nonceで再送を防いでいますが、署名時刻の許容範囲内では、nonceの記録がDBに残ります。** 期限切れの記録は、次の `exec` のときに削除されます。
@@ -355,6 +450,7 @@ AIエージェントが読みやすいスキーマにするコツ:
 |---|---|
 | `provisional_client.py keygen` | CaPassクライアントの `keygen` |
 | `provisional_client.py *-register` / `agent-addtool` | CaPassクライアントの `regist` など |
+| `provisional_client.py toolserver-chkey-prepare` / `toolserver-chkey` | CaPassクライアントの `chkey` |
 | `provisional_client.py agent-tools` / `agent-exec` | CaPassクライアントの `list executable` / `exec` |
 | `provisional_client.py *-approve` | 管理者用のCLI |
 | 承認待ちの確認(SQL) | 承認待ち一覧のAPI |

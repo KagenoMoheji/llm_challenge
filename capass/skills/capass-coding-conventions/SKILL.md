@@ -127,6 +127,7 @@ examples/            暫定クライアントと、ツールサーバの見本�
 - メールアドレスは `EMAIL_PATTERN` で検証する。`EmailStr` は値を正規化して署名とずれるので使わない。
 - 署名の検証は `services/signed_request.py` の `verify_signed_request` / `verify_admin_request` を使い、**DB参照より先に**行う(未認証の相手に、登録の有無などを知らせない)。
 - プレフィックスは `common/signature.py` に定義する。新しい署名付きAPIを足したら、`QUICKSTART.md` の署名仕様の表と `examples/provisional_client.py` も更新する。
+- **署名を複数持つリクエスト**(ツールサーバのリプレースなど、複数の鍵が署名する場合)は、`SignedRequest.SIGNATURE_FIELDS` に署名のフィールドを全て列挙して、署名対象から除く。署名する役割ごとに、別の署名プレフィックスを定義する(署名の使い回しを防ぐ)。
 - **AIエージェントの署名付きAPI**(`tools` と `exec`)は、`services/signed_request.py` の `verify_agent_request` で認証する(`tbl_agent` に登録された公開鍵で検証する)。存在しない `agent_id` は、署名不正と同じ401にする(AIエージェントの有無を知らせない)。ボディが無いGETの署名は、ヘッダー(`HEADER_SIGNED_AT` / `HEADER_SIGNATURE`)で受ける。
 - **副作用のあるリクエスト(ツール実行など)には `nonce` を付け**、`consume_request_nonce` で使用済みにしてから処理する(再送対策)。認証に失敗したリクエストのnonceは記録しない。
 - ツールサーバへの中継中は、DBのトランザクション(接続)を保持しない(呼び出しの前に `commit()` する)。
