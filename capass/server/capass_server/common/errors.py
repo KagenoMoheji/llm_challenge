@@ -174,3 +174,11 @@ class InvalidNewKeySignatureError(SignatureError):
 
     def __init__(self) -> None:
         super().__init__("invalid signature of the new public key")
+
+
+class ToolNotFoundError(ServiceError):
+    """指定の[ツールエンドポイント/AIエージェント]のツールが、そのツールサーバ(公開鍵)で登録されていない(404相当)。
+    他のツールサーバのツールの有無を知らせないよう、「存在しない」と「別のツールサーバのツール」は区別しない。"""
+
+    def __init__(self) -> None:
+        super().__init__("tool not found")

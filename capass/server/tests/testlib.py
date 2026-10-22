@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from capass_server.common.crypto import encrypt_token
 from capass_server.common.signature import (
+    SIGN_CONTEXT_AGENT_CHTKN,
     SIGN_CONTEXT_AGENT_EXEC,
     SIGN_CONTEXT_AGENT_LISTTOOLS,
     SIGN_CONTEXT_AGENT_REGISTER,
@@ -84,6 +85,12 @@ def chkey_body(old_priv: Ed25519PrivateKey, new_priv: Ed25519PrivateKey, toolser
         "signature": base64.b64encode(old_priv.sign(build_signing_message(old_context, payload))).decode(),
         "new_key_signature": base64.b64encode(new_priv.sign(build_signing_message(new_context, payload))).decode(),
     }
+
+
+def chtkn_body(tool_server_priv: Ed25519PrivateKey, agent_id: str, tool_endpoint: str, token: str = "new-proxy-token", nonce: str | None = None, signed_at: int | None = None) -> dict:
+    """ツール代理トークンの更新(chtkn)のボディを作る。ツールサーバの秘密鍵で署名する(署名対象には、URLパスのagent_id/tool_endpointも含む)。"""
+    fields = {"tool_proxy_token": token, "tool_server_public_key": pub_b64(tool_server_priv), "nonce": secrets.token_urlsafe(16) if nonce is None else nonce}
+    return signed_body(tool_server_priv, SIGN_CONTEXT_AGENT_CHTKN, fields, path_params={"agent_id": agent_id, "tool_endpoint": tool_endpoint}, signed_at=signed_at)
 
 
 def approve_body(admin_priv: Ed25519PrivateKey, sign_context: bytes, path_params: dict, signed_at: int | None = None) -> dict:

@@ -21,17 +21,23 @@ from capass_server.common.errors import (
     DuplicateAgentToolError,
     InvalidToolParamsError,
     PermissionDeniedError,
+    ToolNotFoundError,
     ToolParamsSchemaError,
     ToolServerBadResponseError,
     ToolServerNotApprovedError,
     ToolTokenDecryptionError,
 )
 from capass_server.common.params_schema import validate_params
-from capass_server.common.signature import SIGN_CONTEXT_AGENT_ADDTOOL, SIGN_CONTEXT_AGENT_EXEC, SIGN_CONTEXT_AGENT_LISTTOOLS
+from capass_server.common.signature import (
+    SIGN_CONTEXT_AGENT_ADDTOOL,
+    SIGN_CONTEXT_AGENT_CHTKN,
+    SIGN_CONTEXT_AGENT_EXEC,
+    SIGN_CONTEXT_AGENT_LISTTOOLS,
+)
 from capass_server.common.tool_client import ToolServerResponse, call_tool_server
 from capass_server.models import mappers
 from capass_server.models.entities import ApprovalStatus, TblAgentTool
-from capass_server.schemas.agent import AgentAddToolRequest, AgentExecRequest
+from capass_server.schemas.agent import AgentAddToolRequest, AgentChangeToolTokenRequest, AgentExecRequest
 from capass_server.services.signed_request import consume_request_nonce, verify_agent_request, verify_signed_request
 
 
@@ -146,3 +152,32 @@ def exec_agent_tool(db: Session, agent_id: str, tool_endpoint: str, req: AgentEx
     if 400 <= status < 500:
         return result
     raise ToolServerBadResponseError(f"status {status}")
+
+
+def change_tool_token(db: Session, agent_id: str, tool_endpoint: str, req: AgentChangeToolTokenRequest) -> TblAgentTool:
+    """ツール代理トークンを、新しいトークンに更新する(ツールサーバの定期更新ジョブ「chtkn」から呼ばれる)。
+
+    1. ツールサーバの署名を検証する(URLパスのagent_id/tool_endpointも署名対象)。
+    2. ツールサーバの公開鍵が承認済みかを確認する。承認されていない(取り消された)ツールサーバは、更新できない。
+       この確認を、ツールの検索より先にして、承認されていない鍵の持ち主に、AIエージェントやツールの有無を知らせない。
+    3. nonceを使用済みとして記録する(リプレイ防止。古いトークンへの巻き戻しを防ぐ)。
+    4. [ツールエンドポイント/AIエージェント/ツールサーバ公開鍵]に一致するツールを探す。無ければToolNotFoundError(他のツールサーバのツールも「無い」と同じ扱い)。
+    5. トークン(暗号化して保存)とトークン更新日時を更新する。ロック状況とツール利用日時は変えない(ロックの解除は、別の操作)。
+    """
+    payload = req.signed_payload(agent_id=agent_id, tool_endpoint=tool_endpoint)
+    verify_signed_request(req.tool_server_public_key, SIGN_CONTEXT_AGENT_CHTKN, payload, req.signature)
+
+    tool_server = mappers.find_tbl_tool_server_by_public_key(db, req.tool_server_public_key)
+    if tool_server is None or tool_server.status != ApprovalStatus.APPROVED:
+        raise ToolServerNotApprovedError(None if tool_server is None else tool_server.status)
+
+    consume_request_nonce(db, agent_id, req.nonce, req.signed_at)
+
+    agent_tool = mappers.find_tbl_agent_tool(db, tool_endpoint, agent_id)
+    if agent_tool is None or agent_tool.tool_server_public_key != req.tool_server_public_key:
+        raise ToolNotFoundError()
+
+    agent_tool.tool_proxy_token_encrypted = encrypt_token(req.tool_proxy_token)
+    agent_tool.tool_proxy_token_updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return agent_tool

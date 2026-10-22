@@ -99,6 +99,7 @@ class AgentAddToolResponse(BaseModel):
     tool_endpoint: str
     agent_id: str
     created_at: datetime
+    token_max_age_sec: int  # ツールサーバは、これより短い間隔で、ツール代理トークンを更新する(chtkn)
 
 
 class AgentToolItem(BaseModel):
@@ -121,3 +122,28 @@ class AgentExecRequest(SignedRequest):
 
     params: dict[str, Any] = Field(description="ツールパラメータ(JSONオブジェクト。ツールサーバへそのまま渡される。パラメータが無い場合は {} )")
     nonce: str = Field(pattern=NONCE_PATTERN, description=f"リクエストごとに一意な文字列({NONCE_MIN_LEN}〜{NONCE_MAX_LEN}文字の英数字と - _)。同じnonceのリクエストは、リプレイとして拒否される")
+
+
+class AgentChangeToolTokenRequest(SignedRequest):
+    """ツール代理トークンの更新リクエスト(agents/{agent_id}/chtkn/{tool_endpoint})。ツールを登録したツールサーバの秘密鍵で署名する。
+
+    署名プレフィックス: SIGN_CONTEXT_AGENT_CHTKN
+    署名対象: tool_proxy_token, tool_server_public_key, nonce, signed_at + URLパスの agent_id, tool_endpoint
+    """
+
+    tool_proxy_token: str = Field(min_length=1, max_length=TOOL_PROXY_TOKEN_MAX_LEN, description="新しいツール代理トークン")
+    tool_server_public_key: str = Field(description="ツールを登録したツールサーバの公開鍵(Base64。Ed25519の生32バイト)。承認済みである必要がある")
+    nonce: str = Field(pattern=NONCE_PATTERN, description=f"リクエストごとに一意な文字列({NONCE_MIN_LEN}〜{NONCE_MAX_LEN}文字の英数字と - _)。同じnonceのリクエストは、リプレイとして拒否される")
+
+    @field_validator("tool_server_public_key")
+    @classmethod
+    def _validate_tool_server_public_key(cls, v: str) -> str:
+        return validate_public_key_format(v)
+
+
+class AgentChangeToolTokenResponse(BaseModel):
+    tool_endpoint: str
+    agent_id: str
+    tool_proxy_token_updated_at: datetime
+    locked: bool  # ロック中のツールは、更新しても、ロックされたまま(ロックの解除は、別の操作)
+    token_max_age_sec: int

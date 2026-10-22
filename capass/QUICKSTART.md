@@ -1,7 +1,7 @@
 # CaPass QUICKSTART(暫定版)
 
 > **この文書は暫定版です。** CaPassクライアント(CLI)がまだ未実装のため、キー作成(`keygen`)や各API呼び出しは、暫定クライアント [`examples/provisional_client.py`](examples/provisional_client.py) で代用しています。CLIの実装後に置き換えます。
-> 動作するAPIは、下表の8つです(登録・承認・ツール追加、AIエージェントによるツール一覧の取得・実行、ツールサーバのリプレース)。
+> 動作するAPIは、下表の9つです(登録・承認・ツール追加、AIエージェントによるツール一覧の取得・実行、ツールサーバのリプレース、ツール代理トークンの更新)。
 
 ## 1. 全体像
 
@@ -17,6 +17,7 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 | AIエージェント | `GET /api/v1/agents/{agent_id}/tools` | 使用できるツールの一覧(ツールエンドポイントとコンテキスト)の取得 |
 | AIエージェント | `POST /api/v1/agents/{agent_id}/exec/{tool_endpoint}` | ツールの実行(CaPassサーバがツールサーバへ中継する) |
 | ツールサーバ提供者 | `POST /api/v1/toolservers/{toolserver_id}/chkey` | ツールサーバのリプレース(公開鍵の更新。旧・新の両方の署名) |
+| ツールサーバ提供者 | `POST /api/v1/agents/{agent_id}/chtkn/{tool_endpoint}` | ツール代理トークンの更新(ツールサーバの定期更新ジョブ) |
 
 登録の順序は次のとおりです。
 
@@ -26,6 +27,7 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 4. 承認済みのツールサーバが、承認済みのAIエージェントにツールを追加する
 5. AIエージェントが、使用できるツールの一覧を取得し、ツールを選んで実行する(CaPassサーバが、ツールサーバへ中継する)
 6. (ツールサーバを新しいサーバに置き換えるとき)登録済みの公開鍵を、新しいサーバの公開鍵に更新する(5.9)
+7. ツールサーバが、ツール代理トークンを、定期的に更新する(5.10)
 
 ## 2. 署名の仕様
 
@@ -44,6 +46,7 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 | `agents/{agent_id}/approve` | `capass-agent-approve-v1\n` | 管理者の秘密鍵 | `admin_public_key` `signed_at` | `agent_id`(文字列) |
 | `agents/{agent_id}/addtool` | `capass-agent-addtool-v1\n` | ツールサーバの秘密鍵 | `tool_endpoint` `context` `params_schema` `tool_proxy_token` `tool_server_public_key` `signed_at` | `agent_id`(文字列) |
 | `toolservers/{toolserver_id}/chkey` | 旧: `capass-toolserver-chkey-old-v1\n`、新: `capass-toolserver-chkey-new-v1\n` | 旧ツールサーバと新ツールサーバの、両方の秘密鍵 | `new_tool_server_public_key` `signed_at`(署名は、旧が `signature`、新が `new_key_signature`) | `toolserver_id`(整数) |
+| `agents/{agent_id}/chtkn/{tool_endpoint}` | `capass-agent-chtkn-v1\n` | ツールを登録したツールサーバの秘密鍵 | `tool_proxy_token`(新しいトークン) `tool_server_public_key` `nonce` `signed_at` | `agent_id`、`tool_endpoint`(文字列) |
 | `agents/{agent_id}/tools`(GET) | `capass-agent-listtools-v1\n` | AIエージェントの秘密鍵 | なし(ボディが無いので、`signed_at` をヘッダーで送る) | `agent_id`(文字列) |
 | `agents/{agent_id}/exec/{tool_endpoint}` | `capass-agent-exec-v1\n` | AIエージェントの秘密鍵 | `params` `nonce` `signed_at` | `agent_id`、`tool_endpoint`(文字列) |
 
@@ -86,6 +89,7 @@ pip install -e ".[dev]"
 | `CAPASS_SERVER_TOOL_SERVER_TIMEOUT_SEC` | ツールサーバへの中継の制限時間(秒。接続から応答の受信完了まで) | 60 |
 | `CAPASS_SERVER_TOOL_SERVER_MAX_RESPONSE_BYTES` | ツールサーバの応答の最大サイズ(バイト)。超えると502 | 10485760(10MiB) |
 | `CAPASS_SERVER_TOOL_SERVER_ALLOW_HTTP` | ツールサーバの実行URLに、`http://` を許可するか(`true` / `false`)。ローカル開発だけ `true` にする | `false` |
+| `CAPASS_SERVER_TOKEN_MAX_AGE_SEC` | ツール代理トークンの最大経過時間(秒)。ツールサーバは、これより短い間隔で更新する(5.10) | 300 |
 
 暗号化鍵の作り方:
 
@@ -420,14 +424,36 @@ python provisional_client.py toolserver-chkey --toolserver-id 1 --handoff @hando
 - **承認済み(`approved`)のツールサーバだけが、リプレースできます。** `pending` や `revoked` は、`403` です(承認が取り消されたツールサーバが、鍵を更新して復帰することはできません)。
 - **更新後は、旧公開鍵は使えません。** 旧ツールサーバからの `addtool` などは、できなくなります。AIエージェントの一覧と実行は、更新後もそのまま使えます。
 
+### 5.10 ツール代理トークンを定期的に更新する(chtkn)
+
+ツール代理トークンは、定期的に新しいものに更新します(漏れたトークンを使える期間を短くするため)。**トークンを発行するのはツールサーバなので、更新もツールサーバが行います**(ツールサーバの定期更新ジョブ)。
+
+1. ツールサーバが、新しいトークンを発行して、ツールサーバ付きDBに保存する
+2. ツールサーバが、CaPassサーバへ `chtkn` を呼び出して、そのツールのトークンを更新する
+
+```bash
+export TOOL_SERVER_PRIVATE_KEY='<ツールサーバのPRIVATE>'
+python provisional_client.py agent-chtkn --agent-id agent-1 --endpoint psql_manager
+# new tool_proxy_token(...): <新しいトークン>
+# 200 {"tool_endpoint": "psql_manager", "agent_id": "agent-1", "tool_proxy_token_updated_at": "...", "locked": false, "token_max_age_sec": 300}
+```
+
+- **更新の間隔:** レスポンスの `token_max_age_sec`(`addtool` のレスポンスにも含まれます。既定300秒、設定は `CAPASS_SERVER_TOKEN_MAX_AGE_SEC`)より短い間隔で、更新してください(余裕を持って、半分程度がお勧めです)。**更新から `token_max_age_sec` を過ぎたトークンをロックする、CaPassサーバの監視ジョブは、まだ実装されていません。** 今は、更新しなくても、ロックされません。
+- **更新できるのは、そのツールを登録したツールサーバだけです。** 別のツールサーバが、他のツールを更新しようとすると、「ツールが存在しない」(`404`)と同じ扱いになります(他のツールの有無を知らせないため)。承認が取り消された(`pending` / `revoked`)ツールサーバは、更新できません(`403`)。
+- **`nonce` は、リクエストごとに新しく作ってください。** 同じ `nonce` の再利用は `401` です(盗聴した古い更新リクエストの再送で、トークンが古いものに巻き戻るのを防ぐため)。
+- **ロック中のツールも、トークンは更新できますが、ロックは解除されません**(レスポンスの `locked` で確認できます)。ロックの解除の操作は、まだありません。
+- **ツールごとに、1回ずつ呼びます**(複数のツールをまとめて更新するAPIは、ありません)。トークンは、レスポンスには含まれません。
+
+**ツールサーバ側の実装の注意:** ツールサーバが新しいトークンを保存してから、CaPassサーバの更新が完了するまでの間に、`exec` が来ると、CaPassサーバは、まだ**古いトークン**を送ってきます。そのため、**更新の間は、古いトークンと新しいトークンの、両方を受け付けてください。** CaPassサーバの更新が成功したら、古いトークンを(少し猶予を置いて)無効にします。`chtkn` が失敗したときは、古いトークンを使い続けて、リトライします。
+
 ## 6. レスポンスの意味
 
 | ステータス | 原因 |
 |---|---|
 | 200 / 201 | 成功(承認は200、登録・追加は201)。承認済みへの再承認も200(冪等で、最初の承認者は書き換わりません) |
-| 401 | 署名が不正、または `signed_at` が許容範囲を超えてずれている(時刻同期を確認)。`tools` / `exec`: 存在しない `agent_id` も同じ。`exec`: 同じ `nonce` を再利用した。`chkey`: 旧ツールサーバの署名が不正(存在しない `toolserver_id` も同じ)、または、新しい公開鍵の署名が不正(この場合は、`detail` が `invalid signature of the new public key`) |
-| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録)。`tools` / `exec`: AIエージェントが未承認。`exec`: 使用できないツール(権限ありません)、またはツールサーバが403/401を返した。`chkey`: ツールサーバが承認済みではない |
-| 404 | `toolserver_id` / `agent_id` が存在しない |
+| 401 | 署名が不正、または `signed_at` が許容範囲を超えてずれている(時刻同期を確認)。`tools` / `exec`: 存在しない `agent_id` も同じ。`exec` / `chtkn`: 同じ `nonce` を再利用した。`chkey`: 旧ツールサーバの署名が不正(存在しない `toolserver_id` も同じ)、または、新しい公開鍵の署名が不正(この場合は、`detail` が `invalid signature of the new public key`) |
+| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録)。`tools` / `exec`: AIエージェントが未承認。`exec`: 使用できないツール(権限ありません)、またはツールサーバが403/401を返した。`chkey` / `chtkn`: ツールサーバが承認済みではない(`chtkn` は、登録されていない鍵も同じ) |
+| 404 | `toolserver_id` / `agent_id` が存在しない。`chtkn`: そのツールサーバのツールが存在しない(別のツールサーバのツールも同じ) |
 | 409 | すでに登録済み(同じ公開鍵、同じ `agent_id`、同じ `[ツールエンドポイント, AIエージェント]`)、または `revoked` を承認しようとした。`chkey`: 新しい公開鍵が、すでに登録されている(現在の公開鍵と同じ場合を含む) |
 | 422 | リクエストの形式が不正(公開鍵や署名のBase64が不正、メールアドレスの形式が不正、項目の過不足、`agent_id` に使えない文字、`params_schema` が不正など)。`exec`: paramsが、ツールの `params_schema` に合っていない(`errors` に詳細) |
 | 429 | 初回登録APIのレート制限を超えた。`Retry-After` の秒数が経ってから再試行する |
@@ -451,6 +477,7 @@ python provisional_client.py toolserver-chkey --toolserver-id 1 --handoff @hando
 | `provisional_client.py keygen` | CaPassクライアントの `keygen` |
 | `provisional_client.py *-register` / `agent-addtool` | CaPassクライアントの `regist` など |
 | `provisional_client.py toolserver-chkey-prepare` / `toolserver-chkey` | CaPassクライアントの `chkey` |
+| `provisional_client.py agent-chtkn` | CaPassクライアントの `chtkn`(ツールサーバの定期更新ジョブから呼ぶ) |
 | `provisional_client.py agent-tools` / `agent-exec` | CaPassクライアントの `list executable` / `exec` |
 | `provisional_client.py *-approve` | 管理者用のCLI |
 | 承認待ちの確認(SQL) | 承認待ち一覧のAPI |

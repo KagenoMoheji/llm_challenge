@@ -14,7 +14,7 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
-from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
+from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC, TOKEN_MAX_AGE_SEC
 from capass_server.common.crypto import decrypt_token
 from capass_server.common.signature import SIGN_CONTEXT_AGENT_ADDTOOL
 from capass_server.models.entities import ApprovalStatus, TblAgentTool
@@ -53,6 +53,7 @@ def test_addtool_ok(client, session_factory):
     assert data["tool_endpoint"] == "db_query"
     assert data["agent_id"] == "agent-1"
     assert "tool_proxy_token" not in data  # トークンはレスポンスに含めない
+    assert data["token_max_age_sec"] == TOKEN_MAX_AGE_SEC  # ツールサーバが、トークンを更新する間隔の目安(これより短い間隔で更新する)
 
     with session_factory() as db:
         row = db.execute(select(TblAgentTool)).scalar_one()

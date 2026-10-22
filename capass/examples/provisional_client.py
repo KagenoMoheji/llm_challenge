@@ -14,6 +14,7 @@ CLIの `keygen` / `regist` などの代わりに、CaPassサーバのRestAPIを�
   # ツールサーバのリプレース: 新ツールサーバで handoff を作り(PRIVATEは新ツールサーバの鍵)、旧ツールサーバで chkey する(PRIVATEは旧ツールサーバの鍵)
   python provisional_client.py toolserver-chkey-prepare --toolserver-id 1 --old-public-key <旧公開鍵>   # 新ツールサーバ: 環境変数 TOOL_SERVER_PRIVATE_KEY
   python provisional_client.py toolserver-chkey --toolserver-id 1 --handoff @handoff.json              # 旧ツールサーバ: 環境変数 TOOL_SERVER_PRIVATE_KEY
+  python provisional_client.py agent-chtkn         --agent-id agent-1 --endpoint psql_manager   # 環境変数 TOOL_SERVER_PRIVATE_KEY(chtkn の代用。トークンは自動で新しく作る)
   python provisional_client.py agent-tools         --agent-id agent-1                  # 環境変数 AGENT_PRIVATE_KEY(list executable の代用)
   python provisional_client.py agent-exec          --agent-id agent-1 \
       --endpoint psql_manager --params '{"sql": "SELECT 1"}'                           # 環境変数 AGENT_PRIVATE_KEY(exec の代用)
@@ -49,6 +50,7 @@ SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW = b"capass-toolserver-chkey-new-v1\n"
 SIGN_CONTEXT_AGENT_REGISTER = b"capass-agent-register-v1\n"
 SIGN_CONTEXT_AGENT_APPROVE = b"capass-agent-approve-v1\n"
 SIGN_CONTEXT_AGENT_ADDTOOL = b"capass-agent-addtool-v1\n"
+SIGN_CONTEXT_AGENT_CHTKN = b"capass-agent-chtkn-v1\n"
 SIGN_CONTEXT_AGENT_LISTTOOLS = b"capass-agent-listtools-v1\n"
 SIGN_CONTEXT_AGENT_EXEC = b"capass-agent-exec-v1\n"
 
@@ -178,6 +180,12 @@ def build_chkey(old_priv: Ed25519PrivateKey, toolserver_id: int, handoff: dict) 
     return f"/api/v1/toolservers/{toolserver_id}/chkey", body
 
 
+def build_agent_chtkn(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, token: str) -> tuple[str, dict]:
+    fields = {"tool_proxy_token": token, "tool_server_public_key": _public_key_b64(priv), "nonce": secrets.token_urlsafe(16)}  # nonceは、リクエストごとに必ず新しく作る
+    body = _signed_body(priv, SIGN_CONTEXT_AGENT_CHTKN, fields, {"agent_id": agent_id, "tool_endpoint": endpoint})
+    return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/chtkn/{urllib.parse.quote(endpoint, safe='')}", body
+
+
 def build_agent_tools(priv: Ed25519PrivateKey, agent_id: str) -> tuple[str, dict]:
     """GETの署名はヘッダーで送る。署名対象は agent_id と signed_at。"""
     signed_at = int(time.time())
@@ -223,6 +231,12 @@ def cmd_toolserver_chkey_prepare(a: argparse.Namespace) -> None:
 
 def cmd_toolserver_chkey(a: argparse.Namespace) -> None:
     _post(*build_chkey(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.toolserver_id, _load_json_object(a.handoff, "--handoff")))
+
+
+def cmd_agent_chtkn(a: argparse.Namespace) -> None:
+    token = a.token or secrets.token_urlsafe(32)  # 新しいツール代理トークン。省略時は自動発行する
+    print("new tool_proxy_token(ツールサーバ側のDBに、先に保存しておくこと。新しいトークンは、CaPassサーバの更新が完了するまで、古いトークンと両方で受け付けると安全):", token)
+    _post(*build_agent_chtkn(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.agent_id, a.endpoint, token))
 
 
 def cmd_agent_tools(a: argparse.Namespace) -> None:
@@ -278,6 +292,12 @@ def main() -> None:
     p.add_argument("--toolserver-id", type=int, required=True)
     p.add_argument("--handoff", required=True, help="新ツールサーバが作ったhandoff(JSON文字列、または @ファイルパス)")
     p.set_defaults(func=cmd_toolserver_chkey)
+
+    p = sub.add_parser("agent-chtkn", help="ツール代理トークンを更新する(ツールサーバの定期更新ジョブ)")
+    p.add_argument("--agent-id", required=True)
+    p.add_argument("--endpoint", required=True, help="ツールエンドポイント")
+    p.add_argument("--token", help="新しいツール代理トークン(省略時は自動発行)")
+    p.set_defaults(func=cmd_agent_chtkn)
 
     p = sub.add_parser("agent-tools", help="使用できるツールの一覧を取得する(AIエージェント)")
     p.add_argument("--agent-id", required=True)
