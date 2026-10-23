@@ -229,6 +229,10 @@ def test_addtool_invalid_params_schema_is_unprocessable(client, session_factory)
         "property is not an object": {"type": "object", "properties": {"a": True}},
         "not a valid JSON Schema": {"type": "object", "properties": {"a": {"type": "no-such-type", "description": "x"}}},
         "invalid keyword value": {"type": "object", "properties": {"a": described}, "required": "a"},
+        "pattern keyword": {"type": "object", "properties": {"sql": {"type": "string", "description": "SQL", "pattern": "^SELECT .*"}}},
+        "patternProperties keyword": {"type": "object", "properties": {}, "patternProperties": {"^x_": {"type": "string"}}},
+        "pattern in nested schema": {"type": "object", "properties": {"a": {"type": "array", "description": "x", "items": {"type": "string", "pattern": "(a+)+$"}}}},
+        "ref into data": {"type": "object", "properties": {"a": {"$ref": "#/examples/0", "description": "x"}}, "examples": [{"type": "string", "pattern": "(a+)+$"}]},
         "external ref": {"type": "object", "properties": {"a": {"$ref": "https://evil.example.com/schema.json", "description": "x"}}},
         "external ref in nested list": {"type": "object", "properties": {"a": {"anyOf": [{"$ref": "http://evil.example.com/s"}], "description": "x"}}},
         "too large": {"type": "object", "properties": {"a": {"type": "string", "description": "x" * 20000}}},
@@ -245,3 +249,14 @@ def test_addtool_local_ref_in_params_schema_is_ok(client, session_factory):
         "$defs": {"user": {"type": "object", "properties": {"id": {"type": "integer", "description": "ユーザID"}}}},
     }
     assert _post(client, "agent-1", _body(ts_priv, params_schema=schema)).status_code == 201  # スキーマ内の参照("#"から始まる)は使える
+
+
+def test_addtool_parameter_named_pattern_is_ok(client, session_factory):
+    ts_priv = _setup(session_factory)
+    schema = {
+        "type": "object",
+        "properties": {"pattern": {"type": "string", "description": "検索する文字列"}},
+        "required": ["pattern"],
+        "examples": [{"pattern": "TODO"}],  # データの中の "pattern" は、キーワードではない
+    }
+    assert _post(client, "agent-1", _body(ts_priv, params_schema=schema)).status_code == 201

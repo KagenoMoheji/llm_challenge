@@ -131,6 +131,7 @@ examples/            暫定クライアントと、ツールサーバの見本�
 - **AIエージェントの署名付きAPI**(`tools` と `exec`)は、`services/signed_request.py` の `verify_agent_request` で認証する(`tbl_agent` に登録された公開鍵で検証する)。存在しない `agent_id` は、署名不正と同じ401にする(AIエージェントの有無を知らせない)。ボディが無いGETの署名は、ヘッダー(`HEADER_SIGNED_AT` / `HEADER_SIGNATURE`)で受ける。
 - **副作用のあるリクエスト(ツール実行など)には `nonce` を付け**、`consume_request_nonce` で使用済みにしてから処理する(再送対策)。認証に失敗したリクエストのnonceは記録しない。
 - ツールサーバへの中継中は、DBのトランザクション(接続)を保持しない(呼び出しの前に `commit()` する)。
+- **`params_schema` では、正規表現(`pattern` / `patternProperties`)を禁止する**(ReDoS対策。認可は、CaPassではなく、リソース側のスコープ・GRANTで行うのが前提)。`$ref` は、`#`、`#/$defs/<名前>`、`#/definitions/<名前>` のみ。スキーマを辿る処理は、キーワードの位置を見て辿る(パラメータ名や、`examples` などのデータの中身を、キーワードと取り違えない)。
 - **ツールのparamsは、JSON Schema(`params_schema`)で定義する。** 登録時の検証と、実行時のparamsの検証は `common/params_schema.py` に集約する。スキーマは、AIエージェントへの一覧にも含め、各パラメータに `description` を必須にする。
 - ツール代理トークンは、平文でDBに保存・ログ出力・レスポンスしない(`common/crypto.py` で暗号化して保存する)。ツールサーバへ渡すときだけ復号する。
 
