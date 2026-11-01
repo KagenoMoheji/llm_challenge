@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Scheduled Clicker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <div class="logo">
+        <span class="icon">⏰</span>
+        <h1>Scheduled Clicker</h1>
+      </div>
+      <div class="subtitle">指定日時 自動クリック</div>
+    </header>
+
+    <main class="content">
+      <!-- ステップ1: 要素選択 -->
+      <section class="card">
+        <div class="section-title">
+          <span class="step-badge">1</span>
+          <h2>対象ボタン・要素の選択</h2>
+        </div>
+        
+        <button id="btnPickElement" class="btn btn-secondary w-full">
+          🎯 ページ上で要素を選択する
+        </button>
+
+        <div id="selectedElementBox" class="element-info-box hidden">
+          <div class="info-row">
+            <span class="label">ボタン文字:</span>
+            <span id="targetText" class="val highlight-text">未選択</span>
+          </div>
+          <div class="info-row">
+            <span class="label">セレクタ:</span>
+            <code id="targetSelector" class="val code-val">-</code>
+          </div>
+          <div class="info-row text-xs text-muted">
+            <span class="label">対象ページ:</span>
+            <span id="targetUrl" class="val text-truncate">-</span>
+          </div>
+          <button id="btnTestClick" class="btn btn-sm btn-outline mt-2">
+            ⚡ 今すぐテストクリック
+          </button>
+        </div>
+      </section>
+
+      <!-- ステップ2: 日時指定 -->
+      <section class="card">
+        <div class="section-title">
+          <span class="step-badge">2</span>
+          <h2>実行日時の設定</h2>
+        </div>
+
+        <div id="detectedAlert" class="alert-box hidden">
+          <span class="alert-icon">💡</span>
+          <span id="detectedMsg">ページから回復時刻を検出しました</span>
+          <button id="btnApplyDetected" class="btn btn-xs btn-primary">適用</button>
+        </div>
+
+        <div class="input-group">
+          <label for="datetimeInput">実行予定日時:</label>
+          <input type="datetime-local" id="datetimeInput" class="datetime-input">
+        </div>
+
+        <!-- クイック加算ボタン -->
+        <div class="quick-buttons">
+          <button type="button" class="btn btn-chip" data-add-min="1">+1分</button>
+          <button type="button" class="btn btn-chip" data-add-min="5">+5分</button>
+          <button type="button" class="btn btn-chip" data-add-min="15">+15分</button>
+          <button type="button" class="btn btn-chip" data-add-min="60">+1時間</button>
+        </div>
+
+        <button id="btnSchedule" class="btn btn-primary w-full mt-3" disabled>
+          📅 スケジュール登録
+        </button>
+      </section>
+
+      <!-- スケジュールタスク一覧 -->
+      <section class="card">
+        <div class="section-title flex-between">
+          <h2>登録済みタスク</h2>
+          <span id="taskCount" class="badge">0件</span>
+        </div>
+        <div id="taskList" class="task-list">
+          <div class="empty-state">予約中のタスクはありません</div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Scheduled Clicker for Chrome</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
