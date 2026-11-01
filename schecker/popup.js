@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnSchedule = document.getElementById('btnSchedule');
   const taskList = document.getElementById('taskList');
   const taskCount = document.getElementById('taskCount');
+  const toggleIncludeChildren = document.getElementById('toggleIncludeChildren');
 
   let currentTarget = null;
   let detectedTimeData = null;
@@ -45,12 +46,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 3. ストレージから前回の選択要素とタスク一覧を読み込み
-  const storageData = await chrome.storage.local.get(['lastPickedElement', 'scheduled_clicker_tasks']);
+  // 3. ストレージから前回の選択要素、タスク一覧、オプション設定を読み込み
+  const storageData = await chrome.storage.local.get(['lastPickedElement', 'scheduled_clicker_tasks', 'optIncludeChildren']);
   if (storageData.lastPickedElement) {
     // アクティブタブと同じURLまたは直近選択した要素を表示
     setCurrentTarget(storageData.lastPickedElement);
   }
+  if (typeof storageData.optIncludeChildren === 'boolean') {
+    toggleIncludeChildren.checked = storageData.optIncludeChildren;
+  }
+
+  // トグル変更時に設定を記憶
+  toggleIncludeChildren.addEventListener('change', () => {
+    chrome.storage.local.set({ optIncludeChildren: toggleIncludeChildren.checked });
+  });
 
   renderTasks(storageData.scheduled_clicker_tasks || []);
 
@@ -126,11 +135,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const res = await chrome.tabs.sendMessage(activeTab.id, {
         action: 'TRIGGER_CLICK',
-        target: currentTarget
+        target: {
+          ...currentTarget,
+          includeChildren: toggleIncludeChildren.checked
+        }
       });
 
       if (res && res.success) {
-        alert('✅ クリックに成功しました！');
+        const detail = res.clickedCount > 1 
+          ? ` (自身＋子要素計 ${res.clickedCount} 箇所)` 
+          : '';
+        alert(`✅ クリックに成功しました！${detail}`);
       } else {
         alert('⚠️ クリックに失敗しました: ' + (res?.reason || '不明なエラー'));
       }
@@ -163,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       selector: currentTarget.selector,
       xpath: currentTarget.xpath,
       innerText: currentTarget.innerText,
+      includeChildren: toggleIncludeChildren.checked,
       status: 'WAITING'
     };
 
@@ -210,6 +226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
         <div class="task-target">
           <strong>ボタン:</strong> ${escapeHtml(t.innerText || t.selector || '(要素)')}
+          ${t.includeChildren ? '<span class="badge-sub">子要素含む</span>' : ''}
         </div>
         ${t.resultMessage ? `<div class="text-xs text-muted">${escapeHtml(t.resultMessage)}</div>` : ''}
         <div class="task-actions">

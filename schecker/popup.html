@@ -40,6 +40,19 @@
             <span class="label">対象ページ:</span>
             <span id="targetUrl" class="val text-truncate">-</span>
           </div>
+
+          <!-- 子要素クリック試行トグル -->
+          <div class="toggle-group">
+            <div class="toggle-label-wrap">
+              <span class="toggle-title">子要素のクリック試行もする</span>
+              <span class="toggle-desc">内部のボタンやタグもすべてクリックを試行します</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleIncludeChildren">
+              <span class="slider"></span>
+            </label>
+          </div>
+
           <button id="btnTestClick" class="btn btn-sm btn-outline mt-2">
             ⚡ 今すぐテストクリック
           </button>

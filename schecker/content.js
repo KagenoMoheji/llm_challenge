@@ -226,6 +226,43 @@
     document.removeEventListener('keydown', handleKeyDown, true);
   }
 
+  // 単一要素に対する安全なクリック実行
+  function executeClickOnElement(element) {
+    if (!element) return false;
+    if (element.disabled || element.getAttribute('aria-disabled') === 'true') {
+      return false;
+    }
+
+    try {
+      element.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+      
+      const prepEvents = ['mouseenter', 'mouseover', 'mousedown', 'mouseup'];
+      prepEvents.forEach(evtName => {
+        const evt = new MouseEvent(evtName, {
+          bubbles: true,
+          cancelable: true,
+          view: window
+        });
+        element.dispatchEvent(evt);
+      });
+
+      if (typeof element.click === 'function') {
+        element.click();
+      } else {
+        const clickEvt = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window
+        });
+        element.dispatchEvent(clickEvt);
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Scheduled Clicker] Click error on element:', element, err);
+      return false;
+    }
+  }
+
   // 要素を探索してクリックする関数
   function findAndClick(target) {
     let el = null;
@@ -269,44 +306,51 @@
       return { success: true, skipped: true, clickedText: (el.innerText || el.textContent || '').trim() };
     }
 
-    // disabled状態チェック
-    if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
-      return { success: false, reason: 'ELEMENT_DISABLED' };
+    let clickedCount = 0;
+
+    // 1. 選択された要素自身のクリック
+    const selfSuccess = executeClickOnElement(el);
+    if (selfSuccess) {
+      clickedCount++;
     }
 
-    // 画面内にスクロールして確実にクリック
-    try {
-      el.scrollIntoView({ behavior: 'instant', block: 'center' });
-      
-      // マウスホバーと押し込みの事前イベントのみ発火 (clickは含めない)
-      const prepEvents = ['mouseenter', 'mouseover', 'mousedown', 'mouseup'];
-      prepEvents.forEach(evtName => {
-        const evt = new MouseEvent(evtName, {
-          bubbles: true,
-          cancelable: true,
-          view: window
-        });
-        el.dispatchEvent(evt);
+    // 2. 子要素のクリック試行 (トグルが有効な場合のみ)
+    if (target.includeChildren) {
+      const ignoreTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'BR', 'WBR']);
+      // 画面上に描画されている子孫要素を収集
+      const validChildren = Array.from(el.querySelectorAll('*')).filter(child => {
+        if (ignoreTags.has(child.tagName)) return false;
+        const rect = child.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
       });
 
-      // 単一の確定クリックを実行 (el.click または 単一の click イベント)
-      if (typeof el.click === 'function') {
-        el.click();
-      } else {
-        const clickEvt = new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          view: window
-        });
-        el.dispatchEvent(clickEvt);
+      // ボタン等のインタラクティブ要素を優先しつつ、最大30個まで順次試行
+      const interactiveSelector = 'button, a, [role="button"], input, select, textarea, [onclick], [tabindex]';
+      const interactiveChildren = validChildren.filter(c => c.matches(interactiveSelector));
+      const otherChildren = validChildren.filter(c => !c.matches(interactiveSelector));
+
+      const childrenToTry = [...interactiveChildren, ...otherChildren].slice(0, 30);
+      for (const child of childrenToTry) {
+        if (executeClickOnElement(child)) {
+          clickedCount++;
+        }
       }
+    }
 
-      lastClickTime = Date.now();
-      el.setAttribute('data-scheduled-clicked', 'true');
+    lastClickTime = Date.now();
+    el.setAttribute('data-scheduled-clicked', 'true');
 
-      return { success: true, clickedText: (el.innerText || el.textContent || '').trim() };
-    } catch (err) {
-      return { success: false, reason: 'CLICK_ERROR: ' + err.message };
+    if (clickedCount > 0) {
+      return { 
+        success: true, 
+        clickedCount: clickedCount,
+        clickedText: (el.innerText || el.textContent || '').trim() 
+      };
+    } else {
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
+        return { success: false, reason: 'ELEMENT_DISABLED' };
+      }
+      return { success: false, reason: 'CLICK_ATTEMPT_FAILED' };
     }
   }
 

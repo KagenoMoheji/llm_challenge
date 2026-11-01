@@ -50,7 +50,8 @@ async function attemptClickWithRetry(task, tabId, maxRetries = 10, intervalMs = 
         target: {
           selector: task.selector,
           xpath: task.xpath,
-          innerText: task.innerText
+          innerText: task.innerText,
+          includeChildren: task.includeChildren || false
         }
       });
 
