@@ -33,7 +33,7 @@
 4. 左上に表示される **「パッケージ化されていない拡張機能を読み込む」** ボタンをクリックします。
 5. 以下のフォルダを選択します：
    ```
-   C:\Users\reegg\.gemini\antigravity\scratch\scheduled-clicker-extension
+   $HOME\.gemini\antigravity\scratch\scheduled-clicker-extension
    ```
 6. ツールバーのパズルアイコン（拡張機能）から **「Scheduled Clicker」** をピン留めしておくと便利です。
 
