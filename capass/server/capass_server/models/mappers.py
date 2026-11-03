@@ -35,15 +35,39 @@ def insert_tbl_tool_server(db: Session, tool_server: TblToolServer) -> TblToolSe
     return tool_server
 
 
-def update_tbl_tool_server_public_key(db: Session, tool_server_id: int, old_public_key: str, new_public_key: str) -> bool:
-    """ツールサーバの公開鍵を更新する。現在の公開鍵がold_public_keyのままの場合だけ更新し、更新したらTrue(並行して別の更新があった場合はFalse)。
-    tbl_agent_toolの公開鍵は、外部キー(ON UPDATE CASCADE)でデータベースが追従させる。"""
+def find_tbl_tool_server_reserved_successor(db: Session, predecessor_id: int, now: datetime) -> TblToolServer | None:
+    """旧ツールサーバ(predecessor_id)の後継として予約されている(RESERVED)、期限内のツールサーバを返す。"""
+    stmt = select(TblToolServer).where(
+        TblToolServer.replaces_tool_server_id == predecessor_id,
+        TblToolServer.status == ApprovalStatus.RESERVED.value,
+        TblToolServer.status_expires_at > now,
+    )
+    return db.execute(stmt).scalars().first()
+
+
+def find_tbl_tool_server_active_successor(db: Session, predecessor_id: int) -> TblToolServer | None:
+    """旧ツールサーバ(predecessor_id)の後継で、いまアクティブ(APPROVED)なツールサーバを返す。"""
+    stmt = select(TblToolServer).where(
+        TblToolServer.replaces_tool_server_id == predecessor_id,
+        TblToolServer.status == ApprovalStatus.APPROVED.value,
+    )
+    return db.execute(stmt).scalars().first()
+
+
+def update_tbl_tool_server_status(db: Session, tool_server_id: int, expected_status: str, new_status: str, status_expires_at: datetime | None) -> bool:
+    """ステータスが、expected_statusのままの場合だけ、new_statusに更新する(並行して別のリクエストが更新していたらFalse)。"""
     stmt = (
         update(TblToolServer)
-        .where(TblToolServer.id == tool_server_id, TblToolServer.tool_server_public_key == old_public_key)
-        .values(tool_server_public_key=new_public_key)
+        .where(TblToolServer.id == tool_server_id, TblToolServer.status == expected_status)
+        .values(status=new_status, status_expires_at=status_expires_at)
     )
     return db.execute(stmt).rowcount == 1
+
+
+def move_tbl_agent_tool_to_tool_server(db: Session, from_tool_server_id: int, to_tool_server_id: int) -> int:
+    """ツール(AIエージェントごとのレコード)の持つツールサーバのidを、付け替える(ツールサーバのリプレース)。付け替えた数を返す。"""
+    stmt = update(TblAgentTool).where(TblAgentTool.tool_server_id == from_tool_server_id).values(tool_server_id=to_tool_server_id)
+    return db.execute(stmt).rowcount
 
 
 def find_tbl_agent_by_agent_id(db: Session, agent_id: str) -> TblAgent | None:
@@ -75,7 +99,7 @@ def list_tbl_agent_tool_executable(db: Session, agent_id: str) -> list[TblAgentT
     """AIエージェントが実行できるツール(ロックされておらず、ツールサーバが承認済み)の一覧を、ツールエンドポイント順に返す。"""
     stmt = (
         select(TblAgentTool)
-        .join(TblToolServer, TblToolServer.tool_server_public_key == TblAgentTool.tool_server_public_key)
+        .join(TblToolServer, TblToolServer.id == TblAgentTool.tool_server_id)
         .where(
             TblAgentTool.agent_id == agent_id,
             TblAgentTool.locked.is_(False),
@@ -90,7 +114,7 @@ def find_tbl_agent_tool_executable(db: Session, agent_id: str, tool_endpoint: st
     """実行できる(ロックされておらず、ツールサーバが承認済みの)ツールと、そのツールサーバを返す。"""
     stmt = (
         select(TblAgentTool, TblToolServer)
-        .join(TblToolServer, TblToolServer.tool_server_public_key == TblAgentTool.tool_server_public_key)
+        .join(TblToolServer, TblToolServer.id == TblAgentTool.tool_server_id)
         .where(
             TblAgentTool.agent_id == agent_id,
             TblAgentTool.tool_endpoint == tool_endpoint,

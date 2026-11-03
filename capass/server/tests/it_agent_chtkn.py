@@ -65,7 +65,7 @@ def test_chtkn_does_not_change_other_columns(client, session_factory):
     before = _row(session_factory)
     assert _chtkn(client, "agent-1", "psql_manager", chtkn_body(ts_priv, "agent-1", "psql_manager")).status_code == 200
     after = _row(session_factory)
-    for column in ("tool_endpoint", "context", "params_schema", "agent_id", "locked", "tool_used_at", "tool_server_public_key", "created_at"):
+    for column in ("tool_endpoint", "context", "params_schema", "agent_id", "locked", "tool_used_at", "tool_server_id", "created_at"):
         assert getattr(after, column) == getattr(before, column), column
 
 

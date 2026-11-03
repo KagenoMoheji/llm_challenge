@@ -45,7 +45,7 @@
 | `list executable` | 使用できるツールの一覧(AIエージェント側) | `agents/{agent_id}/tools` |
 | `exec` | ツールの実行(AIエージェント側) | `agents/{agent_id}/exec/{tool_endpoint}` |
 | `chtkn` | ツール代理トークンの更新(ツールサーバの定期更新ジョブ) | `agents/{agent_id}/chtkn/{tool_endpoint}` |
-| `chkey` | ツールサーバ公開鍵の更新(リプレース)。新ツールサーバが署名(handoff)を作り、旧ツールサーバが署名して依頼する | `toolservers/{toolserver_id}/chkey` |
+| `chkey` | ツールサーバのリプレース(予約は管理者、切り替えは旧・新の署名、切り戻しは旧の署名) | `toolservers/{toolserver_id}/replace/reserve` `/replace/activate` `/replace/rollback` |
 | `list registered` | ツールサーバが、登録内容(利用日時など)を取得 | 未実装(3.を参照) |
 | `update lock` | ツールサーバが、ツールをロックする | 未実装(3.を参照) |
 | 管理者用 | 承認(`approve`)、承認待ち一覧、`revoke` | `toolservers/{toolserver_id}/approve`、`agents/{agent_id}/approve` |
@@ -67,7 +67,7 @@
 - `revoked` にするAPI。いまはSQLで更新している。
 - 申請者メールアドレスの確認(いまは自己申告)。許可するドメインの制限など。
 - 承認済みのツールサーバが、承認済みの任意のAIエージェントにツールを追加できる現状に対して、AIエージェント提供者の同意を確認する仕組み。
-- ツールサーバのリプレース(`chkey`)で、実行URLも変更する場合の、管理者の承認(現状は、実行URLは変更できず、管理者がSQLで更新する)。
+- 予約(`reserved`)や待機(`standby`)を、期限の前に取り消すAPI(いまはSQLで `revoked` にする)。ツールサーバのリプレースの、承認待ち・予約の一覧API。切り替え・切り戻しの監査ログ(誰が、いつ、どのツールサーバからどのツールサーバへ)。
 
 ## 5. その他
 

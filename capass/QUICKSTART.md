@@ -1,7 +1,7 @@
 # CaPass QUICKSTART(暫定版)
 
 > **この文書は暫定版です。** CaPassクライアント(CLI)がまだ未実装のため、キー作成(`keygen`)や各API呼び出しは、暫定クライアント [`examples/provisional_client.py`](examples/provisional_client.py) で代用しています。CLIの実装後に置き換えます。
-> 動作するAPIは、下表の9つです(登録・承認・ツール追加、AIエージェントによるツール一覧の取得・実行、ツールサーバのリプレース、ツール代理トークンの更新)。
+> 動作するAPIは、下表のとおりです(登録・承認・ツール追加、AIエージェントによるツール一覧の取得・実行、ツールサーバのリプレース(予約・切り替え・切り戻し)、ツール代理トークンの更新)。
 
 ## 0. 前提: CaPassが制御するものと、しないもの
 
@@ -35,7 +35,9 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 | ツールサーバ提供者 | `POST /api/v1/agents/{agent_id}/addtool` | 承認済みAIエージェントへのツール追加(承認済みツールサーバのみ) |
 | AIエージェント | `GET /api/v1/agents/{agent_id}/tools` | 使用できるツールの一覧(ツールエンドポイントとコンテキスト)の取得 |
 | AIエージェント | `POST /api/v1/agents/{agent_id}/exec/{tool_endpoint}` | ツールの実行(CaPassサーバがツールサーバへ中継する) |
-| ツールサーバ提供者 | `POST /api/v1/toolservers/{toolserver_id}/chkey` | ツールサーバのリプレース(公開鍵の更新。旧・新の両方の署名) |
+| CaPassサーバ管理者 | `POST /api/v1/toolservers/{toolserver_id}/replace/reserve` | ツールサーバのリプレース(1/3): 新ツールサーバ(実行URLと公開鍵)を、後継として、事前に承認(予約) |
+| ツールサーバ提供者 | `POST /api/v1/toolservers/{toolserver_id}/replace/activate` | ツールサーバのリプレース(2/3): 予約済みの新ツールサーバへ、切り替え(旧・新の両方の署名) |
+| ツールサーバ提供者 | `POST /api/v1/toolservers/{toolserver_id}/replace/rollback` | ツールサーバのリプレース(3/3): 待機中の旧ツールサーバへ、切り戻し(旧の署名だけ) |
 | ツールサーバ提供者 | `POST /api/v1/agents/{agent_id}/chtkn/{tool_endpoint}` | ツール代理トークンの更新(ツールサーバの定期更新ジョブ) |
 
 登録の順序は次のとおりです。
@@ -45,7 +47,7 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 3. 管理者が、申請者に確認の連絡をしたうえで承認する(`approved`。承認した管理者のメールアドレスが記録される)
 4. 承認済みのツールサーバが、承認済みのAIエージェントにツールを追加する
 5. AIエージェントが、使用できるツールの一覧を取得し、ツールを選んで実行する(CaPassサーバが、ツールサーバへ中継する)
-6. (ツールサーバを新しいサーバに置き換えるとき)登録済みの公開鍵を、新しいサーバの公開鍵に更新する(5.9)
+6. (ツールサーバを新しいサーバに置き換えるとき)管理者が新ツールサーバを事前に承認(予約)しておき、ツールサーバ側が、切り替え・切り戻しを行う(5.9)
 7. ツールサーバが、ツール代理トークンを、定期的に更新する(5.10)
 
 ## 2. 署名の仕様
@@ -64,12 +66,14 @@ AIエージェントにツールを使わせるまでに、次の登録と承認
 | `agents/register` | `capass-agent-register-v1\n` | AIエージェントの秘密鍵 | `agent_id` `agent_public_key` `applicant_email` `signed_at` | なし |
 | `agents/{agent_id}/approve` | `capass-agent-approve-v1\n` | 管理者の秘密鍵 | `admin_public_key` `signed_at` | `agent_id`(文字列) |
 | `agents/{agent_id}/addtool` | `capass-agent-addtool-v1\n` | ツールサーバの秘密鍵 | `tool_endpoint` `context` `params_schema` `tool_proxy_token` `tool_server_public_key` `signed_at` | `agent_id`(文字列) |
-| `toolservers/{toolserver_id}/chkey` | 旧: `capass-toolserver-chkey-old-v1\n`、新: `capass-toolserver-chkey-new-v1\n` | 旧ツールサーバと新ツールサーバの、両方の秘密鍵 | `new_tool_server_public_key` `signed_at`(署名は、旧が `signature`、新が `new_key_signature`) | `toolserver_id`(整数) |
+| `toolservers/{toolserver_id}/replace/reserve` | `capass-toolserver-replace-reserve-v1\n` | 管理者の秘密鍵 | `admin_public_key` `new_tool_server_public_key` `new_tool_server_name` `new_tool_server_exec_url` `applicant_email` `signed_at` | `toolserver_id`(整数。旧ツールサーバ) |
+| `toolservers/{toolserver_id}/replace/activate` | 旧: `capass-toolserver-replace-activate-old-v1\n`、新: `capass-toolserver-replace-activate-new-v1\n` | 旧ツールサーバと新ツールサーバの、両方の秘密鍵 | `new_tool_server_public_key` `signed_at`(署名は、旧が `signature`、新が `new_key_signature`) | `toolserver_id`(整数。旧ツールサーバ) |
+| `toolservers/{toolserver_id}/replace/rollback` | `capass-toolserver-replace-rollback-v1\n` | 旧ツールサーバの秘密鍵 | `signed_at` | `toolserver_id`(整数。切り戻し先の旧ツールサーバ) |
 | `agents/{agent_id}/chtkn/{tool_endpoint}` | `capass-agent-chtkn-v1\n` | ツールを登録したツールサーバの秘密鍵 | `tool_proxy_token`(新しいトークン) `tool_server_public_key` `nonce` `signed_at` | `agent_id`、`tool_endpoint`(文字列) |
 | `agents/{agent_id}/tools`(GET) | `capass-agent-listtools-v1\n` | AIエージェントの秘密鍵 | なし(ボディが無いので、`signed_at` をヘッダーで送る) | `agent_id`(文字列) |
 | `agents/{agent_id}/exec/{tool_endpoint}` | `capass-agent-exec-v1\n` | AIエージェントの秘密鍵 | `params` `nonce` `signed_at` | `agent_id`、`tool_endpoint`(文字列) |
 
-**ツールサーバのリプレース(`chkey`)の署名:** 旧ツールサーバと新ツールサーバが、**同じ内容**に、それぞれの秘密鍵で署名します(プレフィックスは役割ごとに違うので、一方の署名を、もう一方として使い回すことはできません)。署名対象は、`new_tool_server_public_key`、`signed_at`、URLパスの `toolserver_id`、そして**サーバに登録されている旧公開鍵 `old_tool_server_public_key`**(リクエストには含めません)です。
+**ツールサーバのリプレース(`replace/*`)の署名:** `reserve` は管理者が、`activate` は旧ツールサーバと新ツールサーバが**同じ内容**に(プレフィックスは役割ごとに違うので、一方の署名を、もう一方として使い回すことはできません)、`rollback` は旧ツールサーバだけが、署名します。`activate` の署名対象は、`new_tool_server_public_key`、`signed_at`、URLパスの `toolserver_id`、そして**サーバに登録されている旧公開鍵 `old_tool_server_public_key`**(リクエストには含めません)です。`rollback` の署名対象は、`signed_at`、URLパスの `toolserver_id`、サーバに登録されている旧公開鍵(`tool_server_public_key`。リクエストには含めません)です。
 
 **AIエージェントの署名(`tools` と `exec`):** AIエージェントは、`agents/register` で登録して承認された公開鍵に対応する秘密鍵で署名します。サーバは、`tbl_agent` に登録された公開鍵で検証するので、リクエストに公開鍵は含めません。`agent_id` を知っているだけでは、ツールの一覧も実行もできません。
 
@@ -109,6 +113,8 @@ pip install -e ".[dev]"
 | `CAPASS_SERVER_TOOL_SERVER_MAX_RESPONSE_BYTES` | ツールサーバの応答の最大サイズ(バイト)。超えると502 | 10485760(10MiB) |
 | `CAPASS_SERVER_TOOL_SERVER_ALLOW_HTTP` | ツールサーバの実行URLに、`http://` を許可するか(`true` / `false`)。ローカル開発だけ `true` にする | `false` |
 | `CAPASS_SERVER_TOKEN_MAX_AGE_SEC` | ツール代理トークンの最大経過時間(秒)。ツールサーバは、これより短い間隔で更新する(5.10) | 300 |
+| `CAPASS_SERVER_TOOL_SERVER_RESERVATION_TTL_SEC` | ツールサーバのリプレースで、新ツールサーバの予約(reserve)から、切り替え(activate)までの期限(秒) | 604800(7日) |
+| `CAPASS_SERVER_TOOL_SERVER_STANDBY_TTL_SEC` | 切り替え後に、旧ツールサーバへ切り戻し(rollback)できる期間(秒) | 86400(1日) |
 
 暗号化鍵の作り方:
 
@@ -116,7 +122,7 @@ pip install -e ".[dev]"
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-> **既存のDBがある場合:** `tbl_request_nonce` が新設され、`tbl_tool_server` に `exec_url` が、`tbl_agent_tool` に `params_schema` が追加され、`tbl_agent_tool.tool_endpoint` の長さが128文字になりました。`create_all` は既存のテーブルを変更しないので、開発用DBは作り直してください。
+> **既存のDBがある場合:** `tbl_agent_tool` の `tool_server_public_key`(公開鍵)が、`tool_server_id`(`tbl_tool_server.id`)に変わり、`tbl_tool_server` に `replaces_tool_server_id` と `status_expires_at` が追加されました。`create_all` は既存のテーブルを変更しないので、開発用DBは作り直してください。
 
 ### レート制限について
 
@@ -428,28 +434,56 @@ AIエージェントが読みやすいスキーマにするコツ:
 
 `default` は、AIエージェントへの説明です。CaPassサーバは、省略されたパラメータにデフォルト値を補いません(ツールサーバが補います)。
 
-### 5.9 ツールサーバをリプレースする(公開鍵の更新)
+### 5.9 ツールサーバをリプレースする(予約 → 切り替え → 切り戻し)
 
-ツールサーバを新しいサーバに置き換えるときは、登録済みの公開鍵を、新しいサーバの公開鍵に更新します(`chkey`)。**ステータス(承認済み)、名称、実行URL、登録済みのツールは引き継がれ、管理者の承認のやり直しは不要**です。その代わり、**旧ツールサーバと新ツールサーバの、両方の署名**が必要です(旧: 登録元であることの証明、新: 新しい鍵を持っていることの証明)。
+ツールサーバを新しいサーバに置き換えるときは、**CaPassサーバ管理者が、新ツールサーバ(実行URLと公開鍵)を、先に承認(予約)しておき**、切り替えと切り戻しは、**ツールサーバ側だけで、すぐ行えます**。送り先(実行URLと公開鍵)は、管理者が事前に承認したものの間でしか、変えられません。
 
-```bash
-# 1. 新ツールサーバで、キーペアを作り、新しい鍵の所持を証明する署名(handoff)を作る
-python provisional_client.py keygen        # PRIVATE は新ツールサーバ上だけで保管する
-export TOOL_SERVER_PRIVATE_KEY='<新ツールサーバのPRIVATE>'
-python provisional_client.py toolserver-chkey-prepare --toolserver-id 1 \
-  --old-public-key '<旧ツールサーバの公開鍵>' > handoff.json
-
-# 2. handoff.json を旧ツールサーバへ渡して、旧ツールサーバで chkey を実行する
-export TOOL_SERVER_PRIVATE_KEY='<旧ツールサーバのPRIVATE>'
-python provisional_client.py toolserver-chkey --toolserver-id 1 --handoff @handoff.json
-# 200 {"toolserver_id": 1, ..., "tool_server_public_key": "<新ツールサーバの公開鍵>", "status": "approved"}
+```
+旧ツールサーバ(approved) ──reserve(管理者)──▶ 新ツールサーバ(reserved。期限つき)
+            ──activate(旧・新の署名)──▶ 旧(standby。期限つき)/ 新(approved)。ツールが新へ付け替えられる
+            ──rollback(旧の署名)──▶ 旧(approved)/ 新(standby。期限つき)。ツールが旧へ戻る
 ```
 
-- **署名時刻から数分以内(既定は5分)に、`chkey` を実行してください。** handoff の署名時刻は、旧ツールサーバの署名にも使われます。
-- **実行URLは変わりません。** CaPassサーバは、同じURLへ中継を続けるので、新ツールサーバが、**同じURLで待ち受けられる**ようにしてください(DNSやロードバランサの切り替えなど)。実行URLを変える必要がある場合は、管理者が内容を確認して、SQLで更新します(`UPDATE tbl_tool_server SET exec_url = '<新しいURL>' WHERE id = 1;`)。
-- **ツールサーバ付きDB(`[認証情報/ツール代理トークン/AIエージェント情報]`)は、新ツールサーバへ移行しておいてください。** CaPassサーバが保存しているツール代理トークンは、そのまま使われます。
-- **承認済み(`approved`)のツールサーバだけが、リプレースできます。** `pending` や `revoked` は、`403` です(承認が取り消されたツールサーバが、鍵を更新して復帰することはできません)。
-- **更新後は、旧公開鍵は使えません。** 旧ツールサーバからの `addtool` などは、できなくなります。AIエージェントの一覧と実行は、更新後もそのまま使えます。
+| 状態 | 意味 | できること |
+|---|---|---|
+| `approved` | いま使われている(アクティブな)ツールサーバ | `addtool`、`chtkn`、`exec` の中継先 |
+| `reserved` | 管理者が事前に承認した、後継の新ツールサーバ(期限つき) | `activate` の対象になるだけ(それ以外は、まだ何もできない) |
+| `standby` | 切り替え後の、旧ツールサーバ(期限つき) | `rollback` の対象になるだけ |
+| `revoked` | 取り消し | 何もできない |
+
+**手順:**
+
+```bash
+# 1. ツールサーバ管理者が、新ツールサーバの公開鍵・実行URLを、CaPassサーバ管理者へ申告する(事前に)
+#    管理者は、申告内容を確認して、予約する
+export ADMIN_PRIVATE_KEY='<管理者のPRIVATE>'
+python provisional_client.py toolserver-replace-reserve --toolserver-id 1 \
+  --new-public-key '<新ツールサーバの公開鍵>' --new-name "新ツールサーバ" \
+  --new-exec-url https://new-toolserver.example.com/capass/exec --email toolserver-owner@example.com
+# 201 {"toolserver_id": 2, "replaces_toolserver_id": 1, ..., "status": "reserved", "reserved_until": "..."}
+
+# 2. 切り替え(ツールサーバ側だけで、いつでも実行できる)。旧ツールサーバが署名を作り、新ツールサーバが、署名を足して実行する
+export TOOL_SERVER_PRIVATE_KEY='<旧ツールサーバのPRIVATE>'
+python provisional_client.py toolserver-replace-sign-old --toolserver-id 1 --new-public-key '<新ツールサーバの公開鍵>' > handoff.json
+export TOOL_SERVER_PRIVATE_KEY='<新ツールサーバのPRIVATE>'
+python provisional_client.py toolserver-replace-activate --toolserver-id 1 --handoff @handoff.json
+# 200 {"active_toolserver_id": 2, "standby_toolserver_id": 1, "standby_until": "...", "moved_tools": 2, ...}
+
+# 3. 切り戻し(新ツールサーバに問題があったとき。旧ツールサーバの署名だけ)
+export TOOL_SERVER_PRIVATE_KEY='<旧ツールサーバのPRIVATE>'
+python provisional_client.py toolserver-replace-rollback --toolserver-id 1
+# 200 {"active_toolserver_id": 1, "standby_toolserver_id": 2, ...}
+```
+
+`{toolserver_id}` は、3つとも、**置き換えられる(旧)ツールサーバのid**です(`rollback` は、切り戻し先の旧ツールサーバ)。
+
+- **予約と待機には、期限があります**(`CAPASS_SERVER_TOOL_SERVER_RESERVATION_TTL_SEC` と `..._STANDBY_TTL_SEC`)。期限を過ぎた予約・待機中のツールサーバへは、切り替えも切り戻しもできません(古い鍵や送り先が、いつまでも「承認済み」で残らないようにするため)。期限を延ばしたいときは、管理者が再度、予約します。
+- **切り替えると、ツールの `tool_server_id` が、新ツールサーバに付け替えられます。** ツールを割り当てられたAIエージェントの一覧と、ツール代理トークンは、そのまま使えます。`exec` の中継先は、新ツールサーバの実行URLになります。以降の `addtool` / `chtkn` は、新ツールサーバの鍵だけが行えます。
+- **切り戻した後は、新ツールサーバが待機中になり、期限内なら、もう一度、`activate` で切り替えられます**(管理者の再承認は不要)。
+- **署名時刻から数分以内(既定は5分)に、`activate` を実行してください。** handoff の署名時刻は、新ツールサーバの署名にも使われます。
+- **新ツールサーバの実行URLは、`register` と同じ規則です。** 既定ではhttpsのみで、プライベートIPのURLも使えます(`CAPASS_SERVER_TOOL_SERVER_ALLOW_HTTP=true` で、httpを許可できます)。
+- **ツールサーバ付きDB(`[認証情報/ツール代理トークン/AIエージェント情報]`)は、切り替えの前に、新ツールサーバへ移行しておいてください。** CaPassサーバが保存しているツール代理トークンは、そのまま新ツールサーバへ送られます。
+- **管理者が承認するのは、「旧ツールサーバから新ツールサーバへの切り替え」です。** 予約には、置き換える旧ツールサーバが記録されるので、承認済みの別のツールサーバへ、ツールを移すことはできません。
 
 ### 5.10 ツール代理トークンを定期的に更新する(chtkn)
 
@@ -478,10 +512,10 @@ python provisional_client.py agent-chtkn --agent-id agent-1 --endpoint psql_mana
 | ステータス | 原因 |
 |---|---|
 | 200 / 201 | 成功(承認は200、登録・追加は201)。承認済みへの再承認も200(冪等で、最初の承認者は書き換わりません) |
-| 401 | 署名が不正、または `signed_at` が許容範囲を超えてずれている(時刻同期を確認)。`tools` / `exec`: 存在しない `agent_id` も同じ。`exec` / `chtkn`: 同じ `nonce` を再利用した。`chkey`: 旧ツールサーバの署名が不正(存在しない `toolserver_id` も同じ)、または、新しい公開鍵の署名が不正(この場合は、`detail` が `invalid signature of the new public key`) |
-| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録)。`tools` / `exec`: AIエージェントが未承認。`exec`: 使用できないツール(権限ありません)、またはツールサーバが403/401を返した。`chkey` / `chtkn`: ツールサーバが承認済みではない(`chtkn` は、登録されていない鍵も同じ) |
-| 404 | `toolserver_id` / `agent_id` が存在しない。`chtkn`: そのツールサーバのツールが存在しない(別のツールサーバのツールも同じ) |
-| 409 | すでに登録済み(同じ公開鍵、同じ `agent_id`、同じ `[ツールエンドポイント, AIエージェント]`)、または `revoked` を承認しようとした。`chkey`: 新しい公開鍵が、すでに登録されている(現在の公開鍵と同じ場合を含む) |
+| 401 | 署名が不正、または `signed_at` が許容範囲を超えてずれている(時刻同期を確認)。`tools` / `exec`: 存在しない `agent_id` も同じ。`exec` / `chtkn`: 同じ `nonce` を再利用した。`replace/*`: 旧ツールサーバ(または管理者)の署名が不正(存在しない `toolserver_id` も同じ)。`replace/activate`: 新しい公開鍵の署名が不正(この場合は、`detail` が `invalid signature of the new public key`) |
+| 403 | 承認系: 署名した鍵が、`tbl_admin` に登録された有効な管理者の鍵ではない。`addtool`: ツールサーバまたはAIエージェントが未承認(`pending` / `revoked` / 未登録)。`tools` / `exec`: AIエージェントが未承認。`exec`: 使用できないツール(権限ありません)、またはツールサーバが403/401を返した。`replace/reserve`: 署名した鍵が管理者の鍵ではない。`replace/activate`: 旧ツールサーバがアクティブではない。`chtkn`: ツールサーバがアクティブ(承認済み)ではない(登録されていない鍵も同じ) |
+| 404 | `toolserver_id` / `agent_id` が存在しない(`replace/reserve` は、管理者にだけ、旧ツールサーバが存在しないことを伝える)。`chtkn`: そのツールサーバのツールが存在しない(別のツールサーバのツールも同じ) |
+| 409 | すでに登録済み(同じ公開鍵、同じ `agent_id`、同じ `[ツールエンドポイント, AIエージェント]`)、または `revoked` を承認しようとした。`replace/*`: いまの状態では、リプレースできない(旧がアクティブではない、予約が無い・期限切れ、待機中ではない、など。`detail` に理由が入る)。`replace/reserve`: 新しい公開鍵が、すでに登録されている |
 | 422 | リクエストの形式が不正(公開鍵や署名のBase64が不正、メールアドレスの形式が不正、項目の過不足、`agent_id` に使えない文字、`params_schema` が不正など)。`exec`: paramsが、ツールの `params_schema` に合っていない(`errors` に詳細) |
 | 429 | 初回登録APIのレート制限を超えた。`Retry-After` の秒数が経ってから再試行する |
 | 502 | `exec`: ツールサーバに接続できない、5xx/3xxを返した、応答が大きすぎる |
@@ -492,7 +526,7 @@ python provisional_client.py agent-chtkn --agent-id agent-1 --endpoint psql_mana
 - **ロールごとに別のツールエンドポイントとして登録します。** ツールエンドポイントはツールサーバで実際にコマンドを起動する受け口なので、`psql_manager` はツールサーバ側で部長ロールの認証情報、`psql_terminal_admin` は端末管理者ロールの認証情報に対応づけます。AIエージェントはツール一覧の `context`(説明)を見てツールを選ぶので、ロールでできること・できないことを具体的に書いてください。
 - **初回登録のAPIは、誰でも呼べます。** 承認待ちになるだけで権限は付きませんが、悪意のある登録を承認してしまうと、その鍵を持つ相手にツールやAIエージェントとしての権限を与えてしまいます。承認前に、5.3 の確認を必ず行ってください。
 - **承認済みのツールサーバは、承認済みの任意のAIエージェントにツールを追加できます。** 現状は、AIエージェント提供者の同意を確認する仕組みはありません。
-- **`chkey` は、管理者の承認なしに、公開鍵を更新できます。** そのため、**旧ツールサーバの秘密鍵が漏れると、攻撃者は、自分の鍵に更新して、そのツールサーバのツールを乗っ取れます**(新ツールサーバの署名は、攻撃者が自分の鍵で作れるため)。旧ツールサーバの秘密鍵の保管には、注意してください。乗っ取りが分かった場合は、管理者が `revoked` にします(`chkey` で `revoked` から復帰することはできません)。
+- **ツールサーバのリプレース(`activate` / `rollback`)は、管理者の操作なしに行えますが、送り先は、管理者が事前に承認した(実行URL, 公開鍵)の間に限られます。** 旧ツールサーバの秘密鍵が漏れても、攻撃者は、管理者が予約した送り先にしか、切り替えられません(予約された新ツールサーバの鍵も、必要です)。ただし、**予約や待機の期限の間は、承認済みの送り先へ切り替えられる**ので、不要になった予約は、早めに取り消してください(取り消しAPIは未実装のため、SQLで `status` を `revoked` にします)。乗っ取りが分かった場合は、管理者が `revoked` にします(`revoked` や `pending` のツールサーバは、リプレースできません)。
 - **`revoked` は、直ちに効きます。** ツールサーバが `revoked` になると、そのツールサーバのツールは、`addtool` だけでなく、一覧にも出なくなり、実行もできなくなります。AIエージェントが `revoked` になった場合も、一覧・実行ができなくなります。`revoked` にするAPIはまだ無く、SQLで更新します(`UPDATE tbl_tool_server SET status = 'revoked' WHERE id = 1;`)。
 - **ツールサーバの実行URLは、管理者が承認時に確認します。** CaPassサーバは、承認されたURLへ、ツール代理トークン付きでリクエストを送ります。URLが正しいツールサーバのものか(別のホストや、内部の管理用URLを指していないか)を、承認前に必ず確認してください。リダイレクトは追いません。
 - **ツール実行は、nonceで再送を防いでいますが、署名時刻の許容範囲内では、nonceの記録がDBに残ります。** 期限切れの記録は、次の `exec` のときに削除されます。
@@ -503,7 +537,7 @@ python provisional_client.py agent-chtkn --agent-id agent-1 --endpoint psql_mana
 |---|---|
 | `provisional_client.py keygen` | CaPassクライアントの `keygen` |
 | `provisional_client.py *-register` / `agent-addtool` | CaPassクライアントの `regist` など |
-| `provisional_client.py toolserver-chkey-prepare` / `toolserver-chkey` | CaPassクライアントの `chkey` |
+| `provisional_client.py toolserver-replace-*` | CaPassクライアントの `chkey`(リプレース。reserve は管理者用CLI) |
 | `provisional_client.py agent-chtkn` | CaPassクライアントの `chtkn`(ツールサーバの定期更新ジョブから呼ぶ) |
 | `provisional_client.py agent-tools` / `agent-exec` | CaPassクライアントの `list executable` / `exec` |
 | `provisional_client.py *-approve` | 管理者用のCLI |

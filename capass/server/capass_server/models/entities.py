@@ -30,6 +30,9 @@ class ApprovalStatus(str, enum.Enum):
     PENDING = "pending"  # 承認待ち(初回登録直後)
     APPROVED = "approved"  # 承認済み(CaPassサーバ管理者が承認)
     REVOKED = "revoked"  # 却下・失効
+    # ---- ツールサーバのリプレース用 ----
+    RESERVED = "reserved"  # 管理者が事前に承認した、後継のツールサーバ(まだ使われていない)。期限(status_expires_at)がある
+    STANDBY = "standby"  # 切り替え後の、旧ツールサーバ(待機中)。期限(status_expires_at)まで、切り戻しできる
 
 
 class TblAdmin(Base):
@@ -46,7 +49,8 @@ class TblAdmin(Base):
 
 
 class TblToolServer(Base):
-    """ツールサーバ(公開鍵)の承認管理レコード。CaPassサーバ管理者が承認した公開鍵のみ、AIエージェントへのツール追加(addtool)が許可される。"""
+    """ツールサーバ(実行URLと公開鍵の組)の承認管理レコード。1行が、1台(1つの送り先)のツールサーバ。CaPassサーバ管理者が承認したものだけが、AIエージェントへのツール追加(addtool)を許可される。
+    ツール(tbl_agent_tool)は、このレコードのidを持つ。サーバの置き換えでは、後継のレコードを事前に承認(RESERVED)しておき、切り替え時に、ツールの持つidを付け替える(旧はSTANDBYになり、期限まで切り戻せる)。"""
 
     __tablename__ = "tbl_tool_server"
 
@@ -58,6 +62,10 @@ class TblToolServer(Base):
     applicant_email: Mapped[str] = mapped_column(String(EMAIL_MAX_LEN))  # 申請者メアド(申請者の自己申告。管理者が確認の連絡をするために使う)
     approver_email: Mapped[str | None] = mapped_column(String(EMAIL_MAX_LEN), default=None)  # 承認者メアド(承認した管理者のadmin_email)
     status: Mapped[str] = mapped_column(String(STATUS_MAX_LEN), default=ApprovalStatus.PENDING.value)
+    # 後継として予約(reserve)されたレコードが、置き換える対象(旧ツールサーバ)のid。管理者が承認するのは、この「旧→新」の遷移
+    replaces_tool_server_id: Mapped[int | None] = mapped_column(ForeignKey("tbl_tool_server.id"), default=None, index=True)
+    # RESERVED(予約の期限)、STANDBY(切り戻しできる期限)のときの期限。期限を過ぎたら、そのステータスは無効(使えない)
+    status_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
@@ -99,10 +107,8 @@ class TblAgentTool(Base):
     tool_proxy_token_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     tool_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     locked: Mapped[bool] = mapped_column(Boolean, default=False)
-    # tbl_tool_serverで承認済みの公開鍵のみ登録できる。公開鍵の更新(chkey)は、onupdate=CASCADEでこの列にも伝播する
-    tool_server_public_key: Mapped[str] = mapped_column(
-        String(PUBLIC_KEY_MAX_LEN), ForeignKey("tbl_tool_server.tool_server_public_key", onupdate="CASCADE"), index=True
-    )
+    # このツールを提供するツールサーバ(の、いまの送り先)。承認済みのツールサーバだけが登録できる。ツールサーバのリプレースで、付け替えられる
+    tool_server_id: Mapped[int] = mapped_column(ForeignKey("tbl_tool_server.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

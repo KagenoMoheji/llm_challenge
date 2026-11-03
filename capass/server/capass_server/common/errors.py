@@ -182,3 +182,10 @@ class ToolNotFoundError(ServiceError):
 
     def __init__(self) -> None:
         super().__init__("tool not found")
+
+
+class ReplacementNotAllowedError(ServiceError):
+    """ツールサーバのリプレース(reserve / activate / rollback)を、いまの状態では行えない(409相当)。reasonに理由を入れる。"""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"replacement is not allowed: {reason}")

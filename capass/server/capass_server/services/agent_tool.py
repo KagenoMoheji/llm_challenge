@@ -78,7 +78,7 @@ def add_tool_to_agent(db: Session, agent_id: str, req: AgentAddToolRequest) -> T
         tool_proxy_token_updated_at=now,
         tool_used_at=None,
         locked=False,
-        tool_server_public_key=req.tool_server_public_key,
+        tool_server_id=tool_server.id,
         created_at=now,
     )
     try:
@@ -174,7 +174,7 @@ def change_tool_token(db: Session, agent_id: str, tool_endpoint: str, req: Agent
     consume_request_nonce(db, agent_id, req.nonce, req.signed_at)
 
     agent_tool = mappers.find_tbl_agent_tool(db, tool_endpoint, agent_id)
-    if agent_tool is None or agent_tool.tool_server_public_key != req.tool_server_public_key:
+    if agent_tool is None or agent_tool.tool_server_id != tool_server.id:
         raise ToolNotFoundError()
 
     agent_tool.tool_proxy_token_encrypted = encrypt_token(req.tool_proxy_token)

@@ -29,14 +29,24 @@ from capass_server.schemas.agent import (
 from capass_server.schemas.approve import ApproveRequest
 from capass_server.schemas.tool_server import (
     ToolServerApproveResponse,
-    ToolServerChangeKeyRequest,
-    ToolServerChangeKeyResponse,
     ToolServerRegisterRequest,
     ToolServerRegisterResponse,
+    ToolServerReplaceActivateRequest,
+    ToolServerReplaceReserveRequest,
+    ToolServerReplaceReserveResponse,
+    ToolServerReplaceResponse,
+    ToolServerReplaceRollbackRequest,
 )
 from capass_server.services.agent import approve_agent, register_agent
 from capass_server.services.agent_tool import add_tool_to_agent, change_tool_token, exec_agent_tool, list_executable_tools
-from capass_server.services.tool_server import approve_tool_server, change_tool_server_key, register_tool_server
+from capass_server.services.tool_server import (
+    ReplacementResult,
+    activate_tool_server_replacement,
+    approve_tool_server,
+    register_tool_server,
+    reserve_tool_server_replacement,
+    rollback_tool_server_replacement,
+)
 
 router = APIRouter()
 
@@ -73,17 +83,47 @@ def toolservers_approve(toolserver_id: int, req: ApproveRequest, db: Session = D
     )
 
 
-@router.post("/toolservers/{toolserver_id}/chkey", response_model=ToolServerChangeKeyResponse)
-def toolservers_chkey(toolserver_id: int, req: ToolServerChangeKeyRequest, db: Session = Depends(get_db)) -> ToolServerChangeKeyResponse:
-    """ツールサーバのリプレース(公開鍵の更新)。旧ツールサーバと新ツールサーバの、両方の署名が必要(CaPassクライアントの「chkey」から呼ばれる)。
-    承認済みのツールサーバの公開鍵を、新しい公開鍵に更新する。管理者の承認のやり直しは不要。実行URLは変わらない。"""
-    tool_server = change_tool_server_key(db, toolserver_id, req)
-    return ToolServerChangeKeyResponse(
-        toolserver_id=tool_server.id,
-        tool_server_name=tool_server.tool_server_name,
-        tool_server_public_key=tool_server.tool_server_public_key,
-        status=tool_server.status,
+def _replace_response(result: ReplacementResult) -> ToolServerReplaceResponse:
+    return ToolServerReplaceResponse(
+        active_toolserver_id=result.active.id,
+        active_tool_server_exec_url=result.active.exec_url,
+        standby_toolserver_id=result.standby.id,
+        standby_until=result.standby_until,
+        moved_tools=result.moved_tools,
     )
+
+
+# ---------- ツールサーバのリプレース(事前承認 → 切り替え → 切り戻し) ----------
+@router.post("/toolservers/{toolserver_id}/replace/reserve", status_code=201, response_model=ToolServerReplaceReserveResponse)
+def toolservers_replace_reserve(toolserver_id: int, req: ToolServerReplaceReserveRequest, db: Session = Depends(get_db)) -> ToolServerReplaceReserveResponse:
+    """ツールサーバのリプレース(1/3: 予約)。CaPassサーバ管理者が、新ツールサーバ(実行URLと公開鍵)を、旧ツールサーバ({toolserver_id})の後継として、事前に承認する。
+    管理者の署名が必要。予約には期限があり、期限内に、切り替え(activate)する。"""
+    successor = reserve_tool_server_replacement(db, toolserver_id, req)
+    return ToolServerReplaceReserveResponse(
+        toolserver_id=successor.id,
+        replaces_toolserver_id=toolserver_id,
+        tool_server_name=successor.tool_server_name,
+        tool_server_exec_url=successor.exec_url,
+        tool_server_public_key=successor.tool_server_public_key,
+        applicant_email=successor.applicant_email,
+        approver_email=successor.approver_email,
+        status=successor.status,
+        reserved_until=successor.status_expires_at,
+    )
+
+
+@router.post("/toolservers/{toolserver_id}/replace/activate", response_model=ToolServerReplaceResponse)
+def toolservers_replace_activate(toolserver_id: int, req: ToolServerReplaceActivateRequest, db: Session = Depends(get_db)) -> ToolServerReplaceResponse:
+    """ツールサーバのリプレース(2/3: 切り替え)。予約済みの新ツールサーバへ、ツールを切り替える。旧ツールサーバ({toolserver_id})と新ツールサーバの、両方の署名が必要。
+    旧ツールサーバは待機中(standby)になり、期限内なら、切り戻し(rollback)できる。管理者の操作は不要(事前に承認済みの送り先にだけ、切り替えられる)。"""
+    return _replace_response(activate_tool_server_replacement(db, toolserver_id, req))
+
+
+@router.post("/toolservers/{toolserver_id}/replace/rollback", response_model=ToolServerReplaceResponse)
+def toolservers_replace_rollback(toolserver_id: int, req: ToolServerReplaceRollbackRequest, db: Session = Depends(get_db)) -> ToolServerReplaceResponse:
+    """ツールサーバのリプレース(3/3: 切り戻し)。待機中(standby)の旧ツールサーバ({toolserver_id})へ、ツールを戻す。旧ツールサーバの署名だけでよい。
+    新ツールサーバは待機中になり、期限内なら、再度、切り替え(activate)できる。"""
+    return _replace_response(rollback_tool_server_replacement(db, toolserver_id, req))
 
 
 # ---------- AIエージェント(公開鍵)の初回登録と承認 ----------

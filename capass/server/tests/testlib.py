@@ -13,18 +13,21 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import base64
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from sqlalchemy import select
 from capass_server.common.crypto import encrypt_token
 from capass_server.common.signature import (
     SIGN_CONTEXT_AGENT_CHTKN,
     SIGN_CONTEXT_AGENT_EXEC,
     SIGN_CONTEXT_AGENT_LISTTOOLS,
     SIGN_CONTEXT_AGENT_REGISTER,
-    SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW,
-    SIGN_CONTEXT_TOOLSERVER_CHKEY_OLD,
     SIGN_CONTEXT_TOOLSERVER_REGISTER,
+    SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW,
+    SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_OLD,
+    SIGN_CONTEXT_TOOLSERVER_REPLACE_RESERVE,
+    SIGN_CONTEXT_TOOLSERVER_REPLACE_ROLLBACK,
     build_signing_message,
 )
 from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblAgentTool, TblToolServer
@@ -32,6 +35,7 @@ from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, Tb
 APPLICANT_EMAIL = "applicant@example.com"
 ADMIN_EMAIL = "admin@example.com"
 EXEC_URL = "https://toolserver.example.com/capass/exec"
+NEW_EXEC_URL = "https://new-toolserver.example.com/capass/exec"
 # テスト用のparamsのスキーマ(JSON Schema)。sqlパラメータ(文字列、必須)だけを受け付ける
 PARAMS_SCHEMA = {
     "type": "object",
@@ -75,16 +79,39 @@ def exec_body(agent_priv: Ed25519PrivateKey, agent_id: str, tool_endpoint: str, 
     return signed_body(agent_priv, SIGN_CONTEXT_AGENT_EXEC, fields, path_params={"agent_id": agent_id, "tool_endpoint": tool_endpoint}, signed_at=signed_at)
 
 
-def chkey_body(old_priv: Ed25519PrivateKey, new_priv: Ed25519PrivateKey, toolserver_id: int, signed_at: int | None = None, old_context: bytes = SIGN_CONTEXT_TOOLSERVER_CHKEY_OLD, new_context: bytes = SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW) -> dict:
-    """ツールサーバのリプレース(chkey)のボディを作る。旧・新の鍵が、同じ内容(旧公開鍵・新公開鍵・toolserver_id・signed_at)に、それぞれ署名する。"""
+def _sign(priv: Ed25519PrivateKey, sign_context: bytes, payload: dict) -> str:
+    return base64.b64encode(priv.sign(build_signing_message(sign_context, payload))).decode()
+
+
+def replace_reserve_body(admin_priv: Ed25519PrivateKey, predecessor_id: int, new_priv: Ed25519PrivateKey, name: str = "新ツールサーバ", exec_url: str = NEW_EXEC_URL, email: str = APPLICANT_EMAIL, signed_at: int | None = None) -> dict:
+    """ツールサーバのリプレース(予約)のボディ。管理者の秘密鍵で署名する。"""
+    fields = {
+        "admin_public_key": pub_b64(admin_priv),
+        "new_tool_server_public_key": pub_b64(new_priv),
+        "new_tool_server_name": name,
+        "new_tool_server_exec_url": exec_url,
+        "applicant_email": email,
+    }
+    return signed_body(admin_priv, SIGN_CONTEXT_TOOLSERVER_REPLACE_RESERVE, fields, path_params={"toolserver_id": predecessor_id}, signed_at=signed_at)
+
+
+def replace_activate_body(old_priv: Ed25519PrivateKey, new_priv: Ed25519PrivateKey, predecessor_id: int, signed_at: int | None = None, old_context: bytes = SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_OLD, new_context: bytes = SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW) -> dict:
+    """ツールサーバのリプレース(切り替え)のボディ。旧・新の鍵が、同じ内容(toolserver_id・旧公開鍵・新公開鍵・signed_at)に、それぞれ署名する。"""
     at = int(time.time()) if signed_at is None else signed_at
-    payload = {"toolserver_id": toolserver_id, "old_tool_server_public_key": pub_b64(old_priv), "new_tool_server_public_key": pub_b64(new_priv), "signed_at": at}
+    payload = {"toolserver_id": predecessor_id, "old_tool_server_public_key": pub_b64(old_priv), "new_tool_server_public_key": pub_b64(new_priv), "signed_at": at}
     return {
         "new_tool_server_public_key": pub_b64(new_priv),
         "signed_at": at,
-        "signature": base64.b64encode(old_priv.sign(build_signing_message(old_context, payload))).decode(),
-        "new_key_signature": base64.b64encode(new_priv.sign(build_signing_message(new_context, payload))).decode(),
+        "signature": _sign(old_priv, old_context, payload),
+        "new_key_signature": _sign(new_priv, new_context, payload),
     }
+
+
+def replace_rollback_body(old_priv: Ed25519PrivateKey, predecessor_id: int, signed_at: int | None = None) -> dict:
+    """ツールサーバのリプレース(切り戻し)のボディ。切り戻し先の、旧ツールサーバの秘密鍵だけで署名する。"""
+    at = int(time.time()) if signed_at is None else signed_at
+    payload = {"toolserver_id": predecessor_id, "tool_server_public_key": pub_b64(old_priv), "signed_at": at}
+    return {"signed_at": at, "signature": _sign(old_priv, SIGN_CONTEXT_TOOLSERVER_REPLACE_ROLLBACK, payload)}
 
 
 def chtkn_body(tool_server_priv: Ed25519PrivateKey, agent_id: str, tool_endpoint: str, token: str = "new-proxy-token", nonce: str | None = None, signed_at: int | None = None) -> dict:
@@ -105,18 +132,29 @@ def seed_admin(session_factory, priv: Ed25519PrivateKey, email: str = ADMIN_EMAI
         db.commit()
 
 
-def seed_tool_server(session_factory, priv: Ed25519PrivateKey, status: ApprovalStatus = ApprovalStatus.APPROVED, name: str = "test-tool-server") -> int:
-    """tbl_tool_serverにレコードを直接登録する(登録API/承認APIを経由しない前提データ作成用)。idを返す。"""
+def seed_tool_server(
+    session_factory,
+    priv: Ed25519PrivateKey,
+    status: ApprovalStatus = ApprovalStatus.APPROVED,
+    name: str = "test-tool-server",
+    exec_url: str = EXEC_URL,
+    replaces_tool_server_id: int | None = None,
+    expires_in_sec: int | None = None,
+) -> int:
+    """tbl_tool_serverにレコードを直接登録する(登録API/承認APIを経由しない前提データ作成用)。idを返す。
+    expires_in_secは、RESERVED/STANDBYの期限(現在からの秒数。負の値は、期限切れ)。"""
     now = datetime.now(timezone.utc)
-    approved = status == ApprovalStatus.APPROVED
+    approved = status in (ApprovalStatus.APPROVED, ApprovalStatus.RESERVED, ApprovalStatus.STANDBY)
     with session_factory() as db:
         row = TblToolServer(
             tool_server_public_key=pub_b64(priv),
             tool_server_name=name,
-            exec_url=EXEC_URL,
+            exec_url=exec_url,
             applicant_email=APPLICANT_EMAIL,
             approver_email=ADMIN_EMAIL if approved else None,
             status=status.value,
+            replaces_tool_server_id=replaces_tool_server_id,
+            status_expires_at=None if expires_in_sec is None else now + timedelta(seconds=expires_in_sec),
             created_at=now,
             approved_at=now if approved else None,
         )
@@ -146,9 +184,10 @@ def seed_agent(session_factory, priv: Ed25519PrivateKey, agent_id: str = "agent-
 
 
 def seed_agent_tool(session_factory, agent_id: str, tool_endpoint: str, tool_server_priv: Ed25519PrivateKey, token: str = "proxy-token-1", context: str = "テスト用のツール", locked: bool = False, params_schema: dict | None = None) -> None:
-    """tbl_agent_toolにレコードを直接登録する(addtool APIを経由しない前提データ作成用)。トークンは暗号化して保存する。"""
+    """tbl_agent_toolにレコードを直接登録する(addtool APIを経由しない前提データ作成用)。トークンは暗号化して保存する。ツールサーバ(tool_server_priv)は、先に、seed_tool_serverで登録しておく。"""
     now = datetime.now(timezone.utc)
     with session_factory() as db:
+        tool_server_id = db.execute(select(TblToolServer.id).where(TblToolServer.tool_server_public_key == pub_b64(tool_server_priv))).scalar_one()
         db.add(
             TblAgentTool(
                 tool_endpoint=tool_endpoint,
@@ -159,7 +198,7 @@ def seed_agent_tool(session_factory, agent_id: str, tool_endpoint: str, tool_ser
                 tool_proxy_token_updated_at=now,
                 tool_used_at=None,
                 locked=locked,
-                tool_server_public_key=pub_b64(tool_server_priv),
+                tool_server_id=tool_server_id,
                 created_at=now,
             )
         )

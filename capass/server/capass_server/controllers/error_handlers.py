@@ -28,6 +28,7 @@ _STATUS_BY_ERROR: list[tuple[type[errors.ServiceError], int]] = [
     (errors.DuplicateAgentError, 409),
     (errors.DuplicateAgentToolError, 409),
     (errors.InvalidApprovalStateError, 409),
+    (errors.ReplacementNotAllowedError, 409),
     (errors.RateLimitExceededError, 429),
     (errors.ToolServerUnavailableError, 502),
     (errors.ToolServerBadResponseError, 502),

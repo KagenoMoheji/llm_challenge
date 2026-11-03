@@ -17,7 +17,7 @@ from sqlalchemy import select
 from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC, TOKEN_MAX_AGE_SEC
 from capass_server.common.crypto import decrypt_token
 from capass_server.common.signature import SIGN_CONTEXT_AGENT_ADDTOOL
-from capass_server.models.entities import ApprovalStatus, TblAgentTool
+from capass_server.models.entities import ApprovalStatus, TblAgentTool, TblToolServer
 from testlib import PARAMS_SCHEMA, pub_b64, seed_agent, seed_tool_server, signed_body
 
 
@@ -59,7 +59,8 @@ def test_addtool_ok(client, session_factory):
         row = db.execute(select(TblAgentTool)).scalar_one()
         assert row.locked is False
         assert row.tool_used_at is None
-        assert row.tool_server_public_key == pub_b64(ts_priv)
+        tool_server = db.execute(select(TblToolServer).where(TblToolServer.tool_server_public_key == pub_b64(ts_priv))).scalar_one()
+        assert row.tool_server_id == tool_server.id  # ツールは、ツールサーバのid(tbl_tool_server.id)を持つ
         assert row.params_schema == PARAMS_SCHEMA  # paramsのスキーマも保存される
         # トークンは暗号化して保存され、復号すると元の平文に戻る
         assert row.tool_proxy_token_encrypted != "proxy-token-1"
