@@ -4,6 +4,9 @@
 
 MonoMD is a unique Markdown parser that ensures each symbol has a distinct purpose, eliminating redundancy in syntax. Unlike traditional Markdown parsers that allow multiple ways to express the same formatting (like `*italic*` and `_italic_`), MonoMD assigns each symbol its own specific role.
 
+## Quick try app
+https://kagenomoheji.github.io/llm_challenge/monomd/workspace/sample.html
+
 ## 🎯 Philosophy
 
 **Every symbol has its own unique role:**
