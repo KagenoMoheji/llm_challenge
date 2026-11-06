@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{cspSource}} https: data:; style-src {{cspSource}} 'unsafe-inline' https://cdnjs.cloudflare.com; font-src {{cspSource}} https://cdnjs.cloudflare.com; script-src {{cspSource}} 'unsafe-inline';">
+    <title>テスト仕様書エディター</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style id="monomd-css"></style>
+    <link rel="stylesheet" href="{{appCssUri}}">
+    <script src="{{monomdUri}}"></script>
+</head>
+<body>
+    <div class="toolbar">
+        <button id="clearBtn">🗑️ すべてクリア</button>
+        <button id="importBtn">📂 インポート</button>
+        <button id="exportBtn">💾 エクスポート</button>
+        <button id="addNodeBtn">➕ ノード追加</button>
+        <button id="helpBtn">📝 操作方法</button>
+    </div>
+    
+    <!-- ハンバーガーメニュー（スマホ・狭い画面版） -->
+    <button class="hamburger-btn" id="hamburgerBtn"><i class="fas fa-bars"></i> メニュー</button>
+    <div class="menu-overlay" id="menuOverlay"></div>
+    <div class="hamburger-menu" id="hamburgerMenu">
+        <button id="clearBtnMobile">🗑️ すべてクリア</button>
+        <button id="importBtnMobile">📂 インポート</button>
+        <button id="exportBtnMobile">💾 エクスポート</button>
+        <button id="addNodeBtnMobile">➕ ノード追加</button>
+        <button id="helpBtnMobile">📝 操作方法</button>
+    </div>
+    
+    <input type="file" id="fileInput" accept=".tsv,.json" style="display: none;">
+
+    <!-- 操作方法モーダル -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📝 操作方法</h3>
+                <button class="modal-close" id="modalCloseBtn">×</button>
+            </div>
+            <div class="modal-body">
+                <ul>
+                    <li>ノードをドラッグして移動</li>
+                    <li>ノードの4辺をドラッグでリサイズ</li>
+                    <li>テストケースIDをクリックして編集</li>
+                    <li>種別で正常系/異常系を選択</li>
+                    <li>ステータスでノードの見た目が変化</li>
+                    <li>マークダウン部分をダブルクリックで編集</li>
+                    <li>編集中は外側クリックで自動保存</li>
+                    <li>ノードの4方向の点をクリックして接続</li>
+                    <li>ノードを右クリックで削除</li>
+                    <li>接続線を右クリックで削除</li>
+                    <li>背景をドラッグして全体移動</li>
+                    <li>マウスホイールでキャンバス操作、ピンチで拡大縮小</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas">
+        <div id="canvas-content">
+            <svg id="svg"></svg>
+        </div>
+    </div>
+
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item delete" id="deleteNode">🗑️ ノードを削除</div>
+        <div class="context-menu-item delete" id="deleteConnection">🗑️ 接続を削除</div>
+    </div>
+
+    <!-- エクスポートメニュー（モーダル） -->
+    <div class="export-modal-overlay" id="exportModal">
+        <div class="export-modal-content">
+            <div class="export-modal-header">
+                <h4>📥 エクスポート形式を選択</h4>
+                <button class="export-modal-close" id="exportModalCloseBtn">×</button>
+            </div>
+            <div class="export-modal-body">
+                <button id="exportTsvBtn">📄 TSV形式</button>
+                <button id="exportJsonBtn">📋 JSON形式</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 画像拡大表示モーダル -->
+    <div class="image-modal-overlay" id="imageModal">
+        <button class="image-modal-close" id="imageModalCloseBtn">×</button>
+        <img class="image-modal-content" id="imageModalImg" src="" alt="">
+    </div>
+
+    <script src="{{appJsUri}}"></script>
+</body>
+</html>

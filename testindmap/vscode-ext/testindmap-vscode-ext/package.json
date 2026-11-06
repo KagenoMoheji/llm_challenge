@@ -1,0 +1,57 @@
+{
+  "name": "testindmap",
+  "displayName": "Testindmap - Test Specification Mindmap",
+  "description": "テスト仕様書をマインドマップ形式でビジュアル作成・編集できるVSCode拡張機能",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "testindmap.new",
+        "title": "Testindmap: 新規テスト仕様書マインドマップを作成 (Create New Mindmap)",
+        "category": "Testindmap"
+      },
+      {
+        "command": "testindmap.open",
+        "title": "Testindmap: テスト仕様書マインドマップを開く (Open Mindmap File)",
+        "category": "Testindmap"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "testindmap.editor",
+        "displayName": "Testindmap Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.testmap.json"
+          },
+          {
+            "filenamePattern": "*.testindmap.json"
+          },
+          {
+            "filenamePattern": "*.testmap.tsv"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "testindmap.new"
+        },
+        {
+          "command": "testindmap.open"
+        }
+      ]
+    }
+  }
+}
