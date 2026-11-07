@@ -241,9 +241,10 @@ body, html {
     right: 0;
     bottom: 0;
     display: flex;
+    overflow: hidden;
 }
 
-/* キャンバス */
+/* キャンバス（サイドバー開閉に応じて画面右端まで自動拡張） */
 #canvas-wrapper {
     flex: 1;
     height: 100%;
@@ -529,20 +530,21 @@ body, html {
     filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.7));
 }
 
-/* サイドバー */
+/* サイドバー（margin-rightでスムーズにスライドアウトし、キャンバス幅を拡張） */
 #sidebar {
     width: 330px;
+    min-width: 330px;
     background: var(--panel-bg);
     backdrop-filter: blur(12px);
     border-left: 1px solid var(--panel-border);
     display: flex;
     flex-direction: column;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 90;
 }
 
 #sidebar.collapsed {
-    transform: translateX(100%);
+    margin-right: -330px;
 }
 
 .sidebar-header {
@@ -603,21 +605,15 @@ body, html {
     gap: 3px;
 }
 
-/* 画面右下コントロール */
+/* 画面右下コントロール（キャンバスラッパー基準で常に右下に固定配置） */
 .controls-overlay {
     position: absolute;
     bottom: 24px;
-    right: 350px;
+    right: 24px;
     display: flex;
     flex-direction: column;
     gap: 8px;
     z-index: 80;
-    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-#sidebar.collapsed ~ .controls-overlay,
-.controls-overlay.shifted {
-    right: 24px;
 }
 
 .control-btn {
@@ -702,7 +698,6 @@ body, html {
     backdrop-filter: blur(6px);
     display: flex;
     align-items: center;
-    justify-content: space-between;
     justify-content: center;
     z-index: 200;
 }

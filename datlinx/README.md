@@ -1,13 +1,13 @@
 # datlinx (DATa LIneage lyNX)
 
-`CREATE PROCEDURE` / `CREATE FUNCTION` / `CREATE VIEW` のSQLファイルの `FROM/JOIN` を解析し、依存関係マップ（データリネージ・マインドマップ）の生成・検索を行うシングルファイル静的Webアプリケーションです。
+`CREATE PROCEDURE` / `CREATE FUNCTION` / `CREATE VIEW` のSQLファイルの `FROM/JOIN` を解析し、依存関係マップ（データリネージ・マインドマップ）の生成・検索を行うツールです。
 
 ---
 
 ## 🌟 主な機能
 
 - **[1] SQLフォルダ・ファイル入力**:
-  - `CREATE PROCEDURE` / `CREATE FUNCTION` / `CREATE VIEW` のDDLが書かれた `*.sql` ファイル群をまとめたフォルダを一括読み込み（`<input webkitdirectory>` およびドラッグ＆ドロップ対応）。
+  - `CREATE PROCEDURE` / `CREATE FUNCTION` / `CREATE VIEW` のDDLが書かれた `*.sql` ファイル群をまとめたフォルダを一括読み込み（`<input webkitdirectory>`、エクスプローラー右クリック、ドラッグ＆ドロップ対応）。
   - サンプルSQL (10件) をボタン一つで即座に読み込めるデモ機能内蔵。
 - **[2] 依存関係マインドマップ自動描画**:
   - 指定された正規表現パターンに基づき、SQL内の `FROM` / `JOIN` 節から依存元のテーブル名・プロシージャ名・ビュー名を抽出。
@@ -26,39 +26,37 @@
 
 ---
 
-## 🚀 クイックスタート
+## Quick try app
+https://kagenomoheji.github.io/llm_challenge/testindmap/index.html
 
-1. ブラウザ（Google Chrome, Edge 等）で `index.html` をダブルクリックして開きます。
-2. 画面上部の **「📂 フォルダを開く」** から `sample` フォルダを選択するか、キャンバス中央の **「🧪 サンプルSQL (10件) で試す」** をクリックします。
-3. 自動的に依存関係マインドマップが生成・描画されます。
-
----
-
-## 📁 サンプルデータ (`sample/`)
-
-本プロジェクトには、検証・動作確認用として `sample/` フォルダ内に10個のSQLファイルを用意しています。
-
-| ファイル名 | 種別 | 依存元 (FROM / JOIN) |
-| :--- | :--- | :--- |
-| `v_active_users.sql` | VIEW | `m_users` |
-| `v_order_details.sql` | VIEW | `dbo.t_orders`, `dbo.t_order_items`, `dbo.m_products` |
-| `v_user_order_summary.sql` | VIEW | `v_active_users`, `v_order_details` |
-| `v_low_stock_products.sql` | VIEW | `m_products`, `t_inventory` |
-| `fn_get_user_discount.sql` | FUNCTION | `dbo.v_user_order_summary` |
-| `sp_generate_monthly_sales_report.sql` | PROCEDURE | `dbo.v_order_details`, `dbo.v_user_order_summary` |
-| `sp_refresh_daily_kpi.sql` | PROCEDURE | `v_active_users`, `v_user_order_summary` |
-| `sp_inventory_alert.sql` | PROCEDURE | `v_low_stock_products` |
-| `sp_customer_churn_analysis.sql` | PROCEDURE | `v_active_users`, `t_orders` |
-| `sp_full_audit_process.sql` | PROCEDURE | `dbo.v_order_details`, `dbo.v_active_users`, `dbo.t_inventory` |
+## Quick try VSCode extention
+Download [the `.vsix` file](https://github.com/KagenoMoheji/llm_challenge/testindmap/dist/) and install it in VSCode.
+- **エクスプローラー右クリック**: 任意のSQLフォルダを右クリックして「`datlinx: SQLフォルダを解析してマインドマップを開く`」
+- **コマンドパレット (`Ctrl+Shift+P`)**:
+  - `datlinx: ワークスペースの全SQLを解析して開く`
+  - `datlinx: サンプルSQLデータで開く`
 
 ---
 
-## 🔍 抽出正規表現
+## 📁 ディレクトリ構成
 
-SQLファイル内の `FROM` / `JOIN` から参照先を抽出する正規表現パターン：
-
-```regex
-(FROM|JOIN)( ?
-.*| )(
-.*)?([a-zA-Z0-9]+\.)?(テーブル名|プロシージャ名|ビュー名)
+```text
+datlinx/
+├── index.html                       # 静的Webアプリ（シングルファイル版）
+├── README.md                        # 本ドキュメント
+├── sample/                          # 動作確認用サンプルSQL（10ファイル）
+└── vscode-ext/                      # VS Code拡張機能
+    ├── DEVELOPMENT.md               # 開発・デバッグ・パッケージ化ガイド
+    ├── .vscode/
+    │   └── launch.json              # F5デバッグ用設定
+    ├── dist/                        # .vsix 出力先
+    └── datlinx-vscode-ext/          # 拡張機能本体
+        ├── package.json             # 拡張機能マニフェスト
+        ├── extension.js             # メインプロセス（Vanilla JS）
+        ├── README.md                # 拡張機能説明書（エンドユーザー向け）
+        └── media/
+            ├── icon.svg             # アプリアイコン
+            ├── app.html             # Webview HTML
+            ├── app.css              # スタイルシート（3色ハイライト）
+            └── app.js               # Webview UIロジック
 ```

@@ -256,9 +256,10 @@
             right: 0;
             bottom: 0;
             display: flex;
+            overflow: hidden;
         }
 
-        /* キャンバス */
+        /* キャンバス（サイドバー開閉に応じて右端まで伸縮） */
         #canvas-wrapper {
             flex: 1;
             height: 100%;
@@ -424,7 +425,7 @@
             color: var(--node-selected-sub) !important;
         }
 
-        /* ハイライト以外の要素ディミング */
+        /* ディミング */
         .dimmed {
             opacity: 0.18 !important;
         }
@@ -544,20 +545,21 @@
             filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.7));
         }
 
-        /* サイドバー */
+        /* サイドバー（margin-rightでスムーズにスライドアウトし、キャンバス幅を拡張） */
         #sidebar {
             width: 330px;
+            min-width: 330px;
             background: var(--panel-bg);
             backdrop-filter: blur(12px);
             border-left: 1px solid var(--panel-border);
             display: flex;
             flex-direction: column;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 90;
         }
 
         #sidebar.collapsed {
-            transform: translateX(100%);
+            margin-right: -330px;
         }
 
         .sidebar-header {
@@ -618,21 +620,15 @@
             gap: 3px;
         }
 
-        /* 画面右下コントロール */
+        /* 画面右下コントロール（キャンバスラッパー基準で常に右下に固定配置） */
         .controls-overlay {
             position: absolute;
             bottom: 24px;
-            right: 350px;
+            right: 24px;
             display: flex;
             flex-direction: column;
             gap: 8px;
             z-index: 80;
-            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        #sidebar.collapsed ~ .controls-overlay,
-        .controls-overlay.shifted {
-            right: 24px;
         }
 
         .control-btn {
@@ -903,7 +899,6 @@
     <script>
         /**
          * サンプルSQLデータ (10ファイル)
-         * sample/ フォルダに用意したものと同じ内容
          */
         const SAMPLE_SQL_FILES = [
             {
@@ -1106,10 +1101,10 @@ END;`
          * 状態管理
          */
         const state = {
-            parsedFiles: [],      // 解析したSQLファイル一覧
-            nodes: new Map(),     // id -> nodeData
-            edges: [],            // { id, from, to }
-            selectedNodeId: null, // [4] 選択中ノード (依存解析の起点)
+            parsedFiles: [],
+            nodes: new Map(),
+            edges: [],
+            selectedNodeId: null, // [4] 選択中ノード
             searchQuery: "",      // [3] 検索クエリ
             zoom: 1,
             panX: 40,
@@ -1132,26 +1127,23 @@ END;`
         const sidebarFiles = document.getElementById('sidebar-files');
         const fileCountBadge = document.getElementById('file-count-badge');
         const sidebar = document.getElementById('sidebar');
-        const controlsOverlay = document.getElementById('controls-overlay');
 
         /**
          * コメントを除去するヘルパー（誤検知防止）
          */
         function stripSqlComments(sql) {
             return sql
-                .replace(/\/\*[\s\S]*?\*\//g, ' ') // 複数行コメント /* ... */
-                .replace(/--.*$/gm, ' ');          // 単一行コメント -- ...
+                .replace(/\/\*[\s\S]*?\*\//g, ' ')
+                .replace(/--.*$/gm, ' ');
         }
 
         /**
          * [2] SQLパーサー
-         * 要件で提示された正規表現の仕様:
          * (FROM|JOIN)( ?\n.*| )(\n.*)?([a-zA-Z0-9]+\.)?(テーブル名|プロシージャ名|ビュー名)
          */
         function parseSqlContent(fileName, sqlContent) {
             const cleanSql = stripSqlComments(sqlContent);
 
-            // 1. CREATE PROCEDURE / CREATE FUNCTION / CREATE VIEW で自身のオブジェクト名と種別を抽出
             const createRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?(?:DEFENDER\s+|SECURITY\s+DEFINER\s+)?(PROCEDURE|FUNCTION|VIEW)\s+(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/i;
             const matchCreate = cleanSql.match(createRegex);
 
@@ -1171,8 +1163,6 @@ END;`
                 else if (/^v_/i.test(baseName)) objType = 'VIEW';
             }
 
-            // 2. 要件の正規表現:
-            // (FROM|JOIN)( ?\r?\n[ \t]*|[ \t]+)(?:\r?\n[ \t]*)?(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?
             const fromJoinRegex = /(?:\bFROM|\bJOIN)(?: ?\r?\n[ \t]*|[ \t]+)(?:\r?\n[ \t]*)?(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi;
             
             const dependencies = [];
@@ -1282,10 +1272,10 @@ END;`
                 if (targetNode) targetNode.inDegree++;
             });
 
-            // 4. トポロジカル階層（Level）の計算
+            // 4. トポロジカル階層計算
             computeNodeLevels();
 
-            // 5. 座標自動配置（ノード間マージンを十分に確保し、重なりを防止）
+            // 5. 座標自動配置
             layoutNodes();
 
             // 6. レンダリング
@@ -1325,15 +1315,13 @@ END;`
 
         /**
          * ノード自動配置レイアウト
-         * ノード同士の被り（重なり）を防止するため、水平・垂直マージンを十分に確保し、
-         * 各列ごとに上下中央揃えを行う。
          */
         function layoutNodes() {
-            const nodeWidth = 280; // ノードの横幅
-            const horizontalGap = 130; // ノード間の水平マージン
-            const colWidth = nodeWidth + horizontalGap; // 列全体の幅 (410px)
+            const nodeWidth = 280;
+            const horizontalGap = 130;
+            const colWidth = nodeWidth + horizontalGap; // 410px
 
-            const rowHeight = 150; // ノード縦間隔（ノード高さ約100px + 垂直マージン約50pxを確保して重なりを完全防止）
+            const rowHeight = 150; // ノード高さ約100px + 垂直マージン50px
             const startX = 80;
             const startY = 80;
 
@@ -1347,7 +1335,6 @@ END;`
 
             const typePriority = { 'TABLE': 0, 'VIEW': 1, 'FUNCTION': 2, 'PROCEDURE': 3 };
             
-            // 最大行数を求めて垂直方向の中央揃えを計算
             let maxCount = 0;
             levelGroups.forEach(nodes => {
                 if (nodes.length > maxCount) maxCount = nodes.length;
@@ -1362,7 +1349,6 @@ END;`
                     return a.name.localeCompare(b.name);
                 });
 
-                // 各列のノードを垂直方向中央にバランスよく配置
                 const colHeight = nodesInLevel.length * rowHeight;
                 const levelStartY = startY + Math.max(0, (maxColumnHeight - colHeight) / 2);
 
@@ -1374,7 +1360,7 @@ END;`
         }
 
         /**
-         * グラフのレンダリング (DOM + SVG)
+         * グラフのレンダリング
          */
         function renderGraph() {
             nodesLayer.innerHTML = '';
@@ -1388,14 +1374,12 @@ END;`
             }
             emptyState.classList.add('hidden');
 
-            // 1. ノード要素作成
             state.nodes.forEach(node => {
                 const nodeEl = createNodeElement(node);
                 nodesLayer.appendChild(nodeEl);
                 node.element = nodeEl;
             });
 
-            // 2. エッジ（ベジェ曲線）描画
             updateEdges();
         }
 
@@ -1442,13 +1426,7 @@ END;`
                 </div>
             `;
 
-            // [4] クリックで依存関係ハイライト (選択要素: 薄橙, 依存元: 薄緑, 依存先: 薄赤)
-            el.addEventListener('click', (e) => {
-                e.stopPropagation();
-                toggleNodeSelection(node.id);
-            });
-
-            // ドラッグ移動
+            // ドラッグ移動 & クリック（ドラッグ時は選択解除・トグルを防止）
             setupNodeDrag(el, node);
 
             return el;
@@ -1456,11 +1434,8 @@ END;`
 
         /**
          * [4] 依存関係の探索
-         * - 上流（依存元）: 選択ノードから親方向へ再帰的に探索
-         * - 下流（依存先）: 選択ノードから子方向へ再帰的に探索
          */
         function getLineageInfo(targetNodeId) {
-            // 1. 依存元 (Upstream)
             const upstreamNodeIds = new Set();
             const upstreamEdgeIds = new Set();
             const queueUp = [targetNodeId];
@@ -1477,7 +1452,6 @@ END;`
                 }
             }
 
-            // 2. 依存先 (Downstream)
             const downstreamNodeIds = new Set();
             const downstreamEdgeIds = new Set();
             const queueDown = [targetNodeId];
@@ -1505,8 +1479,6 @@ END;`
 
         /**
          * エッジ（ベジェ曲線）の更新
-         * - 依存元のエッジ: 緑色線 + 緑色矢印
-         * - 依存先のエッジ: 赤色線 + 赤色矢印
          */
         function updateEdges() {
             const lineage = state.selectedNodeId ? getLineageInfo(state.selectedNodeId) : null;
@@ -1539,12 +1511,10 @@ END;`
                 // [4] 色分けスタイル適用
                 if (lineage) {
                     if (lineage.upstreamEdgeIds.has(edge.id)) {
-                        // 依存元の線: 緑色
                         pathEl.classList.add('edge-upstream');
                         pathEl.classList.remove('edge-downstream', 'dimmed');
                         pathEl.setAttribute('marker-end', 'url(#arrow-green)');
                     } else if (lineage.downstreamEdgeIds.has(edge.id)) {
-                        // 依存先の線: 赤色
                         pathEl.classList.add('edge-downstream');
                         pathEl.classList.remove('edge-upstream', 'dimmed');
                         pathEl.setAttribute('marker-end', 'url(#arrow-red)');
@@ -1576,9 +1546,6 @@ END;`
 
         /**
          * [3] 検索ハイライト & [4] 依存関係ハイライトの適用
-         * - 選択した要素: 薄い橙色背景
-         * - 依存元の要素: 薄い緑色背景
-         * - 依存先の要素: 薄い赤色背景
          */
         function applySelectionStyles() {
             const lineage = state.selectedNodeId ? getLineageInfo(state.selectedNodeId) : null;
@@ -1594,20 +1561,18 @@ END;`
                 let isSearchMatch = false;
                 let isDimmed = false;
 
-                // [4] 依存関係ハイライト判定
                 if (lineage) {
                     if (node.id === lineage.selectedNodeId) {
-                        isSelected = true; // 選択した要素: 薄い橙色背景
+                        isSelected = true;
                     } else if (lineage.upstreamNodeIds.has(node.id)) {
-                        isUpstream = true; // 依存元の要素: 薄い緑色背景
+                        isUpstream = true;
                     } else if (lineage.downstreamNodeIds.has(node.id)) {
-                        isDownstream = true; // 依存先の要素: 薄い赤色背景
+                        isDownstream = true;
                     } else {
                         isDimmed = true;
                     }
                 }
 
-                // [3] 検索クエリ判定
                 if (query) {
                     const matchName = node.name.toLowerCase().includes(query);
                     const matchSchema = (node.schema || '').toLowerCase().includes(query);
@@ -1619,7 +1584,6 @@ END;`
                     }
                 }
 
-                // クラス反映
                 el.classList.toggle('node-selected', isSelected);
                 el.classList.toggle('node-upstream', isUpstream);
                 el.classList.toggle('node-downstream', isDownstream);
@@ -1673,7 +1637,7 @@ END;`
         });
 
         /**
-         * ノードドラッグ移動
+         * ノードドラッグ移動（移動時は選択解除・トグルを防止）
          */
         function setupNodeDrag(element, node) {
             let isDragging = false;
@@ -1681,10 +1645,12 @@ END;`
             let dragStartY = 0;
             let nodeStartX = 0;
             let nodeStartY = 0;
+            let hasMoved = false;
 
             element.addEventListener('mousedown', (e) => {
                 if (e.target.closest('.fa-file-lines')) return;
                 isDragging = true;
+                hasMoved = false;
                 dragStartX = e.clientX;
                 dragStartY = e.clientY;
                 nodeStartX = node.x;
@@ -1695,6 +1661,10 @@ END;`
 
             window.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
+                const movedDist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
+                if (movedDist > 4) {
+                    hasMoved = true;
+                }
                 const dx = (e.clientX - dragStartX) / state.zoom;
                 const dy = (e.clientY - dragStartY) / state.zoom;
                 node.x = nodeStartX + dx;
@@ -1710,34 +1680,61 @@ END;`
                     element.style.zIndex = '';
                 }
             });
+
+            // クリック時: ドラッグ移動していなければ選択トグル
+            element.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (hasMoved) {
+                    hasMoved = false;
+                    return;
+                }
+                toggleNodeSelection(node.id);
+            });
         }
 
         /**
-         * キャンバスのパン＆ズーム
+         * キャンバスのパン＆ズーム（ドラッグ移動中はハイライトを解除しない）
          */
         function updateTransform() {
             canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
         }
 
+        let isPanningMove = false;
+        let panStartMouseX = 0;
+        let panStartMouseY = 0;
+
         canvasWrapper.addEventListener('mousedown', (e) => {
             if (e.target.closest('.node') || e.target.closest('.controls-overlay')) return;
             state.isPanning = true;
+            isPanningMove = false;
+            panStartMouseX = e.clientX;
+            panStartMouseY = e.clientY;
             state.startX = e.clientX - state.panX;
             state.startY = e.clientY - state.panY;
             canvasWrapper.classList.add('grabbing');
-            clearSelection();
+            // ここでは clearSelection() を呼ばない（ドラッグでハイライトが外れるのを防止）
         });
 
         window.addEventListener('mousemove', (e) => {
             if (!state.isPanning) return;
+            const movedDist = Math.hypot(e.clientX - panStartMouseX, e.clientY - panStartMouseY);
+            if (movedDist > 4) {
+                isPanningMove = true; // 4px以上動いた場合はドラッグ移動と判定
+            }
             state.panX = e.clientX - state.startX;
             state.panY = e.clientY - state.startY;
             updateTransform();
         });
 
         window.addEventListener('mouseup', () => {
-            state.isPanning = false;
-            canvasWrapper.classList.remove('grabbing');
+            if (state.isPanning) {
+                state.isPanning = false;
+                canvasWrapper.classList.remove('grabbing');
+                // ドラッグ移動ではなく、背景をその場でクリックしたときだけ選択解除
+                if (!isPanningMove) {
+                    clearSelection();
+                }
+            }
         });
 
         canvasWrapper.addEventListener('wheel', (e) => {
@@ -1992,9 +1989,9 @@ END;`
             statsPill.innerHTML = `<i class="fa-solid fa-database"></i> ${state.nodes.size} ノード / ${state.edges.length} 依存関係`;
         }
 
+        // サイドバー開閉（margin-rightでスムーズに伸縮し、キャンバス描画領域が右端まで拡大）
         document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
-            controlsOverlay.classList.toggle('shifted');
         });
 
         /**

@@ -34,7 +34,6 @@ const statsPill = document.getElementById('stats-pill');
 const sidebarFiles = document.getElementById('sidebar-files');
 const fileCountBadge = document.getElementById('file-count-badge');
 const sidebar = document.getElementById('sidebar');
-const controlsOverlay = document.getElementById('controls-overlay');
 const folderNameBadge = document.getElementById('folder-name-badge');
 
 /**
@@ -229,7 +228,6 @@ function computeNodeLevels() {
 
 /**
  * ノード自動レイアウト
- * ノード被り防止のため、水平・垂直マージンを十分に確保し、各列で中央揃え
  */
 function layoutNodes() {
     const nodeWidth = 280;
@@ -336,13 +334,7 @@ function createNodeElement(node) {
         </div>
     `;
 
-    // [4] クリックで3色ハイライト
-    el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleNodeSelection(node.id);
-    });
-
-    // ドラッグ移動
+    // ドラッグ移動 & クリック（ドラッグ時は選択解除・トグルを防止）
     setupNodeDrag(el, node);
 
     return el;
@@ -352,7 +344,6 @@ function createNodeElement(node) {
  * [4] 依存関係探索
  */
 function getLineageInfo(targetNodeId) {
-    // 依存元 (Upstream)
     const upstreamNodeIds = new Set();
     const upstreamEdgeIds = new Set();
     const queueUp = [targetNodeId];
@@ -369,7 +360,6 @@ function getLineageInfo(targetNodeId) {
         }
     }
 
-    // 依存先 (Downstream)
     const downstreamNodeIds = new Set();
     const downstreamEdgeIds = new Set();
     const queueDown = [targetNodeId];
@@ -550,7 +540,7 @@ searchClear.addEventListener('click', () => {
 });
 
 /**
- * ノードドラッグ移動
+ * ノードドラッグ移動（移動時は選択解除・トグルを防止）
  */
 function setupNodeDrag(element, node) {
     let isDragging = false;
@@ -558,10 +548,12 @@ function setupNodeDrag(element, node) {
     let dragStartY = 0;
     let nodeStartX = 0;
     let nodeStartY = 0;
+    let hasMoved = false;
 
     element.addEventListener('mousedown', (e) => {
         if (e.target.closest('.stat-item')) return;
         isDragging = true;
+        hasMoved = false;
         dragStartX = e.clientX;
         dragStartY = e.clientY;
         nodeStartX = node.x;
@@ -572,6 +564,10 @@ function setupNodeDrag(element, node) {
 
     window.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
+        const movedDist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
+        if (movedDist > 4) {
+            hasMoved = true;
+        }
         const dx = (e.clientX - dragStartX) / state.zoom;
         const dy = (e.clientY - dragStartY) / state.zoom;
         node.x = nodeStartX + dx;
@@ -587,34 +583,61 @@ function setupNodeDrag(element, node) {
             element.style.zIndex = '';
         }
     });
+
+    // クリック時: ドラッグ移動していなければ選択トグル
+    element.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (hasMoved) {
+            hasMoved = false;
+            return;
+        }
+        toggleNodeSelection(node.id);
+    });
 }
 
 /**
- * キャンバスパン＆ズーム
+ * キャンバスのパン＆ズーム（ドラッグ移動中はハイライトを解除しない）
  */
 function updateTransform() {
     canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
 }
 
+let isPanningMove = false;
+let panStartMouseX = 0;
+let panStartMouseY = 0;
+
 canvasWrapper.addEventListener('mousedown', (e) => {
     if (e.target.closest('.node') || e.target.closest('.controls-overlay')) return;
     state.isPanning = true;
+    isPanningMove = false;
+    panStartMouseX = e.clientX;
+    panStartMouseY = e.clientY;
     state.startX = e.clientX - state.panX;
     state.startY = e.clientY - state.panY;
     canvasWrapper.classList.add('grabbing');
-    clearSelection();
+    // ここでは clearSelection() を呼ばない（ドラッグでハイライトが外れるのを防止）
 });
 
 window.addEventListener('mousemove', (e) => {
     if (!state.isPanning) return;
+    const movedDist = Math.hypot(e.clientX - panStartMouseX, e.clientY - panStartMouseY);
+    if (movedDist > 4) {
+        isPanningMove = true; // 4px以上動いた場合はドラッグ移動と判定
+    }
     state.panX = e.clientX - state.startX;
     state.panY = e.clientY - state.startY;
     updateTransform();
 });
 
 window.addEventListener('mouseup', () => {
-    state.isPanning = false;
-    canvasWrapper.classList.remove('grabbing');
+    if (state.isPanning) {
+        state.isPanning = false;
+        canvasWrapper.classList.remove('grabbing');
+        // ドラッグ移動ではなく、背景をその場でクリックしたときだけ選択解除
+        if (!isPanningMove) {
+            clearSelection();
+        }
+    }
 });
 
 canvasWrapper.addEventListener('wheel', (e) => {
@@ -773,9 +796,9 @@ function updateStats() {
     statsPill.textContent = `${state.nodes.size} ノード / ${state.edges.length} 依存関係`;
 }
 
+// サイドバー開閉（margin-rightでスムーズに伸縮し、キャンバス描画領域が右端まで拡大）
 document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
     sidebar.classList.toggle('collapsed');
-    controlsOverlay.classList.toggle('shifted');
 });
 
 // SQLモーダル
