@@ -1451,20 +1451,7 @@ let isImporting = false;
                 
                 if (lastTouchDistance > 0) {
                     const scale = currentDistance / lastTouchDistance;
-                    currentScale *= scale;
-                    
-                    // スケールの制限（0.5倍〜3倍）
-                    currentScale = Math.max(0.5, Math.min(3, currentScale));
-                    
-                    // canvas-contentにスケールを適用（canvasのサイズは維持）
-                    canvasContent.style.transform = `scale(${currentScale})`;
-                    
-                    // スケールをsessionStorageに保存
-                    try {
-                        sessionStorage.setItem('mindmap_scale', currentScale.toString());
-                    } catch (e) {
-                        console.error('スケールの保存に失敗:', e);
-                    }
+                    setZoom(currentScale * scale);
                 }
                 
                 lastTouchDistance = currentDistance;
@@ -1653,15 +1640,78 @@ let isImporting = false;
             }
         });
 
+        // ズーム設定関数
+        function setZoom(newScale) {
+            // 0.3倍〜3.0倍（30%〜300%）に制限
+            currentScale = Math.max(0.3, Math.min(3.0, Math.round(newScale * 100) / 100));
+            canvasContent.style.transform = `scale(${currentScale})`;
+            
+            const zoomLevelEl = document.getElementById('zoomLevel');
+            if (zoomLevelEl) {
+                zoomLevelEl.textContent = `${Math.round(currentScale * 100)}%`;
+            }
+            
+            try {
+                sessionStorage.setItem('mindmap_scale', currentScale.toString());
+            } catch (e) {
+                console.error('スケールの保存に失敗:', e);
+            }
+        }
+
+        // キーボードショートカット (Ctrl + 上キー / Ctrl + 下キー / Ctrl + 0)
+        document.addEventListener('keydown', (e) => {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+                return;
+            }
+
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setZoom(currentScale + 0.1);
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setZoom(currentScale - 0.1);
+                } else if (e.key === '0') {
+                    e.preventDefault();
+                    setZoom(1.0);
+                }
+            }
+        });
+
+        // Ctrl + マウスホイールでズーム
+        window.addEventListener('wheel', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 0.1 : -0.1;
+                setZoom(currentScale + delta);
+            }
+        }, { passive: false });
+
+        // ズームコントロールUIのイベント
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const zoomLevelEl = document.getElementById('zoomLevel');
+
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => setZoom(currentScale + 0.1));
+        }
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => setZoom(currentScale - 0.1));
+        }
+        if (zoomLevelEl) {
+            zoomLevelEl.addEventListener('click', () => setZoom(1.0));
+        }
+
         // ページロード時の初期化
         (async () => {
             // ズームスケールの復元
             try {
                 const savedScale = sessionStorage.getItem('mindmap_scale');
                 if (savedScale) {
-                    currentScale = parseFloat(savedScale);
-                    currentScale = Math.max(0.5, Math.min(3, currentScale));
-                    canvasContent.style.transform = `scale(${currentScale})`;
+                    setZoom(parseFloat(savedScale));
+                } else {
+                    setZoom(1.0);
                 }
             } catch (e) {
                 console.error('スケールの復元に失敗:', e);

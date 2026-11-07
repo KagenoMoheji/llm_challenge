@@ -919,3 +919,54 @@
         .export-modal-body button:hover {
             background: #5568d3;
         }
+
+        /* ズームコントロールUI */
+        .zoom-controls {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 4px 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 100;
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            backdrop-filter: blur(4px);
+            user-select: none;
+        }
+
+        .zoom-controls button {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: #667eea;
+            transition: background-color 0.15s, color 0.15s;
+        }
+
+        .zoom-controls button:hover {
+            background-color: #f0f2fe;
+            color: #5568d3;
+        }
+
+        .zoom-controls #zoomLevel {
+            cursor: pointer;
+            min-width: 44px;
+            text-align: center;
+        }
+
+        .zoom-controls #zoomLevel:hover {
+            color: #667eea;
+        }

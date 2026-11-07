@@ -52,7 +52,7 @@
                     <li>ノードを右クリックで削除</li>
                     <li>接続線を右クリックで削除</li>
                     <li>背景をドラッグして全体移動</li>
-                    <li>マウスホイールでキャンバス操作、ピンチで拡大縮小</li>
+                    <li>Ctrl + 上キーでズームイン、Ctrl + 下キーでズームアウト（Ctrl+0で100%リセット）</li>
                 </ul>
             </div>
         </div>
@@ -87,6 +87,13 @@
     <div class="image-modal-overlay" id="imageModal">
         <button class="image-modal-close" id="imageModalCloseBtn">×</button>
         <img class="image-modal-content" id="imageModalImg" src="" alt="">
+    </div>
+
+    <!-- ズームコントロールUI -->
+    <div class="zoom-controls">
+        <button id="zoomOutBtn" title="ズームアウト (Ctrl + 下キー)">−</button>
+        <span id="zoomLevel" title="ズームリセット (Ctrl + 0)">100%</span>
+        <button id="zoomInBtn" title="ズームイン (Ctrl + 上キー)">＋</button>
     </div>
 
     <script src="{{appJsUri}}"></script>
