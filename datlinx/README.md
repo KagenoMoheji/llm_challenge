@@ -2,6 +2,16 @@
 
 `CREATE PROCEDURE` / `CREATE FUNCTION` / `CREATE VIEW` のSQLファイルの `FROM/JOIN` を解析し、依存関係マップ（データリネージ・マインドマップ）の生成・検索を行うツールです。
 
+## Quick try app
+https://kagenomoheji.github.io/llm_challenge/testindmap/index.html
+
+## Quick try VSCode extention
+Download [the vsix file](https://github.com/KagenoMoheji/llm_challenge/testindmap/dist/) and install it in VSCode.
+- **エクスプローラー右クリック**: 任意のSQLフォルダを右クリックして「`datlinx: SQLフォルダを解析してマインドマップを開く`」
+- **コマンドパレット (`Ctrl+Shift+P`)**:
+  - `datlinx: ワークスペースの全SQLを解析して開く`
+  - `datlinx: サンプルSQLデータで開く`
+
 ---
 
 ## 🌟 主な機能
@@ -25,38 +35,3 @@
     - 関係のない要素は自動でディミング（半透明化）され、対象のデータリネージが鮮明に浮かび上がります。
 
 ---
-
-## Quick try app
-https://kagenomoheji.github.io/llm_challenge/testindmap/index.html
-
-## Quick try VSCode extention
-Download [the `.vsix` file](https://github.com/KagenoMoheji/llm_challenge/testindmap/dist/) and install it in VSCode.
-- **エクスプローラー右クリック**: 任意のSQLフォルダを右クリックして「`datlinx: SQLフォルダを解析してマインドマップを開く`」
-- **コマンドパレット (`Ctrl+Shift+P`)**:
-  - `datlinx: ワークスペースの全SQLを解析して開く`
-  - `datlinx: サンプルSQLデータで開く`
-
----
-
-## 📁 ディレクトリ構成
-
-```text
-datlinx/
-├── index.html                       # 静的Webアプリ（シングルファイル版）
-├── README.md                        # 本ドキュメント
-├── sample/                          # 動作確認用サンプルSQL（10ファイル）
-└── vscode-ext/                      # VS Code拡張機能
-    ├── DEVELOPMENT.md               # 開発・デバッグ・パッケージ化ガイド
-    ├── .vscode/
-    │   └── launch.json              # F5デバッグ用設定
-    ├── dist/                        # .vsix 出力先
-    └── datlinx-vscode-ext/          # 拡張機能本体
-        ├── package.json             # 拡張機能マニフェスト
-        ├── extension.js             # メインプロセス（Vanilla JS）
-        ├── README.md                # 拡張機能説明書（エンドユーザー向け）
-        └── media/
-            ├── icon.svg             # アプリアイコン
-            ├── app.html             # Webview HTML
-            ├── app.css              # スタイルシート（3色ハイライト）
-            └── app.js               # Webview UIロジック
-```
