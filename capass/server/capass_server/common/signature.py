@@ -25,8 +25,13 @@ SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW = b"capass-toolserver-replace-activ
 SIGN_CONTEXT_TOOLSERVER_REPLACE_ROLLBACK = b"capass-toolserver-replace-rollback-v1\n"
 SIGN_CONTEXT_AGENT_REGISTER = b"capass-agent-register-v1\n"
 SIGN_CONTEXT_AGENT_APPROVE = b"capass-agent-approve-v1\n"
-SIGN_CONTEXT_AGENT_ADDTOOL = b"capass-agent-addtool-v1\n"
-SIGN_CONTEXT_AGENT_CHTKN = b"capass-agent-chtkn-v1\n"
+# ツール(ロール単位のツールエンドポイント)の登録と、トークンの更新(ツールサーバが署名)
+SIGN_CONTEXT_TOOL_ADDTOOL = b"capass-tool-addtool-v1\n"
+SIGN_CONTEXT_TOOL_CHTKN = b"capass-tool-chtkn-v1\n"
+# AIエージェントへのツールの割り当て。grant=申請(AIエージェントが署名)、grant-approve=承認(管理者)、revoke=取り消し(管理者、またはツールの所有者のツールサーバ)
+SIGN_CONTEXT_AGENT_GRANT = b"capass-agent-grant-v1\n"
+SIGN_CONTEXT_AGENT_GRANT_APPROVE = b"capass-agent-grant-approve-v1\n"
+SIGN_CONTEXT_AGENT_REVOKE = b"capass-agent-revoke-v1\n"
 SIGN_CONTEXT_AGENT_LISTTOOLS = b"capass-agent-listtools-v1\n"
 SIGN_CONTEXT_AGENT_EXEC = b"capass-agent-exec-v1\n"
 

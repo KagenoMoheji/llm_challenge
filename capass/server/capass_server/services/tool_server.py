@@ -115,7 +115,7 @@ class ReplacementResult(NamedTuple):
     active: TblToolServer  # アクティブ(approved)になったツールサーバ
     standby: TblToolServer  # 待機中(standby)になったツールサーバ
     standby_until: datetime  # 待機中のツールサーバへ、切り替え(切り戻し)できる期限
-    moved_tools: int  # 付け替えたツール(AIエージェントごとのレコード)の数
+    moved_tools: int  # 付け替えたツールの数
 
 
 def _is_expired(expires_at: datetime | None, now: datetime) -> bool:
@@ -135,7 +135,7 @@ def _switch_active_tool_server(db: Session, current: TblToolServer, target: TblT
     if not (current_updated and target_updated):
         db.rollback()
         raise ReplacementNotAllowedError("the tool server status was changed by another request")
-    moved_tools = mappers.move_tbl_agent_tool_to_tool_server(db, current.id, target.id)
+    moved_tools = mappers.move_tbl_tool_to_tool_server(db, current.id, target.id)
     db.commit()
     return ReplacementResult(active=target, standby=current, standby_until=standby_until, moved_tools=moved_tools)
 

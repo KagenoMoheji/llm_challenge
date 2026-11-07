@@ -147,4 +147,4 @@ class ToolServerReplaceResponse(BaseModel):
     active_tool_server_exec_url: str
     standby_toolserver_id: int  # 待機中になったツールサーバのid
     standby_until: datetime | None  # 待機中のツールサーバへ、切り替え(切り戻し)できる期限
-    moved_tools: int  # 付け替えたツール(AIエージェントごとのレコード)の数
+    moved_tools: int  # 付け替えたツールの数

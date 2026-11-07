@@ -16,19 +16,14 @@ from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
 from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC, TOOL_SERVER_RESERVATION_TTL_SEC, TOOL_SERVER_STANDBY_TTL_SEC
-from capass_server.common.signature import (
-    SIGN_CONTEXT_AGENT_ADDTOOL,
-    SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW,
-    SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_OLD,
-)
-from capass_server.models.entities import ApprovalStatus, TblAgentTool, TblToolServer
+from capass_server.common.signature import SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW, SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_OLD
+from capass_server.models.entities import ApprovalStatus, TblTool, TblToolServer
 from capass_server.services import tool_server as tool_server_service
 from testlib import (
     ADMIN_EMAIL,
     APPLICANT_EMAIL,
     EXEC_URL,
     NEW_EXEC_URL,
-    PARAMS_SCHEMA,
     chtkn_body,
     exec_body,
     list_tools_headers,
@@ -39,7 +34,7 @@ from testlib import (
     seed_agent,
     seed_agent_tool,
     seed_tool_server,
-    signed_body,
+    tool_add_body,
 )
 
 
@@ -53,22 +48,6 @@ def _activate(client, old_id, body):
 
 def _rollback(client, old_id, body):
     return client.post(f"/api/v1/toolservers/{old_id}/replace/rollback", json=body)
-
-
-def _chtkn(client, priv, tool_endpoint="psql_manager"):
-    return client.post(f"/api/v1/agents/agent-1/chtkn/{tool_endpoint}", json=chtkn_body(priv, "agent-1", tool_endpoint))
-
-
-def _addtool(client, priv, tool_endpoint):
-    fields = {
-        "tool_endpoint": tool_endpoint,
-        "context": "テスト",
-        "params_schema": PARAMS_SCHEMA,
-        "tool_proxy_token": "token-" + tool_endpoint,
-        "tool_server_public_key": pub_b64(priv),
-    }
-    body = signed_body(priv, SIGN_CONTEXT_AGENT_ADDTOOL, fields, path_params={"agent_id": "agent-1"})
-    return client.post("/api/v1/agents/agent-1/addtool", json=body)
 
 
 def _setup(session_factory):
@@ -96,9 +75,8 @@ def _server(session_factory, server_id):
 
 
 def _tool_servers(session_factory):
-    """ツールエンドポイントごとの、ツールサーバのid(AIエージェントagent-1のツール)。"""
     with session_factory() as db:
-        return {t.tool_endpoint: t.tool_server_id for t in db.execute(select(TblAgentTool)).scalars().all()}
+        return {t.tool_endpoint: t.tool_server_id for t in db.execute(select(TblTool)).scalars().all()}
 
 
 def _utc(dt):
@@ -125,8 +103,8 @@ def test_reserve_registers_a_reserved_successor(client, session_factory, admin_p
 
 def test_reserved_server_cannot_operate_before_activation(client, session_factory, admin_priv):
     old_id, new_id, old_priv, new_priv, _ = _setup_reserved(client, session_factory, admin_priv)
-    assert _addtool(client, new_priv, "new_tool").status_code == 403  # 予約中の鍵では、まだ何もできない
-    assert _chtkn(client, new_priv).status_code == 403
+    assert client.post("/api/v1/tools/addtool", json=tool_add_body(new_priv, tool_endpoint="new_tool")).status_code == 403  # 予約中の鍵では、まだ何もできない
+    assert client.post("/api/v1/tools/psql_manager/chtkn", json=chtkn_body(new_priv, "psql_manager")).status_code == 403
 
 
 def test_reserve_by_non_admin_is_forbidden(client, session_factory, admin_priv):
@@ -227,10 +205,10 @@ def test_activate_switches_tools_to_the_reserved_server(client, session_factory,
 def test_after_activation_only_the_new_server_operates(client, session_factory, admin_priv):
     old_id, new_id, old_priv, new_priv, _ = _setup_reserved(client, session_factory, admin_priv)
     assert _activate(client, old_id, replace_activate_body(old_priv, new_priv, old_id)).status_code == 200
-    assert _chtkn(client, new_priv).status_code == 200
-    assert _chtkn(client, old_priv).status_code == 403  # 旧(待機中)の鍵では、もう更新できない
-    assert _addtool(client, new_priv, "added_by_new").status_code == 201
-    assert _addtool(client, old_priv, "added_by_old").status_code == 403
+    assert client.post("/api/v1/tools/psql_manager/chtkn", json=chtkn_body(new_priv, "psql_manager")).status_code == 200
+    assert client.post("/api/v1/tools/psql_manager/chtkn", json=chtkn_body(old_priv, "psql_manager")).status_code == 403  # 旧(待機中)の鍵では、もう更新できない
+    assert client.post("/api/v1/tools/addtool", json=tool_add_body(new_priv, tool_endpoint="added_by_new")).status_code == 201
+    assert client.post("/api/v1/tools/addtool", json=tool_add_body(old_priv, tool_endpoint="added_by_old")).status_code == 403
 
 
 def test_activate_does_not_move_tools_of_other_tool_servers(client, session_factory, admin_priv):
@@ -334,8 +312,8 @@ def test_rollback_restores_the_old_server_with_only_its_signature(client, sessio
     assert set(_tool_servers(session_factory).values()) == {old_id}
     assert client.post("/api/v1/agents/agent-1/exec/psql_manager", json=exec_body(agent_priv, "agent-1", "psql_manager")).status_code == 200
     assert fake_tool_server.calls[0]["url"] == EXEC_URL  # 旧のURLへ戻る
-    assert _chtkn(client, new_priv).status_code == 403  # 新(待機中)は、操作できない
-    assert _chtkn(client, old_priv).status_code == 200
+    assert client.post("/api/v1/tools/psql_manager/chtkn", json=chtkn_body(new_priv, "psql_manager")).status_code == 403  # 新(待機中)は、操作できない
+    assert client.post("/api/v1/tools/psql_manager/chtkn", json=chtkn_body(old_priv, "psql_manager")).status_code == 200
 
 
 def test_roll_forward_again_after_rollback(client, session_factory, admin_priv):

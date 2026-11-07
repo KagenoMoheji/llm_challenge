@@ -17,7 +17,7 @@
 - **動作のイメージ:** ツールサーバ上で、CaPassクライアントを「受け口モード」で常駐させる(コマンド名は仮: `capass serve`)。実行URLは、この受け口のURLになる。
 - **受け口がやること:**
   1. `Authorization: Bearer` のツール代理トークンを、ツールサーバ付きDB(`[認証情報/ツール代理トークン/AIエージェント情報]`)と照合する(定数時間で比較する。トークンはハッシュで保存する)
-  2. `agent_id` と `tool_endpoint` が、トークンに紐づくものと一致することを確認する
+  2. `tool_endpoint` が、トークンに紐づくものと一致することを確認する(トークンは、ロール(ツール)単位で、AIエージェントには紐づかない。`agent_id` は、受け口のログに残す)
   3. `params` を、ツールの `params_schema` で再検証する(CaPassサーバでも検証済みだが、ツールサーバ側でも行う)
   4. 認証情報の権限(スコープ)の範囲内かを確認する(範囲外なら403)
   5. `tool_endpoint` ごとの設定に従って、ツールを実行し、結果を返す
@@ -41,14 +41,14 @@
 | サブコマンド | 役割 | 対応するAPI |
 |---|---|---|
 | `keygen` | 公開鍵/秘密鍵の作成(ツールサーバ、AIエージェント、管理者) | なし(ローカル) |
-| `regist` | ツールサーバ/AIエージェントの初回登録、ツールの追加 | `toolservers/register`、`agents/register`、`agents/{agent_id}/addtool` |
+| `regist` | ツールサーバ/AIエージェントの初回登録、ツール(ロール単位)の登録、AIエージェントへの割り当ての申請 | `toolservers/register`、`agents/register`、`tools/addtool`、`agents/{agent_id}/grant/{tool_endpoint}` |
 | `list executable` | 使用できるツールの一覧(AIエージェント側) | `agents/{agent_id}/tools` |
 | `exec` | ツールの実行(AIエージェント側) | `agents/{agent_id}/exec/{tool_endpoint}` |
-| `chtkn` | ツール代理トークンの更新(ツールサーバの定期更新ジョブ) | `agents/{agent_id}/chtkn/{tool_endpoint}` |
+| `chtkn` | ツール代理トークンの更新(ツールサーバの定期更新ジョブ。割り当てられた全AIエージェントに反映される) | `tools/{tool_endpoint}/chtkn` |
 | `chkey` | ツールサーバのリプレース(予約は管理者、切り替えは旧・新の署名、切り戻しは旧の署名) | `toolservers/{toolserver_id}/replace/reserve` `/replace/activate` `/replace/rollback` |
 | `list registered` | ツールサーバが、登録内容(利用日時など)を取得 | 未実装(3.を参照) |
 | `update lock` | ツールサーバが、ツールをロックする | 未実装(3.を参照) |
-| 管理者用 | 承認(`approve`)、承認待ち一覧、`revoke` | `toolservers/{toolserver_id}/approve`、`agents/{agent_id}/approve` |
+| 管理者用 | 承認(`approve`)、割り当ての承認・取り消し、予約(`replace/reserve`)、承認待ち一覧 | `toolservers/{toolserver_id}/approve`、`agents/{agent_id}/approve`、`agents/{agent_id}/grant/{tool_endpoint}/approve`、`agents/{agent_id}/revoke/{tool_endpoint}`、`toolservers/{toolserver_id}/replace/reserve` |
 
 - AIエージェント側のCLI(`list executable` / `exec`)は、**`params_schema` を、AIエージェントが使うツール定義(MCPの `inputSchema` など)へ、そのまま渡せる形で出力する**と、AIエージェントが扱いやすい。
 - 秘密鍵の保管場所(ファイル権限、OSのキーストアなど)を決める。
@@ -66,8 +66,14 @@
 - 承認時の公開鍵の照合(承認する対象の公開鍵を、管理者が明示して、DBの値と一致することを確認する)。
 - `revoked` にするAPI。いまはSQLで更新している。
 - 申請者メールアドレスの確認(いまは自己申告)。許可するドメインの制限など。
-- 承認済みのツールサーバが、承認済みの任意のAIエージェントにツールを追加できる現状に対して、AIエージェント提供者の同意を確認する仕組み。
 - 予約(`reserved`)や待機(`standby`)を、期限の前に取り消すAPI(いまはSQLで `revoked` にする)。ツールサーバのリプレースの、承認待ち・予約の一覧API。切り替え・切り戻しの監査ログ(誰が、いつ、どのツールサーバからどのツールサーバへ)。
+
+### 4.1 WebUIと利用者(将来)
+
+- **AIエージェントの利用者が、WebUIから、ツールの割り当て(`grant`)を申請し、その上司などが承認する形を目指す。** いまは、申請者メールアドレス(`applicant_email`)と、承認者メールアドレス(`approver_email`。承認したCaPassサーバ管理者)を、割り当て(`tbl_agent_tool`)に記録している。
+- **利用者のテーブルとログイン機能を作り、メールアドレスの文字列を、利用者への参照に置き換える。** ログインは、自前のパスワード認証ではなく、社内のIdP(SSO / OIDC)を使う。申請者の自己申告(確認されていないメールアドレス)の問題も、これで解決する。
+- 承認者は、申請者の上司などを、社内のディレクトリ(IdPのグループ、人事データなど)から決める。**申請者と承認者が、同じ人にならない**ようにする(職務の分離)。申請・承認・取り消しの通知(メール、チャット)と、監査ログも必要。
+- WebUIの認証(セッション)と、いまの署名による認証(CLI・機械向け)は、併存させる。承認の処理(service層)は、承認者の種類(管理者の鍵、ログインした利用者)によらず、共通にする。
 
 ## 5. その他
 
@@ -75,5 +81,4 @@
 - **レート制限の共有:** 初回登録APIのレート制限は、プロセスのメモリ上。複数プロセス・複数台構成では、共有ストア(Redisなど)が必要。
 - **ツール代理トークンの暗号鍵:** 環境変数ではなく、KMSなどで管理する。
 - **ツールサーバへの接続:** 接続の再利用(コネクションプール)や、非同期化が必要になったら、標準ライブラリの `urllib` から、HTTPクライアントのライブラリ(httpxなど)への置き換えを検討する。
-- **ツール代理トークンの一括更新:** 複数のツールのトークンを、1回のリクエストで更新するAPI(いまは、ツールごとに1回ずつ)。
 - **`params` のサイズ上限:** `exec` のボディのサイズに、上限を設ける。

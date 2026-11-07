@@ -15,18 +15,20 @@ from capass_server.common.db import get_db
 from capass_server.common.globals import HEADER_SIGNATURE, HEADER_SIGNED_AT
 from capass_server.controllers.dependencies import rate_limit_register
 from capass_server.schemas.agent import (
-    AgentAddToolRequest,
-    AgentAddToolResponse,
     AgentApproveResponse,
-    AgentChangeToolTokenRequest,
-    AgentChangeToolTokenResponse,
     AgentExecRequest,
+    AgentGrantApproveResponse,
+    AgentGrantRequest,
+    AgentGrantResponse,
     AgentRegisterRequest,
     AgentRegisterResponse,
+    AgentRevokeRequest,
+    AgentRevokeResponse,
     AgentToolItem,
     AgentToolListResponse,
 )
 from capass_server.schemas.approve import ApproveRequest
+from capass_server.schemas.tool import ToolAddRequest, ToolAddResponse, ToolChangeTokenRequest, ToolChangeTokenResponse
 from capass_server.schemas.tool_server import (
     ToolServerApproveResponse,
     ToolServerRegisterRequest,
@@ -38,7 +40,14 @@ from capass_server.schemas.tool_server import (
     ToolServerReplaceRollbackRequest,
 )
 from capass_server.services.agent import approve_agent, register_agent
-from capass_server.services.agent_tool import add_tool_to_agent, change_tool_token, exec_agent_tool, list_executable_tools
+from capass_server.services.agent_tool import (
+    approve_agent_tool_grant,
+    exec_agent_tool,
+    list_executable_tools,
+    request_agent_tool_grant,
+    revoke_agent_tool_grant,
+)
+from capass_server.services.tool import add_tool, change_tool_token
 from capass_server.services.tool_server import (
     ReplacementResult,
     activate_tool_server_replacement,
@@ -155,30 +164,63 @@ def agents_approve(agent_id: str, req: ApproveRequest, db: Session = Depends(get
 
 
 # ---------- AIエージェントへのツール追加 ----------
-@router.post("/agents/{agent_id}/addtool", status_code=201, response_model=AgentAddToolResponse)
-def agents_addtool(agent_id: str, req: AgentAddToolRequest, db: Session = Depends(get_db)) -> AgentAddToolResponse:
-    """AIエージェントにツール(ツール代理トークン)を追加する(旧 register。CaPassクライアントの「regist」から呼ばれる)。承認済みツールサーバの署名を検証する。"""
-    agent_tool = add_tool_to_agent(db, agent_id, req)
-    return AgentAddToolResponse(
-        tool_endpoint=agent_tool.tool_endpoint,
-        agent_id=agent_tool.agent_id,
-        created_at=agent_tool.created_at,
-        token_max_age_sec=TOKEN_MAX_AGE_SEC,
-    )
+# ---------- ツール(ロール単位のツールエンドポイント)の登録とトークンの更新 ----------
+@router.post("/tools/addtool", status_code=201, response_model=ToolAddResponse)
+def tools_addtool(req: ToolAddRequest, db: Session = Depends(get_db)) -> ToolAddResponse:
+    """ツール(ロール単位のツールエンドポイント)の登録(CaPassクライアントの「regist」から呼ばれる)。承認済みツールサーバの署名が必要。
+    登録しただけでは、どのAIエージェントも使えない。AIエージェントへの割り当ては、grant(申請)と、その承認で行う。"""
+    tool = add_tool(db, req)
+    return ToolAddResponse(tool_endpoint=tool.tool_endpoint, created_at=tool.created_at, token_max_age_sec=TOKEN_MAX_AGE_SEC)
 
 
-@router.post("/agents/{agent_id}/chtkn/{tool_endpoint}", response_model=AgentChangeToolTokenResponse)
-def agents_chtkn(agent_id: str, tool_endpoint: str, req: AgentChangeToolTokenRequest, db: Session = Depends(get_db)) -> AgentChangeToolTokenResponse:
+@router.post("/tools/{tool_endpoint}/chtkn", response_model=ToolChangeTokenResponse)
+def tools_chtkn(tool_endpoint: str, req: ToolChangeTokenRequest, db: Session = Depends(get_db)) -> ToolChangeTokenResponse:
     """ツール代理トークンの更新(CaPassクライアントの「chtkn」から呼ばれる。ツールサーバの定期更新ジョブ)。ツールを登録したツールサーバの署名が必要。
+    トークンはロール単位なので、1回の更新が、そのツールを割り当てられた全てのAIエージェントに反映される。
     ツールサーバは、`token_max_age_sec` より短い間隔で、トークンを更新する。ロック中のツールは、更新しても、ロックされたまま。"""
-    agent_tool = change_tool_token(db, agent_id, tool_endpoint, req)
-    return AgentChangeToolTokenResponse(
-        tool_endpoint=agent_tool.tool_endpoint,
-        agent_id=agent_tool.agent_id,
-        tool_proxy_token_updated_at=agent_tool.tool_proxy_token_updated_at,
-        locked=agent_tool.locked,
+    tool = change_tool_token(db, tool_endpoint, req)
+    return ToolChangeTokenResponse(
+        tool_endpoint=tool.tool_endpoint,
+        tool_proxy_token_updated_at=tool.tool_proxy_token_updated_at,
+        locked=tool.locked,
         token_max_age_sec=TOKEN_MAX_AGE_SEC,
     )
+
+
+# ---------- AIエージェントへのツールの割り当て(申請 → 承認 / 取り消し) ----------
+@router.post("/agents/{agent_id}/grant/{tool_endpoint}", status_code=201, response_model=AgentGrantResponse)
+def agents_grant(agent_id: str, tool_endpoint: str, req: AgentGrantRequest, db: Session = Depends(get_db)) -> AgentGrantResponse:
+    """AIエージェントへのツールの割り当ての申請(承認待ち:pendingになる)。AIエージェントの署名が必要。承認(approve)されると、使えるようになる。
+    取り消された(revoked)割り当ては、再申請できる。"""
+    grant = request_agent_tool_grant(db, agent_id, tool_endpoint, req)
+    return AgentGrantResponse(
+        agent_id=grant.agent_id,
+        tool_endpoint=tool_endpoint,
+        status=grant.status,
+        applicant_email=grant.applicant_email,
+        created_at=grant.created_at,
+    )
+
+
+@router.post("/agents/{agent_id}/grant/{tool_endpoint}/approve", response_model=AgentGrantApproveResponse)
+def agents_grant_approve(agent_id: str, tool_endpoint: str, req: ApproveRequest, db: Session = Depends(get_db)) -> AgentGrantApproveResponse:
+    """AIエージェントへのツールの割り当ての承認(いまは、CaPassサーバ管理者のみ。将来は、申請者の上司など)。管理者の署名が必要。"""
+    grant = approve_agent_tool_grant(db, agent_id, tool_endpoint, req)
+    return AgentGrantApproveResponse(
+        agent_id=grant.agent_id,
+        tool_endpoint=tool_endpoint,
+        status=grant.status,
+        applicant_email=grant.applicant_email,
+        approver_email=grant.approver_email,
+        approved_at=grant.approved_at,
+    )
+
+
+@router.post("/agents/{agent_id}/revoke/{tool_endpoint}", response_model=AgentRevokeResponse)
+def agents_revoke(agent_id: str, tool_endpoint: str, req: AgentRevokeRequest, db: Session = Depends(get_db)) -> AgentRevokeResponse:
+    """AIエージェントへのツールの割り当ての取り消し。CaPassサーバ管理者、または、そのツールを登録したツールサーバの署名が必要。"""
+    grant = revoke_agent_tool_grant(db, agent_id, tool_endpoint, req)
+    return AgentRevokeResponse(agent_id=grant.agent_id, tool_endpoint=tool_endpoint, status=grant.status)
 
 
 # ---------- AIエージェントによるツール実行 ----------

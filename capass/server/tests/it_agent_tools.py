@@ -125,3 +125,23 @@ def test_list_tools_pending_or_revoked_agent_is_forbidden(client, session_factor
 def test_list_tools_requires_signature_headers(client, session_factory):
     _setup(session_factory)
     assert _get(client, "agent-1", {}).status_code == 422
+
+
+def test_list_tools_only_returns_approved_grants(client, session_factory):
+    agent_priv, ts_priv = _setup(session_factory)
+    seed_agent_tool(session_factory, "agent-1", "tool_ok", ts_priv)
+    seed_agent_tool(session_factory, "agent-1", "tool_pending", ts_priv, grant_status=ApprovalStatus.PENDING)
+    seed_agent_tool(session_factory, "agent-1", "tool_revoked", ts_priv, grant_status=ApprovalStatus.REVOKED)
+    tools = _get(client, "agent-1", list_tools_headers(agent_priv, "agent-1")).json()["tools"]
+    assert [t["tool_endpoint"] for t in tools] == ["tool_ok"]  # 申請中・取り消された割り当ては、一覧に出ない
+
+
+def test_list_tools_shows_a_tool_shared_by_agents_to_each_of_them(client, session_factory):
+    agent_priv, ts_priv = _setup(session_factory)
+    agent2_priv = Ed25519PrivateKey.generate()
+    seed_agent(session_factory, agent2_priv, "agent-2")
+    seed_agent_tool(session_factory, "agent-1", "shared_tool", ts_priv)
+    seed_agent_tool(session_factory, "agent-2", "shared_tool", ts_priv)
+    for agent_id, priv in (("agent-1", agent_priv), ("agent-2", agent2_priv)):
+        tools = _get(client, agent_id, list_tools_headers(priv, agent_id)).json()["tools"]
+        assert [t["tool_endpoint"] for t in tools] == ["shared_tool"]

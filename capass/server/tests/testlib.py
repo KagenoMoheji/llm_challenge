@@ -19,10 +19,13 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from sqlalchemy import select
 from capass_server.common.crypto import encrypt_token
 from capass_server.common.signature import (
-    SIGN_CONTEXT_AGENT_CHTKN,
     SIGN_CONTEXT_AGENT_EXEC,
+    SIGN_CONTEXT_AGENT_GRANT,
     SIGN_CONTEXT_AGENT_LISTTOOLS,
     SIGN_CONTEXT_AGENT_REGISTER,
+    SIGN_CONTEXT_AGENT_REVOKE,
+    SIGN_CONTEXT_TOOL_ADDTOOL,
+    SIGN_CONTEXT_TOOL_CHTKN,
     SIGN_CONTEXT_TOOLSERVER_REGISTER,
     SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW,
     SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_OLD,
@@ -30,7 +33,7 @@ from capass_server.common.signature import (
     SIGN_CONTEXT_TOOLSERVER_REPLACE_ROLLBACK,
     build_signing_message,
 )
-from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblAgentTool, TblToolServer
+from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblAgentTool, TblTool, TblToolServer
 
 APPLICANT_EMAIL = "applicant@example.com"
 ADMIN_EMAIL = "admin@example.com"
@@ -57,6 +60,11 @@ def signed_body(priv: Ed25519PrivateKey, sign_context: bytes, fields: dict, path
     return body
 
 
+def _sign(priv: Ed25519PrivateKey, sign_context: bytes, payload: dict) -> str:
+    return base64.b64encode(priv.sign(build_signing_message(sign_context, payload))).decode()
+
+
+# ---------- リクエストボディの作成 ----------
 def toolserver_register_body(priv: Ed25519PrivateKey, name: str = "社内ツールサーバA", email: str = APPLICANT_EMAIL, exec_url: str = EXEC_URL, signed_at: int | None = None) -> dict:
     fields = {"tool_server_public_key": pub_b64(priv), "tool_server_name": name, "tool_server_exec_url": exec_url, "applicant_email": email}
     return signed_body(priv, SIGN_CONTEXT_TOOLSERVER_REGISTER, fields, signed_at=signed_at)
@@ -67,20 +75,48 @@ def agent_register_body(priv: Ed25519PrivateKey, agent_id: str = "agent-1", emai
     return signed_body(priv, SIGN_CONTEXT_AGENT_REGISTER, fields, signed_at=signed_at)
 
 
+def approve_body(admin_priv: Ed25519PrivateKey, sign_context: bytes, path_params: dict, signed_at: int | None = None) -> dict:
+    fields = {"admin_public_key": pub_b64(admin_priv)}
+    return signed_body(admin_priv, sign_context, fields, path_params=path_params, signed_at=signed_at)
+
+
+def tool_add_body(tool_server_priv: Ed25519PrivateKey, tool_endpoint: str = "db_query", context: str = "DBに対してSELECTを実行する", params_schema: dict | None = None, token: str = "proxy-token-1", signed_at: int | None = None, **overrides) -> dict:
+    fields = {
+        "tool_endpoint": tool_endpoint,
+        "context": context,
+        "params_schema": PARAMS_SCHEMA if params_schema is None else params_schema,
+        "tool_proxy_token": token,
+        "tool_server_public_key": pub_b64(tool_server_priv),
+    }
+    fields.update(overrides)
+    return signed_body(tool_server_priv, SIGN_CONTEXT_TOOL_ADDTOOL, fields, signed_at=signed_at)
+
+
+def chtkn_body(tool_server_priv: Ed25519PrivateKey, tool_endpoint: str, token: str = "new-proxy-token", nonce: str | None = None, signed_at: int | None = None) -> dict:
+    """ツール代理トークンの更新(chtkn)のボディ。ツールサーバの秘密鍵で署名する(署名対象には、URLパスのtool_endpointも含む)。"""
+    fields = {"tool_proxy_token": token, "tool_server_public_key": pub_b64(tool_server_priv), "nonce": secrets.token_urlsafe(16) if nonce is None else nonce}
+    return signed_body(tool_server_priv, SIGN_CONTEXT_TOOL_CHTKN, fields, path_params={"tool_endpoint": tool_endpoint}, signed_at=signed_at)
+
+
+def grant_body(agent_priv: Ed25519PrivateKey, agent_id: str, tool_endpoint: str, email: str = APPLICANT_EMAIL, signed_at: int | None = None) -> dict:
+    """ツールの割り当ての申請(grant)のボディ。AIエージェントの秘密鍵で署名する。"""
+    return signed_body(agent_priv, SIGN_CONTEXT_AGENT_GRANT, {"applicant_email": email}, path_params={"agent_id": agent_id, "tool_endpoint": tool_endpoint}, signed_at=signed_at)
+
+
+def revoke_body(signer_priv: Ed25519PrivateKey, agent_id: str, tool_endpoint: str, signed_at: int | None = None) -> dict:
+    """ツールの割り当ての取り消し(revoke)のボディ。管理者、または、そのツールを登録したツールサーバの秘密鍵で署名する。"""
+    return signed_body(signer_priv, SIGN_CONTEXT_AGENT_REVOKE, {"signer_public_key": pub_b64(signer_priv)}, path_params={"agent_id": agent_id, "tool_endpoint": tool_endpoint}, signed_at=signed_at)
+
+
 def list_tools_headers(agent_priv: Ed25519PrivateKey, agent_id: str, signed_at: int | None = None) -> dict:
     """GET agents/{agent_id}/tools の署名ヘッダーを作る。署名対象は agent_id と signed_at。"""
     at = int(time.time()) if signed_at is None else signed_at
-    message = build_signing_message(SIGN_CONTEXT_AGENT_LISTTOOLS, {"agent_id": agent_id, "signed_at": at})
-    return {"X-CaPass-Signed-At": str(at), "X-CaPass-Signature": base64.b64encode(agent_priv.sign(message)).decode()}
+    return {"X-CaPass-Signed-At": str(at), "X-CaPass-Signature": _sign(agent_priv, SIGN_CONTEXT_AGENT_LISTTOOLS, {"agent_id": agent_id, "signed_at": at})}
 
 
 def exec_body(agent_priv: Ed25519PrivateKey, agent_id: str, tool_endpoint: str, params: dict | None = None, nonce: str | None = None, signed_at: int | None = None) -> dict:
     fields = {"params": {"sql": "SELECT 1"} if params is None else params, "nonce": secrets.token_urlsafe(16) if nonce is None else nonce}
     return signed_body(agent_priv, SIGN_CONTEXT_AGENT_EXEC, fields, path_params={"agent_id": agent_id, "tool_endpoint": tool_endpoint}, signed_at=signed_at)
-
-
-def _sign(priv: Ed25519PrivateKey, sign_context: bytes, payload: dict) -> str:
-    return base64.b64encode(priv.sign(build_signing_message(sign_context, payload))).decode()
 
 
 def replace_reserve_body(admin_priv: Ed25519PrivateKey, predecessor_id: int, new_priv: Ed25519PrivateKey, name: str = "新ツールサーバ", exec_url: str = NEW_EXEC_URL, email: str = APPLICANT_EMAIL, signed_at: int | None = None) -> dict:
@@ -114,17 +150,7 @@ def replace_rollback_body(old_priv: Ed25519PrivateKey, predecessor_id: int, sign
     return {"signed_at": at, "signature": _sign(old_priv, SIGN_CONTEXT_TOOLSERVER_REPLACE_ROLLBACK, payload)}
 
 
-def chtkn_body(tool_server_priv: Ed25519PrivateKey, agent_id: str, tool_endpoint: str, token: str = "new-proxy-token", nonce: str | None = None, signed_at: int | None = None) -> dict:
-    """ツール代理トークンの更新(chtkn)のボディを作る。ツールサーバの秘密鍵で署名する(署名対象には、URLパスのagent_id/tool_endpointも含む)。"""
-    fields = {"tool_proxy_token": token, "tool_server_public_key": pub_b64(tool_server_priv), "nonce": secrets.token_urlsafe(16) if nonce is None else nonce}
-    return signed_body(tool_server_priv, SIGN_CONTEXT_AGENT_CHTKN, fields, path_params={"agent_id": agent_id, "tool_endpoint": tool_endpoint}, signed_at=signed_at)
-
-
-def approve_body(admin_priv: Ed25519PrivateKey, sign_context: bytes, path_params: dict, signed_at: int | None = None) -> dict:
-    fields = {"admin_public_key": pub_b64(admin_priv)}
-    return signed_body(admin_priv, sign_context, fields, path_params=path_params, signed_at=signed_at)
-
-
+# ---------- 前提データの直接登録(登録API/承認APIを経由しない) ----------
 def seed_admin(session_factory, priv: Ed25519PrivateKey, email: str = ADMIN_EMAIL, is_active: bool = True) -> None:
     """tbl_adminに管理者を直接登録する(管理者がSQLクライアントで登録する運用の代わり)。"""
     with session_factory() as db:
@@ -141,8 +167,7 @@ def seed_tool_server(
     replaces_tool_server_id: int | None = None,
     expires_in_sec: int | None = None,
 ) -> int:
-    """tbl_tool_serverにレコードを直接登録する(登録API/承認APIを経由しない前提データ作成用)。idを返す。
-    expires_in_secは、RESERVED/STANDBYの期限(現在からの秒数。負の値は、期限切れ)。"""
+    """tbl_tool_serverにレコードを直接登録する。idを返す。expires_in_secは、RESERVED/STANDBYの期限(現在からの秒数。負の値は、期限切れ)。"""
     now = datetime.now(timezone.utc)
     approved = status in (ApprovalStatus.APPROVED, ApprovalStatus.RESERVED, ApprovalStatus.STANDBY)
     with session_factory() as db:
@@ -183,23 +208,54 @@ def seed_agent(session_factory, priv: Ed25519PrivateKey, agent_id: str = "agent-
     return agent_id
 
 
-def seed_agent_tool(session_factory, agent_id: str, tool_endpoint: str, tool_server_priv: Ed25519PrivateKey, token: str = "proxy-token-1", context: str = "テスト用のツール", locked: bool = False, params_schema: dict | None = None) -> None:
-    """tbl_agent_toolにレコードを直接登録する(addtool APIを経由しない前提データ作成用)。トークンは暗号化して保存する。ツールサーバ(tool_server_priv)は、先に、seed_tool_serverで登録しておく。"""
+def seed_tool(session_factory, tool_endpoint: str, tool_server_id: int, token: str = "proxy-token-1", context: str = "テスト用のツール", params_schema: dict | None = None, locked: bool = False) -> int:
+    """tbl_toolにツールを直接登録する(トークンは暗号化して保存する)。idを返す。"""
     now = datetime.now(timezone.utc)
     with session_factory() as db:
-        tool_server_id = db.execute(select(TblToolServer.id).where(TblToolServer.tool_server_public_key == pub_b64(tool_server_priv))).scalar_one()
+        row = TblTool(
+            tool_endpoint=tool_endpoint,
+            context=context,
+            params_schema=PARAMS_SCHEMA if params_schema is None else params_schema,
+            tool_server_id=tool_server_id,
+            tool_proxy_token_encrypted=encrypt_token(token),
+            tool_proxy_token_updated_at=now,
+            locked=locked,
+            created_at=now,
+        )
+        db.add(row)
+        db.commit()
+        return row.id
+
+
+def seed_grant(session_factory, agent_id: str, tool_id: int, status: ApprovalStatus = ApprovalStatus.APPROVED, locked: bool = False) -> None:
+    """tbl_agent_toolに、AIエージェントへのツールの割り当てを直接登録する。"""
+    now = datetime.now(timezone.utc)
+    approved = status == ApprovalStatus.APPROVED
+    with session_factory() as db:
         db.add(
             TblAgentTool(
-                tool_endpoint=tool_endpoint,
-                context=context,
-                params_schema=PARAMS_SCHEMA if params_schema is None else params_schema,
                 agent_id=agent_id,
-                tool_proxy_token_encrypted=encrypt_token(token),
-                tool_proxy_token_updated_at=now,
-                tool_used_at=None,
+                tool_id=tool_id,
+                status=status.value,
+                applicant_email=APPLICANT_EMAIL,
+                approver_email=ADMIN_EMAIL if approved else None,
                 locked=locked,
-                tool_server_id=tool_server_id,
+                tool_used_at=None,
                 created_at=now,
+                approved_at=now if approved else None,
             )
         )
         db.commit()
+
+
+def seed_agent_tool(session_factory, agent_id: str, tool_endpoint: str, tool_server_priv: Ed25519PrivateKey, token: str = "proxy-token-1", context: str = "テスト用のツール", locked: bool = False, params_schema: dict | None = None, grant_status: ApprovalStatus = ApprovalStatus.APPROVED) -> int:
+    """ツール(無ければ登録する)と、AIエージェントへの割り当てを、まとめて登録する。ツールが登録済みなら、tokenなどは使わず、割り当てだけ追加する。tool_idを返す。
+    ツールサーバ(tool_server_priv)は、先に、seed_tool_serverで登録しておく。"""
+    with session_factory() as db:
+        tool_server = db.execute(select(TblToolServer).where(TblToolServer.tool_server_public_key == pub_b64(tool_server_priv))).scalar_one()
+        tool = db.execute(select(TblTool).where(TblTool.tool_endpoint == tool_endpoint)).scalar_one_or_none()
+        tool_server_id, tool_id = tool_server.id, None if tool is None else tool.id
+    if tool_id is None:
+        tool_id = seed_tool(session_factory, tool_endpoint, tool_server_id, token, context, params_schema, locked)
+    seed_grant(session_factory, agent_id, tool_id, grant_status)
+    return tool_id

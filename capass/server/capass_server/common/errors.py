@@ -83,10 +83,17 @@ class DuplicateAgentError(ServiceError):
 
 
 class DuplicateAgentToolError(ServiceError):
-    """同一の[ツールエンドポイント/AIエージェント]が登録済み(409相当)。"""
+    """同じAIエージェントへの、同じツールの割り当てが、申請中または承認済み(409相当)。"""
+
+    def __init__(self, status: str) -> None:
+        super().__init__(f"the tool is already requested or granted for the agent (status: {status})")
+
+
+class DuplicateToolError(ServiceError):
+    """同じツールエンドポイントのツールが、登録済み(409相当)。"""
 
     def __init__(self) -> None:
-        super().__init__("tool is already registered for the agent")
+        super().__init__("tool_endpoint is already registered")
 
 
 class InvalidApprovalStateError(ServiceError):
@@ -182,6 +189,20 @@ class ToolNotFoundError(ServiceError):
 
     def __init__(self) -> None:
         super().__init__("tool not found")
+
+
+class GrantNotFoundError(ServiceError):
+    """指定のAIエージェントへの、ツールの割り当て(申請)が存在しない(404相当)。"""
+
+    def __init__(self) -> None:
+        super().__init__("grant not found")
+
+
+class NotAuthorizedError(ServiceError):
+    """この操作を行う権限が無い(403相当)。対象が存在しない場合も、同じ応答にして、存在を知らせない。"""
+
+    def __init__(self) -> None:
+        super().__init__("not authorized")
 
 
 class ReplacementNotAllowedError(ServiceError):
