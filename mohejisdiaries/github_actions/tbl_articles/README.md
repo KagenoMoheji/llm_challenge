@@ -46,11 +46,32 @@ github_actions/
 
 ## スクリプトの実行方法
 
-### ローカル / Docker での実行
+### ローカル環境での実行
 ```bash
 python generate_table.py \
   --articles-dir articles \
   --output github_actions/deliverable/tbl_articles/table.json
+```
+
+### WSL2 + Docker を使ったワンライナー実行 (ローカル環境を汚さない方法)
+ホストOSのPython環境を変更せず、WSL2上のDockerコンテナ（使い捨て `--rm`）内で依存解決から実行までをワンライナーで行う手順です。
+
+#### 1. テーブル生成
+```bash
+wsl docker run --rm \
+  -v /mnt/$HOME/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace \
+  -w /workspace \
+  python:3.11-slim \
+  sh -c "pip install --no-cache-dir -r github_actions/tbl_articles/requirements.txt && python github_actions/tbl_articles/generate_table.py --articles-dir articles --output github_actions/deliverable/tbl_articles/table.json"
+```
+
+#### 2. ユニットテスト実行
+```bash
+wsl docker run --rm \
+  -v /mnt/$HOME/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace \
+  -w /workspace \
+  python:3.11-slim \
+  sh -c "pip install --no-cache-dir -r github_actions/tbl_articles/requirements.txt && pytest github_actions/tbl_articles/test_generate_table.py -v"
 ```
 
 ### オプション引数

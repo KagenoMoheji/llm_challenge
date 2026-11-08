@@ -343,6 +343,309 @@
                 padding: 40px 20px;
             }
         }
+
+        /* ===================================================
+           トップページ (Top Page Layout & Slider)
+           =================================================== */
+
+        .top-page-layout {
+            display: grid;
+            /* タイル3列(285px * 3 = 855px) + gap(32px) + サイドバー(280px) */
+            grid-template-columns: 855px 280px;
+            gap: 32px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        @media (max-width: 1200px) {
+            .top-page-layout {
+                grid-template-columns: 1fr;
+                gap: 40px;
+                justify-content: start;
+            }
+        }
+
+        /* メインカラム */
+        .top-main-column {
+            min-width: 0;
+            width: 855px;
+            max-width: 100%;
+        }
+
+        /* サイドバーカラム（今後のタグ一覧や検索用） */
+        .top-sidebar-column {
+            min-width: 0;
+            width: 100%;
+        }
+
+        /* 記事一覧セクション */
+        .articles-section {
+            width: 100%;
+        }
+
+        /* 見出しバー: 「記事一覧 [All]」 */
+        .section-header-bar {
+            background-color: #2b2b2b;
+            color: #ffffff;
+            padding: 12px 20px;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+            width: 855px;
+            box-sizing: border-box;
+        }
+
+        .section-header-bar .filter-label {
+            font-size: 15px;
+            color: #b0b0b0;
+            font-weight: 400;
+            margin-left: 10px;
+        }
+
+        /* スライダーインジケーター（ドット） */
+        .slider-pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 0 16px;
+            width: 855px;
+            box-sizing: border-box;
+        }
+
+        .slider-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #d1cfc7;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .slider-dot.active {
+            background-color: #1a1a1a;
+            transform: scale(1.15);
+        }
+
+        .slider-dot:hover:not(.active) {
+            background-color: #8c8983;
+        }
+
+        /* スライダーコンテナ */
+        .slider-viewport {
+            width: 855px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .slider-track {
+            display: flex;
+            transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            width: 100%;
+        }
+
+        /* スライダーページ (3x3 グリッド: 各タイル幅285px・高さ500px固定、上・右線は不要) */
+        .slider-page-grid {
+            width: 855px;
+            flex-shrink: 0;
+            display: grid;
+            grid-template-columns: repeat(3, 285px);
+            grid-template-rows: repeat(3, 300px);
+            box-sizing: border-box;
+        }
+
+        /* 共通タイルスタイル (幅285px・高さ500px固定、左と下の線のみ) */
+        .slider-tile {
+            width: 285px;
+            height: 300px;
+            min-width: 285px;
+            max-width: 285px;
+            min-height: 300px;
+            max-height: 300px;
+            position: relative;
+            border-left: 2px solid #e0ddd5;
+            border-bottom: 2px solid #e0ddd5;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 32px 24px 28px;
+            background-color: rgba(255, 255, 255, 0.4);
+            transition: background-color 0.25s ease;
+            overflow: visible;
+        }
+
+        /* 各タイル左下を始点に線が赤色に染まるアニメーション */
+        /* 下線: 左下から右へ伸びる */
+        .slider-tile::before {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: -2px;
+            width: 0;
+            height: 4px;
+            background-color: var(--accent);
+            transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            z-index: 3;
+        }
+
+        /* 左線: 左下から上へ伸びる */
+        .slider-tile::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: -2px;
+            width: 4px;
+            height: 0;
+            background-color: var(--accent);
+            transition: height 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            z-index: 3;
+        }
+
+        /* ホバー時に左下から赤色線が伸長 */
+        .slider-tile:hover::before {
+            width: calc(100% + 2px);
+        }
+
+        .slider-tile:hover::after {
+            height: calc(100% + 2px);
+        }
+
+        /* ナビゲーションタイル（最　新の記　事、過　去の記　事へ、最　近の記事へ、最　古の記　事） */
+        .nav-tile {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            user-select: none;
+            line-height: 1.45;
+            letter-spacing: 0.12em;
+            padding: 24px;
+        }
+
+        /* 最　新の記　事 (黒太字、中央配置) */
+        .nav-tile-latest {
+            font-size: 40px;
+            font-weight: 700;
+            color: var(--ink);
+        }
+
+        /* 過　去の記事へ / 最　近の記事へ (薄いグレー太字、クリッカブル) */
+        .nav-tile-link {
+            font-size: 40px;
+            font-weight: 700;
+            color: #9c9a94;
+            cursor: pointer;
+            transition: color 0.25s ease;
+        }
+
+        .nav-tile-link:hover {
+            color: var(--ink);
+        }
+
+        /* 最　古の記　事 (薄いグレー太字、非クリッカブル) */
+        .nav-tile-oldest {
+            font-size: 40px;
+            font-weight: 700;
+            color: var(--ink);
+        }
+
+        /* 記事タイル */
+        .article-tile {
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .article-tile-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .article-tile-title {
+            font-size: 25px;
+            font-weight: 700;
+            line-height: 1.5;
+            color: var(--ink);
+            margin-bottom: 12px;
+            display: -webkit-box;
+            -webkit-line-clamp: 8;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: color 0.2s ease;
+        }
+
+        .article-tile:hover .article-tile-title {
+            color: var(--accent);
+        }
+
+        /* 「続きを読む」ボタン: 通常時は四角形「■」 */
+        .tile-readmore-btn {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            background-color: #ededed;
+            color: #555555;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            box-sizing: border-box;
+            transition: transform 0.22s ease, background-color 0.22s ease, color 0.22s ease;
+            z-index: 4;
+            overflow: visible;
+        }
+
+        /* 右側に出現する三角「▶」: 「■」が「■▶」になる */
+        .tile-readmore-btn::after {
+            content: '';
+            position: absolute;
+            top: 25%;
+            right: 0;
+            width: 0;
+            height: 50%;
+            background-color: #ededed;
+            clip-path: polygon(0 0, 100% 50%, 0 100%);
+            transition: right 0.22s ease, width 0.22s ease, background-color 0.22s ease;
+            pointer-events: none;
+        }
+
+        .tile-readmore-btn .btn-label {
+            display: inline-block;
+            transition: color 0.22s ease;
+            letter-spacing: 0.04em;
+        }
+
+        /* hover時: ボタンが左に少しズレて、右側に三角がピョコッと結合出現し「■▶」になる */
+        .slider-tile:hover .tile-readmore-btn {
+            background-color: #e2e2e2;
+            color: var(--accent);
+            transform: translateX(-9px);
+        }
+
+        .slider-tile:hover .tile-readmore-btn::after {
+            background-color: #e2e2e2;
+            right: -8px;
+            width: 9px;
+        }
+
+        .slider-tile:hover .tile-readmore-btn .btn-label {
+            color: var(--accent);
+        }
+
+        /* 空タイル */
+        .empty-tile {
+            pointer-events: none;
+            background-color: transparent;
+        }
     </style>
 </head>
 <body>
@@ -434,38 +737,240 @@
             `;
         }
 
+        // 記事テーブルデータ取得
+        async function fetchArticlesTable() {
+            const candidates = [
+                './github_actions/deliverable/tbl_articles/table.json',
+                'https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/main-github_actions/mohejisdiaries/github_actions/deliverable/tbl_articles/table.json',
+                'https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/github_actions/deliverable/tbl_articles/table.json?ref=main-github_actions'
+            ];
+
+            for (const url of candidates) {
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) continue;
+                    if (url.includes('api.github.com')) {
+                        const data = await response.json();
+                        const content = decodeURIComponent(escape(atob(data.content)));
+                        const parsed = JSON.parse(content);
+                        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                    } else {
+                        const parsed = await response.json();
+                        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                    }
+                } catch (e) {
+                    // 次のURLをフォールバック
+                }
+            }
+
+            // 万一フェッチ失敗時の初期フォールバックデータ
+            return [
+                {
+                    id: "2019001",
+                    fileName: "2019001_sample.yml",
+                    title: "matplotlibでガントチャートを実装する",
+                    createDate: "2019-07-13",
+                    updateDate: "2019-07-13",
+                    tags: ["Python", "個人開発"]
+                }
+            ];
+        }
+
+        // スライダー表示確認用のサンプル記事データ（実データが少ない場合に複数ページ動作を可能にする）
+        const PREVIEW_SAMPLE_ARTICLES = [
+            { id: "2019002", title: "クリック座標をフラグメント識別子にして検索できるChrome拡張を開発した", createDate: "2019-05-19", updateDate: "2019-05-19", tags: ["Chrome拡張", "JavaScript"] },
+            { id: "2019003", title: "Macで欲しいアレコレをAutomatorで", createDate: "2019-05-02", updateDate: "2019-05-02", tags: ["Mac", "作業効率化"] },
+            { id: "2019004", title: "【両OS対応】React Nativeで爆速プロトタイプアプリを作ろう", createDate: "2019-04-19", updateDate: "2019-04-19", tags: ["React", "モバイル"] },
+            { id: "2019005", title: "時系列データから秒単位のガントチャートを美しく生成する", createDate: "2019-04-05", updateDate: "2019-04-05", tags: ["Python", "可視化"] },
+            { id: "2019006", title: "CSS GridレイアウトとFlexboxの使い分け完全ガイド", createDate: "2019-03-22", updateDate: "2019-03-22", tags: ["CSS", "HTML"] },
+            { id: "2019007", title: "TypeScriptによる型安全なWebフロントエンド開発", createDate: "2019-03-10", updateDate: "2019-03-10", tags: ["TypeScript"] },
+            { id: "2019008", title: "GraphQL入門：REST APIからの移行手順とスキーマ設計", createDate: "2019-02-28", updateDate: "2019-02-28", tags: ["Web開発", "API"] },
+            { id: "2019009", title: "Dockerコンテナで構築する快適なローカル開発環境", createDate: "2019-02-15", updateDate: "2019-02-15", tags: ["Docker", "環境構築"] },
+            { id: "2019010", title: "GitHub Actionsで作るCI/CD自動化レシピ集", createDate: "2019-01-30", updateDate: "2019-01-30", tags: ["CI/CD", "GitHub"] },
+            { id: "2019011", title: "自然言語処理におけるBERTモデルのファインチューニング実践", createDate: "2019-01-18", updateDate: "2019-01-18", tags: ["機械学習", "自然言語処理"] },
+            { id: "2019012", title: "WebGLとThree.jsでインタラクティブな3D表現に挑戦する", createDate: "2019-01-05", updateDate: "2019-01-05", tags: ["JavaScript", "WebGL"] },
+            { id: "2018001", title: "個人ブログサイトの静的サイトジェネレーション戦略", createDate: "2018-12-20", updateDate: "2018-12-20", tags: ["静的サイト", "Web"] },
+            { id: "2018002", title: "Webパフォーマンス最適化：Core Web Vitalsの改善手法", createDate: "2018-12-01", updateDate: "2018-12-01", tags: ["パフォーマンス", "フロントエンド"] },
+            { id: "2018003", title: "Go言語で作るCLIツールのアーキテクチャ設計", createDate: "2018-11-15", updateDate: "2018-11-15", tags: ["Go", "CLI"] }
+        ];
+
         // トップページをレンダリング
-        function renderTopPage() {
+        async function renderTopPage() {
             const mainContent = document.getElementById('main-content');
-            document.title = 'ブログトップ';
-            
+            document.title = "Moheji's diaries = もへじの編綴";
+
+            // テーブルデータの取得
+            let loadedArticles = await fetchArticlesTable();
+            if (!Array.isArray(loadedArticles)) loadedArticles = [];
+
+            // 実データ（table.json）をベースにし、スライダー確認用に不足分をサンプル記事で補填
+            const knownIds = new Set(loadedArticles.map(a => a.id));
+            const mergedArticles = [...loadedArticles];
+            for (const sample of PREVIEW_SAMPLE_ARTICLES) {
+                if (!knownIds.has(sample.id)) {
+                    mergedArticles.push(sample);
+                }
+            }
+
+            // 1ページあたり記事は7件（3x3=9マスのうち、左上と右下の2マスがナビ用）
+            const ARTICLES_PER_PAGE = 7;
+            const totalPages = Math.max(1, Math.ceil(mergedArticles.length / ARTICLES_PER_PAGE));
+
+            // スライダーページのHTML生成
+            let pagesHtml = '';
+            for (let p = 0; p < totalPages; p++) {
+                const pageArticles = mergedArticles.slice(p * ARTICLES_PER_PAGE, (p + 1) * ARTICLES_PER_PAGE);
+                const isLastPage = (p === totalPages - 1);
+                // 最終ページの場合、「最古の記事」の直後のスロット番号 (1 + pageArticles.length)
+                const oldestSlotIndex = isLastPage ? (1 + pageArticles.length) : -1;
+
+                let tilesHtml = '';
+                for (let slot = 0; slot < 9; slot++) {
+                    if (slot === 0) {
+                        // 左上タイル (0, 0)
+                        if (p === 0) {
+                            tilesHtml += `
+                                <div class="slider-tile nav-tile nav-tile-latest">
+                                    最　新<br>の<br>記　事
+                                </div>
+                            `;
+                        } else {
+                            tilesHtml += `
+                                <div class="slider-tile nav-tile nav-tile-link nav-tile-prev" data-target-page="${p - 1}" role="button" tabindex="0">
+                                    最　近<br>の<br>記事へ
+                                </div>
+                            `;
+                        }
+                    } else if (isLastPage && slot === oldestSlotIndex && slot <= 8) {
+                        // 最終ページ: 最古の記事の直後の位置に配置
+                        tilesHtml += `
+                            <div class="slider-tile nav-tile nav-tile-oldest">
+                                最　古<br>の<br>記　事
+                            </div>
+                        `;
+                    } else if (!isLastPage && slot === 8) {
+                        // 途中ページの右下タイル (2, 2)
+                        tilesHtml += `
+                            <div class="slider-tile nav-tile nav-tile-link nav-tile-next" data-target-page="${p + 1}" role="button" tabindex="0">
+                                過　去<br>の<br>記事へ
+                            </div>
+                        `;
+                    } else {
+                        // 記事タイル (slot 1〜7) または空タイル
+                        const articleIdx = slot - 1;
+                        if (articleIdx >= 0 && articleIdx < pageArticles.length) {
+                            const article = pageArticles[articleIdx];
+                            // 記事パスの算出: id "2019001" -> /articles/2019/1
+                            let targetPath = '/articles/2019/1';
+                            if (article.id) {
+                                const yMatch = article.id.match(/^(\d{4})(\d+)$/);
+                                if (yMatch) {
+                                    targetPath = `/articles/${yMatch[1]}/${parseInt(yMatch[2], 10)}`;
+                                }
+                            }
+
+                            tilesHtml += `
+                                <div class="slider-tile article-tile" data-path="${targetPath}">
+                                    <div class="article-tile-content">
+                                        <div class="article-tile-title">${escapeHtml(article.title)}</div>
+                                    </div>
+                                    <div class="tile-readmore-btn" data-path="${targetPath}">
+                                        <span class="btn-label">続きを読む</span>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            // 空タイル
+                            tilesHtml += `<div class="slider-tile empty-tile"></div>`;
+                        }
+                    }
+                }
+
+                pagesHtml += `
+                    <div class="slider-page-grid" data-page-index="${p}">
+                        ${tilesHtml}
+                    </div>
+                `;
+            }
+
+            // ドットインジケーターのHTML生成
+            let dotsHtml = '';
+            for (let p = 0; p < totalPages; p++) {
+                dotsHtml += `<div class="slider-dot ${p === 0 ? 'active' : ''}" data-dot-index="${p}"></div>`;
+            }
+
+            // トップページレイアウト全体のHTML構築
             mainContent.innerHTML = `
-                <div style="padding: 60px 24px;">
-                    <h1 style="font-size: 32px; margin-bottom: 40px;">記事一覧</h1>
-                    <ul style="list-style: none; padding: 0;">
-                        <li style="margin-bottom: 20px;">
-                            <span class="article-link" data-path="/articles/2019/1" style="font-size: 18px; color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent); cursor: pointer;">
-                                /articles/2019/1
-                            </span>
-                        </li>
-                    </ul>
+                <div class="top-page-layout">
+                    <!-- メインカラム: 記事一覧スライダー -->
+                    <div class="top-main-column">
+                        <section class="articles-section">
+                            <div class="section-header-bar">
+                                <span>記事一覧</span>
+                                <span class="filter-label">[All]</span>
+                            </div>
+                            <div class="slider-pagination" id="slider-pagination">
+                                ${dotsHtml}
+                            </div>
+                            <div class="slider-viewport">
+                                <div class="slider-track" id="articles-slider-track">
+                                    ${pagesHtml}
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- サイドバーカラム（今後のタグ一覧・検索・日報エリア） -->
+                    <aside class="top-sidebar-column">
+                        <!-- 次のステップでタグ一覧＆記事一覧フィルタ機能等を配置 -->
+                    </aside>
                 </div>
             `;
-            
-            // リンクのクリックイベントを設定
-            const links = mainContent.querySelectorAll('.article-link');
-            links.forEach(link => {
-                link.addEventListener('click', function() {
+
+            // スライダー制御ロジック
+            let currentPage = 0;
+            const track = document.getElementById('articles-slider-track');
+            const dots = mainContent.querySelectorAll('.slider-dot');
+
+            function goToPage(pageIndex) {
+                if (pageIndex < 0 || pageIndex >= totalPages) return;
+                currentPage = pageIndex;
+                if (track) {
+                    track.style.transform = `translateX(-${currentPage * 100}%)`;
+                }
+                dots.forEach((dot, idx) => {
+                    dot.classList.toggle('active', idx === currentPage);
+                });
+            }
+
+            // ドットのクリックイベント
+            dots.forEach(dot => {
+                dot.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const targetPage = parseInt(this.getAttribute('data-dot-index'), 10);
+                    goToPage(targetPage);
+                });
+            });
+
+            // ナビゲーションタイルのクリックイベント（過去の記事へ / 最近の記事へ）
+            const navLinks = mainContent.querySelectorAll('.nav-tile-link');
+            navLinks.forEach(navBtn => {
+                navBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const targetPage = parseInt(this.getAttribute('data-target-page'), 10);
+                    goToPage(targetPage);
+                });
+            });
+
+            // 記事タイルのクリックイベント（タイル全体 & 続きを読むボタン）
+            const articleTiles = mainContent.querySelectorAll('.article-tile, .tile-readmore-btn');
+            articleTiles.forEach(elem => {
+                elem.addEventListener('click', function(e) {
+                    e.stopPropagation();
                     const path = this.getAttribute('data-path');
-                    navigateTo(path);
-                });
-                
-                // ホバー時の視覚効果を追加
-                link.addEventListener('mouseenter', function() {
-                    this.style.opacity = '0.7';
-                });
-                link.addEventListener('mouseleave', function() {
-                    this.style.opacity = '1';
+                    if (path) {
+                        navigateTo(path);
+                    }
                 });
             });
         }
@@ -713,7 +1218,7 @@
             
             if (route.type === 'top') {
                 // トップページを表示
-                renderTopPage();
+                await renderTopPage();
             } else if (route.type === '404') {
                 // 404エラーページを表示
                 render404Page();
