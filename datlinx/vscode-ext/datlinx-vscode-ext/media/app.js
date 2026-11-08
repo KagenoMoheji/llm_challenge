@@ -184,15 +184,27 @@ function buildGraph(parsedFiles) {
     // 重複テーブルの検出
     detectDuplicateTables(parsedFiles);
 
+    // 定義済みTABLEのセット
+    const definedTableIds = new Set();
+    parsedFiles.forEach(file => {
+        if (file.objType === 'TABLE') {
+            definedTableIds.add(file.name.toLowerCase());
+        }
+    });
+
     // 重複テーブル名セット
     const duplicateTableIds = new Set(state.duplicateTables.map(d => d.tableId));
 
-    // プロシージャ投入先マップ: targetTableLower -> procedureId
+    // プロシージャ投入先マップ: targetTableLower -> [procedureId, ...]
     const insertProducerMap = new Map();
     parsedFiles.forEach(file => {
         if (file.insertTargets) {
             file.insertTargets.forEach(target => {
-                insertProducerMap.set(target.name.toLowerCase(), file.name.toLowerCase());
+                const tId = target.name.toLowerCase();
+                if (!insertProducerMap.has(tId)) {
+                    insertProducerMap.set(tId, []);
+                }
+                insertProducerMap.get(tId).push(file.name.toLowerCase());
             });
         }
     });
@@ -224,13 +236,16 @@ function buildGraph(parsedFiles) {
         });
     });
 
-    // 2. FROM / JOIN または INSERT INTO で参照されているが未定義のオブジェクトを TABLE ノードとして登録
+    // 2. FROM / JOIN で参照されているが未定義のオブジェクトを TABLE ノードとして登録
+    // （※INSERT投入先テーブルでCREATE TABLEが無いものはプロシージャ自身が現在地となるためノード作成しない）
     parsedFiles.forEach(file => {
-        // FROM / JOIN
         file.dependencies.forEach(dep => {
             const depId = dep.name.toLowerCase();
             if (!state.nodes.has(depId)) {
+                // 重複テーブルかつ非表示ONなら作成しない
                 if (state.hideDuplicateTables && duplicateTableIds.has(depId)) return;
+                // プロシージャの投入先でCREATE TABLEが無い場合も、プロシージャが現在地となるため作成しない
+                if (insertProducerMap.has(depId) && !definedTableIds.has(depId)) return;
 
                 state.nodes.set(depId, {
                     id: depId,
@@ -250,33 +265,6 @@ function buildGraph(parsedFiles) {
                 });
             }
         });
-
-        // INSERT INTO の先
-        if (file.insertTargets) {
-            file.insertTargets.forEach(target => {
-                const targetId = target.name.toLowerCase();
-                if (!state.nodes.has(targetId)) {
-                    if (state.hideDuplicateTables && duplicateTableIds.has(targetId)) return;
-
-                    state.nodes.set(targetId, {
-                        id: targetId,
-                        name: target.name,
-                        schema: target.schema,
-                        type: 'TABLE',
-                        fileName: '(Target Table)',
-                        fullPath: '',
-                        content: null,
-                        insertTargets: [],
-                        isDuplicateTable: duplicateTableIds.has(targetId),
-                        x: 0,
-                        y: 0,
-                        level: 0,
-                        inDegree: 0,
-                        outDegree: 0
-                    });
-                }
-            });
-        }
     });
 
     // 3. エッジの構築
@@ -303,12 +291,21 @@ function buildGraph(parsedFiles) {
         file.dependencies.forEach(dep => {
             const sourceDepId = dep.name.toLowerCase();
 
-            // もし「重複CREATE TABLE非表示」がONで、参照元が重複テーブルの場合：
-            // そのテーブルにINSERTしているプロシージャが存在すれば、プロシージャから直接接続！
-            if (state.hideDuplicateTables && duplicateTableIds.has(sourceDepId)) {
-                const producerProcId = insertProducerMap.get(sourceDepId);
-                if (producerProcId && state.nodes.has(producerProcId) && state.nodes.has(targetId)) {
-                    addEdge(producerProcId, targetId);
+            // もし参照元テーブルにINSERTしているプロシージャが存在する場合:
+            // A) 重複CREATE TABLEがあり非表示トグルがONの場合
+            // B) そもそも重複するCREATE TABLEが存在しない（CREATE TABLEが無い）場合
+            // ──▶ プロシージャから直接接続（プロシージャ自身が投入先テーブルの現在地）
+            if (insertProducerMap.has(sourceDepId)) {
+                const isDupAndHidden = state.hideDuplicateTables && duplicateTableIds.has(sourceDepId);
+                const isNotCreated = !definedTableIds.has(sourceDepId);
+
+                if (isDupAndHidden || isNotCreated) {
+                    const producers = insertProducerMap.get(sourceDepId);
+                    producers.forEach(producerProcId => {
+                        if (state.nodes.has(producerProcId) && state.nodes.has(targetId)) {
+                            addEdge(producerProcId, targetId);
+                        }
+                    });
                     return;
                 }
             }
@@ -319,11 +316,12 @@ function buildGraph(parsedFiles) {
         });
 
         // INSERT INTO の接続 (プロシージャ ──▶ 投入先テーブル)
+        // ※CREATE TABLE が存在し、かつ非表示トグルがOFFの時のみエッジを作成
         if (file.insertTargets && file.insertTargets.length > 0) {
             file.insertTargets.forEach(target => {
                 const insTargetId = target.name.toLowerCase();
-                // 重複非表示ONの場合はテーブルノードが存在しないのでエッジは作らない（プロシージャ自身が現在地）
-                if (state.hideDuplicateTables && duplicateTableIds.has(insTargetId)) {
+                // CREATE TABLE が無い場合、または非表示トグルONの場合はエッジを作らない
+                if (!definedTableIds.has(insTargetId) || (state.hideDuplicateTables && duplicateTableIds.has(insTargetId))) {
                     return;
                 }
                 if (state.nodes.has(targetId) && state.nodes.has(insTargetId)) {
