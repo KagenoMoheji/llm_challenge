@@ -10,8 +10,10 @@ const state = {
     parsedFiles: [],
     nodes: new Map(),
     edges: [],
-    selectedNodeId: null, // [4] 選択中ノード
-    searchQuery: "",      // [3] 検索クエリ
+    duplicateTables: [],        // 重複テーブル情報一覧
+    hideDuplicateTables: false, // 重複「CREATE TABLE」の非表示トグル状態
+    selectedNodeId: null,       // [4] 選択中ノード
+    searchQuery: "",            // [3] 検索クエリ
     zoom: 1,
     panX: 40,
     panY: 40,
@@ -31,9 +33,11 @@ const searchInput = document.getElementById('search-input');
 const searchClear = document.getElementById('search-clear');
 const searchCount = document.getElementById('search-count');
 const statsPill = document.getElementById('stats-pill');
+const sidebar = document.getElementById('sidebar');
 const sidebarFiles = document.getElementById('sidebar-files');
 const fileCountBadge = document.getElementById('file-count-badge');
-const sidebar = document.getElementById('sidebar');
+const sidebarDuplicates = document.getElementById('sidebar-duplicates');
+const toggleHideDuplicates = document.getElementById('toggle-hide-duplicates');
 const folderNameBadge = document.getElementById('folder-name-badge');
 
 /**
@@ -46,14 +50,13 @@ function stripSqlComments(sql) {
 }
 
 /**
- * [2] SQLパース
- * (FROM|JOIN)( ?\n.*| )(\n.*)?([a-zA-Z0-9]+\.)?(テーブル名|プロシージャ名|ビュー名)
+ * [2] SQLパース (CREATE PROCEDURE / VIEW / FUNCTION / TABLE + FROM / JOIN + INSERT INTO)
  */
 function parseSqlContent(fileName, fullPath, sqlContent) {
     const cleanSql = stripSqlComments(sqlContent);
 
     // 1. 定義されているオブジェクト名と種別
-    const createRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?(?:DEFENDER\s+|SECURITY\s+DEFINER\s+)?(PROCEDURE|FUNCTION|VIEW)\s+(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/i;
+    const createRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?(?:DEFENDER\s+|SECURITY\s+DEFINER\s+)?(PROCEDURE|FUNCTION|VIEW|TABLE)\s+(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/i;
     const matchCreate = cleanSql.match(createRegex);
 
     let objType = 'VIEW';
@@ -70,9 +73,10 @@ function parseSqlContent(fileName, fullPath, sqlContent) {
         if (/^sp_/i.test(baseName)) objType = 'PROCEDURE';
         else if (/^fn_/i.test(baseName)) objType = 'FUNCTION';
         else if (/^v_/i.test(baseName)) objType = 'VIEW';
+        else if (/^(?:tbl_|t_|m_|create_table_)/i.test(baseName)) objType = 'TABLE';
     }
 
-    // 2. 要件の正規表現で依存元を抽出
+    // 2. FROM / JOIN からの依存元抽出
     const fromJoinRegex = /(?:\bFROM|\bJOIN)(?: ?\r?\n[ \t]*|[ \t]+)(?:\r?\n[ \t]*)?(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi;
     
     const dependencies = [];
@@ -102,6 +106,26 @@ function parseSqlContent(fileName, fullPath, sqlContent) {
         }
     }
 
+    // 3. INSERT INTO 投入先テーブルの抽出 (プロシージャ用)
+    const insertRegex = /\bINSERT\s+(?:INTO\s+)?(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi;
+    const insertTargets = [];
+    let insertMatch;
+
+    while ((insertMatch = insertRegex.exec(cleanSql)) !== null) {
+        const insSchema = insertMatch[1] || '';
+        const insName = insertMatch[2];
+
+        if (!insName) continue;
+        if (reservedKeywords.has(insName.toUpperCase())) continue;
+
+        if (!insertTargets.some(t => t.name.toLowerCase() === insName.toLowerCase())) {
+            insertTargets.push({
+                schema: insSchema,
+                name: insName
+            });
+        }
+    }
+
     return {
         fileName,
         fullPath: fullPath || '',
@@ -109,8 +133,45 @@ function parseSqlContent(fileName, fullPath, sqlContent) {
         objType,
         schema,
         name: objName,
-        dependencies
+        dependencies,
+        insertTargets
     };
+}
+
+/**
+ * 重複テーブル一覧の検出
+ * INSERTも行っているプロシージャの投入先テーブルと、CREATE TABLEされたテーブルの間で同名テーブルを検出
+ */
+function detectDuplicateTables(parsedFiles) {
+    const tableDefinitions = new Map(); // tableNameLower -> file
+    parsedFiles.forEach(file => {
+        if (file.objType === 'TABLE') {
+            tableDefinitions.set(file.name.toLowerCase(), file);
+        }
+    });
+
+    const duplicates = [];
+    parsedFiles.forEach(file => {
+        if (file.insertTargets && file.insertTargets.length > 0) {
+            file.insertTargets.forEach(target => {
+                const targetLower = target.name.toLowerCase();
+                if (tableDefinitions.has(targetLower)) {
+                    const tableFile = tableDefinitions.get(targetLower);
+                    duplicates.push({
+                        tableName: target.name,
+                        schema: target.schema || tableFile.schema,
+                        procedureName: file.name,
+                        procedureFileName: file.fileName,
+                        procedureId: file.name.toLowerCase(),
+                        tableFileName: tableFile.fileName,
+                        tableId: targetLower
+                    });
+                }
+            });
+        }
+    });
+
+    state.duplicateTables = duplicates;
 }
 
 /**
@@ -120,9 +181,31 @@ function buildGraph(parsedFiles) {
     state.nodes.clear();
     state.edges = [];
 
-    // 1. ファイル定義オブジェクト
+    // 重複テーブルの検出
+    detectDuplicateTables(parsedFiles);
+
+    // 重複テーブル名セット
+    const duplicateTableIds = new Set(state.duplicateTables.map(d => d.tableId));
+
+    // プロシージャ投入先マップ: targetTableLower -> procedureId
+    const insertProducerMap = new Map();
+    parsedFiles.forEach(file => {
+        if (file.insertTargets) {
+            file.insertTargets.forEach(target => {
+                insertProducerMap.set(target.name.toLowerCase(), file.name.toLowerCase());
+            });
+        }
+    });
+
+    // 1. 各ファイルで定義されているオブジェクトをノード登録
     parsedFiles.forEach(file => {
         const id = file.name.toLowerCase();
+
+        // 「重複CREATE TABLEを非表示」がONかつ自身が重複TABLEの場合、マインドマップノードから除外
+        if (state.hideDuplicateTables && file.objType === 'TABLE' && duplicateTableIds.has(id)) {
+            return;
+        }
+
         state.nodes.set(id, {
             id,
             name: file.name,
@@ -131,6 +214,8 @@ function buildGraph(parsedFiles) {
             fileName: file.fileName,
             fullPath: file.fullPath,
             content: file.content,
+            insertTargets: file.insertTargets || [],
+            isDuplicateTable: duplicateTableIds.has(id) && file.objType === 'TABLE',
             x: 0,
             y: 0,
             level: 0,
@@ -139,11 +224,14 @@ function buildGraph(parsedFiles) {
         });
     });
 
-    // 2. 参照されているが未定義のオブジェクト（基底テーブル）
+    // 2. FROM / JOIN または INSERT INTO で参照されているが未定義のオブジェクトを TABLE ノードとして登録
     parsedFiles.forEach(file => {
+        // FROM / JOIN
         file.dependencies.forEach(dep => {
             const depId = dep.name.toLowerCase();
             if (!state.nodes.has(depId)) {
+                if (state.hideDuplicateTables && duplicateTableIds.has(depId)) return;
+
                 state.nodes.set(depId, {
                     id: depId,
                     name: dep.name,
@@ -152,6 +240,8 @@ function buildGraph(parsedFiles) {
                     fileName: '(Database Table)',
                     fullPath: '',
                     content: null,
+                    insertTargets: [],
+                    isDuplicateTable: false,
                     x: 0,
                     y: 0,
                     level: 0,
@@ -160,21 +250,87 @@ function buildGraph(parsedFiles) {
                 });
             }
         });
+
+        // INSERT INTO の先
+        if (file.insertTargets) {
+            file.insertTargets.forEach(target => {
+                const targetId = target.name.toLowerCase();
+                if (!state.nodes.has(targetId)) {
+                    if (state.hideDuplicateTables && duplicateTableIds.has(targetId)) return;
+
+                    state.nodes.set(targetId, {
+                        id: targetId,
+                        name: target.name,
+                        schema: target.schema,
+                        type: 'TABLE',
+                        fileName: '(Target Table)',
+                        fullPath: '',
+                        content: null,
+                        insertTargets: [],
+                        isDuplicateTable: duplicateTableIds.has(targetId),
+                        x: 0,
+                        y: 0,
+                        level: 0,
+                        inDegree: 0,
+                        outDegree: 0
+                    });
+                }
+            });
+        }
     });
 
-    // 3. エッジ構築: 依存元 (from) ──▶ 依存先 (to)
+    // 3. エッジの構築
     let edgeCounter = 0;
+    const addedEdgeSet = new Set();
+
+    function addEdge(sourceId, targetId) {
+        if (sourceId === targetId) return;
+        const key = `${sourceId}___${targetId}`;
+        if (addedEdgeSet.has(key)) return;
+        addedEdgeSet.add(key);
+
+        state.edges.push({
+            id: `edge_${sourceId}_to_${targetId}_${edgeCounter++}`,
+            from: sourceId,
+            to: targetId
+        });
+    }
+
     parsedFiles.forEach(file => {
         const targetId = file.name.toLowerCase();
+
+        // FROM / JOIN の接続
         file.dependencies.forEach(dep => {
-            const sourceId = dep.name.toLowerCase();
-            const edgeId = `edge_${sourceId}_to_${targetId}_${edgeCounter++}`;
-            state.edges.push({
-                id: edgeId,
-                from: sourceId,
-                to: targetId
-            });
+            const sourceDepId = dep.name.toLowerCase();
+
+            // もし「重複CREATE TABLE非表示」がONで、参照元が重複テーブルの場合：
+            // そのテーブルにINSERTしているプロシージャが存在すれば、プロシージャから直接接続！
+            if (state.hideDuplicateTables && duplicateTableIds.has(sourceDepId)) {
+                const producerProcId = insertProducerMap.get(sourceDepId);
+                if (producerProcId && state.nodes.has(producerProcId) && state.nodes.has(targetId)) {
+                    addEdge(producerProcId, targetId);
+                    return;
+                }
+            }
+
+            if (state.nodes.has(sourceDepId) && state.nodes.has(targetId)) {
+                addEdge(sourceDepId, targetId);
+            }
         });
+
+        // INSERT INTO の接続 (プロシージャ ──▶ 投入先テーブル)
+        if (file.insertTargets && file.insertTargets.length > 0) {
+            file.insertTargets.forEach(target => {
+                const insTargetId = target.name.toLowerCase();
+                // 重複非表示ONの場合はテーブルノードが存在しないのでエッジは作らない（プロシージャ自身が現在地）
+                if (state.hideDuplicateTables && duplicateTableIds.has(insTargetId)) {
+                    return;
+                }
+                if (state.nodes.has(targetId) && state.nodes.has(insTargetId)) {
+                    addEdge(targetId, insTargetId);
+                }
+            });
+        }
     });
 
     // 次数計算
@@ -194,6 +350,7 @@ function buildGraph(parsedFiles) {
     // 6. レンダリング
     renderGraph();
     renderSidebar();
+    renderDuplicatesSidebar();
     updateStats();
 }
 
@@ -230,11 +387,11 @@ function computeNodeLevels() {
  * ノード自動レイアウト
  */
 function layoutNodes() {
-    const nodeWidth = 280;
+    const nodeWidth = 290;
     const horizontalGap = 130;
-    const colWidth = nodeWidth + horizontalGap; // 410px
+    const colWidth = nodeWidth + horizontalGap; // 420px
 
-    const rowHeight = 150; // ノード高さ約100px + 垂直マージン50px
+    const rowHeight = 155; // ノード高さ約100px + 垂直マージン55px
     const startX = 80;
     const startY = 80;
 
@@ -311,6 +468,17 @@ function createNodeElement(node) {
     else if (node.type === 'PROCEDURE') badgeClass = 'badge-procedure';
     else if (node.type === 'FUNCTION') badgeClass = 'badge-function';
 
+    // INSERT投入先テーブルのバッジ表示 (プロシージャがINSERTを持つ場合)
+    let insertBadgeHtml = '';
+    if (node.insertTargets && node.insertTargets.length > 0) {
+        const targetNames = node.insertTargets.map(t => escapeHtml(t.name)).join(', ');
+        insertBadgeHtml = `
+            <div class="node-insert-badge" title="INSERT投入先テーブル (現在地): ${targetNames}">
+                ↳ 投入先: ${targetNames}
+            </div>
+        `;
+    }
+
     el.innerHTML = `
         <div class="node-header">
             <span class="badge ${badgeClass}">${node.type}</span>
@@ -319,6 +487,7 @@ function createNodeElement(node) {
         <div class="node-body">
             ${node.schema ? `<div class="node-schema">${escapeHtml(node.schema)}.</div>` : ''}
             <div class="node-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</div>
+            ${insertBadgeHtml}
         </div>
         <div class="node-footer">
             <span class="stat-item" title="依存元 (参照している元)">
@@ -404,8 +573,8 @@ function updateEdges() {
             svgLayer.appendChild(pathEl);
         }
 
-        const nodeWidth = 280;
-        const nodeHeight = 88;
+        const nodeWidth = 290;
+        const nodeHeight = 92;
 
         const fromX = source.x + nodeWidth;
         const fromY = source.y + (nodeHeight / 2);
@@ -689,7 +858,7 @@ function fitToScreen() {
     state.nodes.forEach(node => {
         minX = Math.min(minX, node.x);
         minY = Math.min(minY, node.y);
-        maxX = Math.max(maxX, node.x + 280);
+        maxX = Math.max(maxX, node.x + 290);
         maxY = Math.max(maxY, node.y + 120);
     });
 
@@ -712,7 +881,7 @@ function fitToScreen() {
 function centerOnNode(node) {
     const viewW = canvasWrapper.clientWidth;
     const viewH = canvasWrapper.clientHeight;
-    state.panX = (viewW / 2) - ((node.x + 140) * state.zoom);
+    state.panX = (viewW / 2) - ((node.x + 145) * state.zoom);
     state.panY = (viewH / 2) - ((node.y + 50) * state.zoom);
     updateTransform();
 }
@@ -760,7 +929,9 @@ window.addEventListener('message', (event) => {
     }
 });
 
-// サイドバー
+/**
+ * 上段: 解析済みSQLファイル一覧の描画
+ */
 function renderSidebar() {
     sidebarFiles.innerHTML = '';
     fileCountBadge.textContent = `${state.parsedFiles.length} 件`;
@@ -768,15 +939,27 @@ function renderSidebar() {
     state.parsedFiles.forEach(file => {
         const card = document.createElement('div');
         card.className = 'file-card';
+
+        let badgeClass = 'badge-table';
+        if (file.objType === 'VIEW') badgeClass = 'badge-view';
+        else if (file.objType === 'PROCEDURE') badgeClass = 'badge-procedure';
+        else if (file.objType === 'FUNCTION') badgeClass = 'badge-function';
+
+        let insertHtml = '';
+        if (file.insertTargets && file.insertTargets.length > 0) {
+            insertHtml = file.insertTargets.map(t => `<span class="insert-pill">↳ INSERT: ${escapeHtml(t.name)}</span>`).join('');
+        }
+
         card.innerHTML = `
             <div class="file-card-title">
                 <span>${escapeHtml(file.name)}</span>
-                <span class="badge ${file.objType === 'PROCEDURE' ? 'badge-procedure' : file.objType === 'FUNCTION' ? 'badge-function' : 'badge-view'}">${file.objType}</span>
+                <span class="badge ${badgeClass}">${file.objType}</span>
             </div>
             <div class="file-card-deps">
+                ${insertHtml}
                 ${file.dependencies.length > 0 
                     ? file.dependencies.map(d => `<span class="dep-pill">⮑ ${escapeHtml(d.name)}</span>`).join('') 
-                    : '<span style="color:#64748b;">(依存なし)</span>'}
+                    : (!insertHtml ? '<span style="color:#64748b;">(依存なし)</span>' : '')}
             </div>
         `;
 
@@ -792,6 +975,65 @@ function renderSidebar() {
     });
 }
 
+/**
+ * 下段: 重複テーブル一覧の描画
+ */
+function renderDuplicatesSidebar() {
+    sidebarDuplicates.innerHTML = '';
+
+    if (state.duplicateTables.length === 0) {
+        sidebarDuplicates.innerHTML = `
+            <div style="text-align:center; padding: 24px 10px; color: var(--text-sub); font-size: 12px;">
+                <div style="font-size: 18px; color: #34d399; margin-bottom: 6px;">✓</div>
+                INSERT投入先とCREATE TABLEの重複はありません
+            </div>
+        `;
+        return;
+    }
+
+    state.duplicateTables.forEach(dup => {
+        const card = document.createElement('div');
+        card.className = 'duplicate-card';
+        card.innerHTML = `
+            <div class="dup-table-name">
+                <span>${escapeHtml(dup.schema ? dup.schema + '.' : '')}${escapeHtml(dup.tableName)}</span>
+            </div>
+            <div class="dup-detail">
+                <div class="dup-row">
+                    <span class="badge badge-procedure" style="font-size:9px;">PROC</span>
+                    <span style="color:var(--text-main); font-weight:600;">${escapeHtml(dup.procedureName)}</span>
+                    <span style="font-size:10px; color:#94a3b8;">(投入元)</span>
+                </div>
+                <div class="dup-row">
+                    <span class="badge badge-table" style="font-size:9px;">TABLE</span>
+                    <span style="color:var(--text-main); font-weight:600;">${escapeHtml(dup.tableFileName)}</span>
+                    <span style="font-size:10px; color:#94a3b8;">(定義元)</span>
+                </div>
+            </div>
+        `;
+
+        // クリックで該当ノードへジャンプ
+        card.addEventListener('click', () => {
+            const targetNode = state.nodes.get(dup.procedureId) || state.nodes.get(dup.tableId);
+            if (targetNode) {
+                centerOnNode(targetNode);
+                toggleNodeSelection(targetNode.id);
+            }
+        });
+
+        sidebarDuplicates.appendChild(card);
+    });
+}
+
+/**
+ * 重複CREATE TABLE非表示トグルの変更イベント
+ */
+toggleHideDuplicates.addEventListener('change', (e) => {
+    state.hideDuplicateTables = e.target.checked;
+    buildGraph(state.parsedFiles);
+    fitToScreen();
+});
+
 function updateStats() {
     statsPill.textContent = `${state.nodes.size} ノード / ${state.edges.length} 依存関係`;
 }
@@ -799,6 +1041,56 @@ function updateStats() {
 // サイドバー開閉（margin-rightでスムーズに伸縮し、キャンバス描画領域が右端まで拡大）
 document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
     sidebar.classList.toggle('collapsed');
+});
+
+/**
+ * 各一覧のハンバーガーメニュー風折りたたみトグル
+ */
+const sectionFiles = document.getElementById('section-files');
+const sectionDuplicates = document.getElementById('section-duplicates');
+
+document.getElementById('btn-toggle-section-files').addEventListener('click', () => {
+    sectionFiles.classList.toggle('is-collapsed');
+});
+
+document.getElementById('btn-toggle-section-duplicates').addEventListener('click', () => {
+    sectionDuplicates.classList.toggle('is-collapsed');
+});
+
+/**
+ * スプリッターによる上下リサイズ機能
+ */
+const resizer = document.getElementById('sidebar-resizer');
+let isResizing = false;
+let startY = 0;
+let startHeight = 0;
+
+resizer.addEventListener('mousedown', (e) => {
+    if (sectionFiles.classList.contains('is-collapsed') || sectionDuplicates.classList.contains('is-collapsed')) {
+        return;
+    }
+    isResizing = true;
+    startY = e.clientY;
+    startHeight = sectionFiles.getBoundingClientRect().height;
+    resizer.classList.add('resizing');
+    document.body.style.cursor = 'row-resize';
+    e.preventDefault();
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const deltaY = e.clientY - startY;
+    const newHeight = Math.max(90, Math.min(sidebar.clientHeight - 130, startHeight + deltaY));
+    sectionFiles.style.height = `${newHeight}px`;
+    sectionFiles.style.flex = 'none';
+});
+
+window.addEventListener('mouseup', () => {
+    if (isResizing) {
+        isResizing = false;
+        resizer.classList.remove('resizing');
+        document.body.style.cursor = '';
+    }
 });
 
 // SQLモーダル

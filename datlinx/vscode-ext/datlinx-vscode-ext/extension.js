@@ -104,7 +104,6 @@ function activate(context) {
         for (const entry of entries) {
             const fullPath = path.join(dirPath, entry.name);
             if (entry.isDirectory()) {
-                // node_modulesや.gitは除外
                 if (entry.name !== 'node_modules' && entry.name !== '.git') {
                     await scanSqlFiles(fullPath, fileList);
                 }
@@ -166,17 +165,15 @@ function activate(context) {
         const sampleFiles = getSampleSqlList();
         currentFolderPath = null;
         currentFilesData = sampleFiles;
-        sendDataToWebview(webview, sampleFiles, 'Sample Data (10 files)');
+        sendDataToWebview(webview, sampleFiles, 'Sample Data (13 files)');
     }
 
     // 1. コマンド: フォルダを開く (エクスプローラー右クリック / パレット)
     context.subscriptions.push(
         vscode.commands.registerCommand('datlinx.openFolder', async (uri) => {
             if (uri && uri.fsPath) {
-                // エクスプローラーでフォルダを右クリックした場合
                 await loadFolder(uri.fsPath);
             } else {
-                // コマンドパレットからの場合
                 const workspaceFolders = vscode.workspace.workspaceFolders;
                 const defaultUri = workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri : undefined;
                 await promptAndOpenFolder(defaultUri);
@@ -225,10 +222,68 @@ function getHtmlForWebview(webview, context) {
 }
 
 /**
- * 内蔵サンプルSQLリスト (10ファイル)
+ * 内蔵サンプルSQLリスト (13ファイル: CREATE TABLE / INSERT INTO を含む)
  */
 function getSampleSqlList() {
     return [
+        {
+            name: "create_table_daily_sales_summary.sql",
+            fullPath: "",
+            content: `CREATE TABLE dbo.daily_sales_summary (
+    summary_date DATE NOT NULL,
+    product_id INT NOT NULL,
+    product_name NVARCHAR(100),
+    total_sales DECIMAL(18, 2),
+    order_count INT,
+    created_at DATETIME DEFAULT GETDATE()
+);`
+        },
+        {
+            name: "sp_calc_and_insert_daily_summary.sql",
+            fullPath: "",
+            content: `CREATE PROCEDURE dbo.sp_calc_and_insert_daily_summary
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- 日次売上集計を計算し、daily_sales_summaryテーブルへ投入
+    INSERT INTO dbo.daily_sales_summary (summary_date, product_id, product_name, total_sales, order_count)
+    SELECT
+        CAST(d.order_date AS DATE) AS summary_date,
+        d.product_id,
+        d.product_name,
+        SUM(d.subtotal) AS total_sales,
+        COUNT(d.order_id) AS order_count
+    FROM
+        dbo.v_order_details d
+    INNER JOIN
+        dbo.v_active_users u
+        ON d.user_id = u.user_id
+    GROUP BY
+        CAST(d.order_date AS DATE),
+        d.product_id,
+        d.product_name;
+END;`
+        },
+        {
+            name: "v_daily_sales_dashboard.sql",
+            fullPath: "",
+            content: `CREATE VIEW dbo.v_daily_sales_dashboard AS
+SELECT
+    s.summary_date,
+    s.product_id,
+    s.product_name,
+    s.total_sales,
+    s.order_count,
+    CASE
+        WHEN s.total_sales >= 100000 THEN 'TARGET_ACHIEVED'
+        ELSE 'IN_PROGRESS'
+    END AS sales_status
+FROM
+    dbo.daily_sales_summary s
+WHERE
+    s.summary_date >= DATEADD(day, -30, CAST(GETDATE() AS DATE));`
+        },
         {
             name: "v_active_users.sql",
             fullPath: "",

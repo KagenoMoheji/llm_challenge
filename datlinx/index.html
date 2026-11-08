@@ -216,13 +216,13 @@
             background: rgba(15, 23, 42, 0.7);
             color: var(--text-main);
             font-size: 13px;
-            width: 220px;
+            width: 200px;
             transition: all 0.2s ease;
             outline: none;
         }
 
         .search-input:focus {
-            width: 270px;
+            width: 250px;
             border-color: var(--node-selected-border);
             box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25);
             background: rgba(15, 23, 42, 0.95);
@@ -308,7 +308,7 @@
         .node {
             position: absolute;
             pointer-events: auto;
-            width: 280px;
+            width: 290px;
             background: #1e293b;
             border: 1.5px solid rgba(255, 255, 255, 0.15);
             border-radius: 12px;
@@ -405,7 +405,7 @@
             border-top: 1px solid rgba(220, 38, 38, 0.25) !important;
         }
 
-        /* [3] 検索フォーム一致時のハイライト (薄い橙色) */
+        /* [3] 検索フォーム一致時のハイライト */
         .node.node-search-match {
             background-color: var(--node-selected-bg) !important;
             border-color: var(--node-selected-border) !important;
@@ -505,6 +505,43 @@
             line-height: 1.35;
         }
 
+        /* INSERT投入先バッジ */
+        .node-insert-badge {
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(249, 115, 22, 0.15);
+            color: #fb923c;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .node.node-selected .node-insert-badge {
+            background: rgba(234, 88, 12, 0.2);
+            color: #7c2d12;
+            border-color: rgba(234, 88, 12, 0.4);
+        }
+
+        .node.node-upstream .node-insert-badge {
+            background: rgba(22, 163, 74, 0.2);
+            color: #14532d;
+            border-color: rgba(22, 163, 74, 0.4);
+        }
+
+        .node.node-downstream .node-insert-badge {
+            background: rgba(220, 38, 38, 0.2);
+            color: #7f1d1d;
+            border-color: rgba(220, 38, 38, 0.4);
+        }
+
         .node-footer {
             padding: 6px 12px;
             background: rgba(0, 0, 0, 0.22);
@@ -545,10 +582,10 @@
             filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.7));
         }
 
-        /* サイドバー（margin-rightでスムーズにスライドアウトし、キャンバス幅を拡張） */
+        /* サイドバー（上下分割 & スプリッターリサイズ対応） */
         #sidebar {
-            width: 330px;
-            min-width: 330px;
+            width: 360px;
+            min-width: 360px;
             background: var(--panel-bg);
             backdrop-filter: blur(12px);
             border-left: 1px solid var(--panel-border);
@@ -556,34 +593,174 @@
             flex-direction: column;
             transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 90;
+            overflow: hidden;
         }
 
         #sidebar.collapsed {
-            margin-right: -330px;
+            margin-right: -360px;
         }
 
-        .sidebar-header {
-            padding: 14px 16px;
+        .sidebar-section {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: flex 0.2s ease, height 0.2s ease;
+        }
+
+        #section-files {
+            height: 52%;
+            min-height: 90px;
+        }
+
+        #section-duplicates {
+            flex: 1;
+            min-height: 90px;
+        }
+
+        .sidebar-section.is-collapsed {
+            height: 44px !important;
+            min-height: 44px !important;
+            flex: none !important;
+        }
+
+        .sidebar-section.is-collapsed .sidebar-section-body {
+            display: none !important;
+        }
+
+        .sidebar-section-header {
+            height: 44px;
+            min-height: 44px;
+            padding: 0 14px;
             border-bottom: 1px solid var(--panel-border);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 13.5px;
+            font-size: 13px;
             font-weight: 600;
+            background: rgba(255, 255, 255, 0.02);
         }
 
-        .sidebar-content {
+        .section-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-toggle-btn {
+            background: none;
+            border: none;
+            color: var(--text-sub);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: color 0.2s ease, background 0.2s ease;
+        }
+
+        .section-toggle-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .sidebar-section-body {
             flex: 1;
             overflow-y: auto;
-            padding: 12px;
+            padding: 10px 12px;
         }
 
+        /* スプリッター（水平リサイズハンドル） */
+        .sidebar-resizer {
+            height: 6px;
+            min-height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: row-resize;
+            position: relative;
+            transition: background 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .sidebar-resizer:hover, .sidebar-resizer.resizing {
+            background: var(--accent-primary);
+        }
+
+        .resizer-line {
+            width: 32px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 1px;
+        }
+
+        /* スイッチトグルボタン */
+        .duplicate-toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 18px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.2);
+            transition: .25s;
+            border-radius: 18px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .25s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #ea580c;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(16px);
+        }
+
+        .toggle-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-sub);
+        }
+
+        /* ファイルカード */
         .file-card {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 8px;
-            padding: 10px 12px;
-            margin-bottom: 10px;
+            padding: 9px 11px;
+            margin-bottom: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -598,9 +775,9 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 600;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
         }
 
         .file-card-deps {
@@ -620,7 +797,59 @@
             gap: 3px;
         }
 
-        /* 画面右下コントロール（キャンバスラッパー基準で常に右下に固定配置） */
+        .insert-pill {
+            background: rgba(249, 115, 22, 0.15);
+            color: #fb923c;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+            padding: 1px 6px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        /* 重複テーブルカード */
+        .duplicate-card {
+            background: rgba(234, 88, 12, 0.08);
+            border: 1px solid rgba(234, 88, 12, 0.25);
+            border-radius: 8px;
+            padding: 9px 11px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .duplicate-card:hover {
+            background: rgba(234, 88, 12, 0.15);
+            border-color: rgba(234, 88, 12, 0.45);
+            transform: translateY(-1px);
+        }
+
+        .dup-table-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #fed7aa;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dup-detail {
+            font-size: 11px;
+            color: var(--text-sub);
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .dup-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* 画面右下コントロール */
         .controls-overlay {
             position: absolute;
             bottom: 24px;
@@ -795,7 +1024,7 @@
             <input type="file" id="file-input" multiple accept=".sql">
 
             <!-- サンプルデータ読込 -->
-            <button class="btn btn-sample" id="btn-load-sample" title="準備された10個のサンプルSQLを一発読込">
+            <button class="btn btn-sample" id="btn-load-sample" title="準備されたサンプルSQLを一発読込">
                 <i class="fa-solid fa-flask"></i> サンプル読込
             </button>
 
@@ -813,8 +1042,8 @@
             </button>
 
             <!-- サイドバー切替 -->
-            <button class="btn" id="btn-toggle-sidebar" title="SQLファイル一覧の表示切替">
-                <i class="fa-solid fa-list-check"></i>
+            <button class="btn" id="btn-toggle-sidebar" title="右サイドバーの開閉">
+                <i class="fa-solid fa-table-columns"></i>
             </button>
         </div>
     </header>
@@ -850,15 +1079,15 @@
                 </div>
                 <h2 class="empty-title">SQLフォルダまたはファイルを読み込み</h2>
                 <p class="empty-desc">
-                    <code>CREATE PROCEDURE</code> / <code>CREATE FUNCTION</code> / <code>CREATE VIEW</code> のDDLが書かれたSQLファイルフォルダをドラッグ＆ドロップするか、上部ボタンから選択してください。<br>
-                    正規表現で FROM / JOIN を解析して依存関係マインドマップを自動生成します。
+                    <code>CREATE PROCEDURE</code> / <code>CREATE FUNCTION</code> / <code>CREATE VIEW</code> / <code>CREATE TABLE</code> のDDLが書かれたSQLファイルフォルダをドラッグ＆ドロップするか、上部ボタンから選択してください。<br>
+                    FROM / JOIN / INSERT INTO を解析して依存関係マインドマップを自動生成します。
                 </p>
                 <div style="display:flex; justify-content:center; gap:12px;">
                     <button class="btn btn-primary" onclick="document.getElementById('folder-input').click()">
                         <i class="fa-regular fa-folder-open"></i> フォルダを選択
                     </button>
                     <button class="btn btn-sample" id="empty-load-sample">
-                        <i class="fa-solid fa-flask"></i> サンプルSQL (10件) で試す
+                        <i class="fa-solid fa-flask"></i> サンプルSQLで試す
                     </button>
                 </div>
             </div>
@@ -872,14 +1101,50 @@
             </div>
         </div>
 
-        <!-- サイドバー（ファイル一覧 & 詳細） -->
+        <!-- 右サイドバー（上下分割: ファイル一覧 & 重複テーブル一覧） -->
         <aside id="sidebar">
-            <div class="sidebar-header">
-                <span><i class="fa-solid fa-file-code"></i> 解析済みSQLファイル</span>
-                <span id="file-count-badge" class="badge badge-table">0 件</span>
+            <!-- 上段: 解析済みSQLファイル一覧 -->
+            <div class="sidebar-section" id="section-files">
+                <div class="sidebar-section-header" id="header-files">
+                    <div class="section-title-wrap">
+                        <button class="section-toggle-btn" id="btn-toggle-section-files" title="折りたたみ切り替え">
+                            <i class="fa-solid fa-bars"></i>
+                        </button>
+                        <span><i class="fa-solid fa-file-code"></i> 解析済みファイル</span>
+                    </div>
+                    <span id="file-count-badge" class="badge badge-table">0 件</span>
+                </div>
+                <div class="sidebar-section-body" id="sidebar-files">
+                    <!-- 動的生成 -->
+                </div>
             </div>
-            <div class="sidebar-content" id="sidebar-files">
-                <!-- 動的に生成 -->
+
+            <!-- 上下リサイズ用スプリッターハンドル -->
+            <div class="sidebar-resizer" id="sidebar-resizer" title="ドラッグして上下の高さを調整">
+                <div class="resizer-line"></div>
+            </div>
+
+            <!-- 下段: 重複テーブル一覧（INSERT投入先 vs CREATE TABLE） -->
+            <div class="sidebar-section" id="section-duplicates">
+                <div class="sidebar-section-header" id="header-duplicates">
+                    <div class="section-title-wrap">
+                        <button class="section-toggle-btn" id="btn-toggle-section-duplicates" title="折りたたみ切り替え">
+                            <i class="fa-solid fa-bars"></i>
+                        </button>
+                        <span><i class="fa-solid fa-clone"></i> 重複TABLE</span>
+                    </div>
+                    <!-- 重複CREATE TABLE 非表示トグルボタン -->
+                    <div class="duplicate-toggle-wrap">
+                        <label class="switch" title="重複する「CREATE TABLE」のノードをマインドマップから非表示にし、投入先プロシージャを現在地として直接接続します">
+                            <input type="checkbox" id="toggle-hide-duplicates">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label" id="toggle-hide-label">TABLE非表示</span>
+                    </div>
+                </div>
+                <div class="sidebar-section-body" id="sidebar-duplicates">
+                    <!-- 動的生成 -->
+                </div>
             </div>
         </aside>
     </main>
@@ -898,9 +1163,64 @@
     <!-- アプリケーションロジック -->
     <script>
         /**
-         * サンプルSQLデータ (10ファイル)
+         * サンプルSQLデータ (13ファイル: CREATE TABLE / INSERT INTO を含む)
          */
         const SAMPLE_SQL_FILES = [
+            {
+                name: "create_table_daily_sales_summary.sql",
+                content: `CREATE TABLE dbo.daily_sales_summary (
+    summary_date DATE NOT NULL,
+    product_id INT NOT NULL,
+    product_name NVARCHAR(100),
+    total_sales DECIMAL(18, 2),
+    order_count INT,
+    created_at DATETIME DEFAULT GETDATE()
+);`
+            },
+            {
+                name: "sp_calc_and_insert_daily_summary.sql",
+                content: `CREATE PROCEDURE dbo.sp_calc_and_insert_daily_summary
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- 日次売上集計を計算し、daily_sales_summaryテーブルへ投入
+    INSERT INTO dbo.daily_sales_summary (summary_date, product_id, product_name, total_sales, order_count)
+    SELECT
+        CAST(d.order_date AS DATE) AS summary_date,
+        d.product_id,
+        d.product_name,
+        SUM(d.subtotal) AS total_sales,
+        COUNT(d.order_id) AS order_count
+    FROM
+        dbo.v_order_details d
+    INNER JOIN
+        dbo.v_active_users u
+        ON d.user_id = u.user_id
+    GROUP BY
+        CAST(d.order_date AS DATE),
+        d.product_id,
+        d.product_name;
+END;`
+            },
+            {
+                name: "v_daily_sales_dashboard.sql",
+                content: `CREATE VIEW dbo.v_daily_sales_dashboard AS
+SELECT
+    s.summary_date,
+    s.product_id,
+    s.product_name,
+    s.total_sales,
+    s.order_count,
+    CASE
+        WHEN s.total_sales >= 100000 THEN 'TARGET_ACHIEVED'
+        ELSE 'IN_PROGRESS'
+    END AS sales_status
+FROM
+    dbo.daily_sales_summary s
+WHERE
+    s.summary_date >= DATEADD(day, -30, CAST(GETDATE() AS DATE));`
+            },
             {
                 name: "v_active_users.sql",
                 content: `CREATE VIEW v_active_users AS
@@ -1104,6 +1424,8 @@ END;`
             parsedFiles: [],
             nodes: new Map(),
             edges: [],
+            duplicateTables: [],  // 重複テーブル情報一覧
+            hideDuplicateTables: false, // 重複「CREATE TABLE」の非表示トグル状態
             selectedNodeId: null, // [4] 選択中ノード
             searchQuery: "",      // [3] 検索クエリ
             zoom: 1,
@@ -1124,12 +1446,14 @@ END;`
         const searchClear = document.getElementById('search-clear');
         const searchCount = document.getElementById('search-count');
         const statsPill = document.getElementById('stats-pill');
+        const sidebar = document.getElementById('sidebar');
         const sidebarFiles = document.getElementById('sidebar-files');
         const fileCountBadge = document.getElementById('file-count-badge');
-        const sidebar = document.getElementById('sidebar');
+        const sidebarDuplicates = document.getElementById('sidebar-duplicates');
+        const toggleHideDuplicates = document.getElementById('toggle-hide-duplicates');
 
         /**
-         * コメントを除去するヘルパー（誤検知防止）
+         * コメントを除去するヘルパー
          */
         function stripSqlComments(sql) {
             return sql
@@ -1138,13 +1462,13 @@ END;`
         }
 
         /**
-         * [2] SQLパーサー
-         * (FROM|JOIN)( ?\n.*| )(\n.*)?([a-zA-Z0-9]+\.)?(テーブル名|プロシージャ名|ビュー名)
+         * [2] SQLパーサー (CREATE PROCEDURE / VIEW / FUNCTION / TABLE + FROM / JOIN + INSERT INTO)
          */
         function parseSqlContent(fileName, sqlContent) {
             const cleanSql = stripSqlComments(sqlContent);
 
-            const createRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?(?:DEFENDER\s+|SECURITY\s+DEFINER\s+)?(PROCEDURE|FUNCTION|VIEW)\s+(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/i;
+            // 1. CREATE PROCEDURE / FUNCTION / VIEW / TABLE のオブジェクト定義抽出
+            const createRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?(?:DEFENDER\s+|SECURITY\s+DEFINER\s+)?(PROCEDURE|FUNCTION|VIEW|TABLE)\s+(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/i;
             const matchCreate = cleanSql.match(createRegex);
 
             let objType = 'VIEW';
@@ -1161,8 +1485,10 @@ END;`
                 if (/^sp_/i.test(baseName)) objType = 'PROCEDURE';
                 else if (/^fn_/i.test(baseName)) objType = 'FUNCTION';
                 else if (/^v_/i.test(baseName)) objType = 'VIEW';
+                else if (/^(?:tbl_|t_|m_|create_table_)/i.test(baseName)) objType = 'TABLE';
             }
 
+            // 2. FROM / JOIN からの依存元抽出
             const fromJoinRegex = /(?:\bFROM|\bJOIN)(?: ?\r?\n[ \t]*|[ \t]+)(?:\r?\n[ \t]*)?(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi;
             
             const dependencies = [];
@@ -1192,14 +1518,71 @@ END;`
                 }
             }
 
+            // 3. INSERT INTO 投入先テーブルの抽出 (プロシージャ用)
+            const insertRegex = /\bINSERT\s+(?:INTO\s+)?(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi;
+            const insertTargets = [];
+            let insertMatch;
+
+            while ((insertMatch = insertRegex.exec(cleanSql)) !== null) {
+                const insSchema = insertMatch[1] || '';
+                const insName = insertMatch[2];
+
+                if (!insName) continue;
+                if (reservedKeywords.has(insName.toUpperCase())) continue;
+
+                if (!insertTargets.some(t => t.name.toLowerCase() === insName.toLowerCase())) {
+                    insertTargets.push({
+                        schema: insSchema,
+                        name: insName
+                    });
+                }
+            }
+
             return {
                 fileName,
                 content: sqlContent,
                 objType,
                 schema,
                 name: objName,
-                dependencies
+                dependencies,
+                insertTargets
             };
+        }
+
+        /**
+         * 重複テーブル一覧の検出
+         * INSERTも行っているプロシージャの投入先テーブルと、CREATE TABLEされたテーブルの間で同名テーブルを検出
+         */
+        function detectDuplicateTables(parsedFiles) {
+            const tableDefinitions = new Map(); // tableNameLower -> file
+            parsedFiles.forEach(file => {
+                if (file.objType === 'TABLE') {
+                    tableDefinitions.set(file.name.toLowerCase(), file);
+                }
+            });
+
+            const duplicates = [];
+            parsedFiles.forEach(file => {
+                if (file.insertTargets && file.insertTargets.length > 0) {
+                    file.insertTargets.forEach(target => {
+                        const targetLower = target.name.toLowerCase();
+                        if (tableDefinitions.has(targetLower)) {
+                            const tableFile = tableDefinitions.get(targetLower);
+                            duplicates.push({
+                                tableName: target.name,
+                                schema: target.schema || tableFile.schema,
+                                procedureName: file.name,
+                                procedureFileName: file.fileName,
+                                procedureId: file.name.toLowerCase(),
+                                tableFileName: tableFile.fileName,
+                                tableId: targetLower
+                            });
+                        }
+                    });
+                }
+            });
+
+            state.duplicateTables = duplicates;
         }
 
         /**
@@ -1209,9 +1592,31 @@ END;`
             state.nodes.clear();
             state.edges = [];
 
-            // 1. 各ファイルで定義されているオブジェクトをノードとして登録
+            // 重複テーブルの検出
+            detectDuplicateTables(parsedFiles);
+
+            // 重複テーブル名セット
+            const duplicateTableIds = new Set(state.duplicateTables.map(d => d.tableId));
+
+            // プロシージャ投入先マップ: targetTableLower -> procedureId
+            const insertProducerMap = new Map();
+            parsedFiles.forEach(file => {
+                if (file.insertTargets) {
+                    file.insertTargets.forEach(target => {
+                        insertProducerMap.set(target.name.toLowerCase(), file.name.toLowerCase());
+                    });
+                }
+            });
+
+            // 1. 各ファイルで定義されているオブジェクトをノード登録
             parsedFiles.forEach(file => {
                 const id = file.name.toLowerCase();
+
+                // 「重複CREATE TABLEを非表示」がONかつ自身が重複TABLEの場合、マインドマップノードから除外
+                if (state.hideDuplicateTables && file.objType === 'TABLE' && duplicateTableIds.has(id)) {
+                    return;
+                }
+
                 state.nodes.set(id, {
                     id,
                     name: file.name,
@@ -1219,6 +1624,8 @@ END;`
                     type: file.objType,
                     fileName: file.fileName,
                     content: file.content,
+                    insertTargets: file.insertTargets || [],
+                    isDuplicateTable: duplicateTableIds.has(id) && file.objType === 'TABLE',
                     x: 0,
                     y: 0,
                     level: 0,
@@ -1227,11 +1634,15 @@ END;`
                 });
             });
 
-            // 2. FROM/JOINで参照されているがファイル定義のないもの（大元のテーブル等）を TABLE ノードとして登録
+            // 2. FROM / JOIN または INSERT INTO で参照されているが未定義のオブジェクトを TABLE ノードとして登録
             parsedFiles.forEach(file => {
+                // FROM / JOIN
                 file.dependencies.forEach(dep => {
                     const depId = dep.name.toLowerCase();
                     if (!state.nodes.has(depId)) {
+                        // 重複非表示で除外対象なら作成しない
+                        if (state.hideDuplicateTables && duplicateTableIds.has(depId)) return;
+
                         state.nodes.set(depId, {
                             id: depId,
                             name: dep.name,
@@ -1239,6 +1650,8 @@ END;`
                             type: 'TABLE',
                             fileName: '(Database Table)',
                             content: null,
+                            insertTargets: [],
+                            isDuplicateTable: false,
                             x: 0,
                             y: 0,
                             level: 0,
@@ -1247,21 +1660,86 @@ END;`
                         });
                     }
                 });
+
+                // INSERT INTO の先
+                if (file.insertTargets) {
+                    file.insertTargets.forEach(target => {
+                        const targetId = target.name.toLowerCase();
+                        if (!state.nodes.has(targetId)) {
+                            if (state.hideDuplicateTables && duplicateTableIds.has(targetId)) return;
+
+                            state.nodes.set(targetId, {
+                                id: targetId,
+                                name: target.name,
+                                schema: target.schema,
+                                type: 'TABLE',
+                                fileName: '(Target Table)',
+                                content: null,
+                                insertTargets: [],
+                                isDuplicateTable: duplicateTableIds.has(targetId),
+                                x: 0,
+                                y: 0,
+                                level: 0,
+                                inDegree: 0,
+                                outDegree: 0
+                            });
+                        }
+                    });
+                }
             });
 
-            // 3. エッジの構築: 依存元 (from) ──▶ 依存先 (to)
+            // 3. エッジの構築
             let edgeCounter = 0;
+            const addedEdgeSet = new Set();
+
+            function addEdge(sourceId, targetId) {
+                if (sourceId === targetId) return;
+                const key = `${sourceId}___${targetId}`;
+                if (addedEdgeSet.has(key)) return;
+                addedEdgeSet.add(key);
+
+                state.edges.push({
+                    id: `edge_${sourceId}_to_${targetId}_${edgeCounter++}`,
+                    from: sourceId,
+                    to: targetId
+                });
+            }
+
             parsedFiles.forEach(file => {
                 const targetId = file.name.toLowerCase();
+
+                // FROM / JOIN の接続
                 file.dependencies.forEach(dep => {
-                    const sourceId = dep.name.toLowerCase();
-                    const edgeId = `edge_${sourceId}_to_${targetId}_${edgeCounter++}`;
-                    state.edges.push({
-                        id: edgeId,
-                        from: sourceId,
-                        to: targetId
-                    });
+                    const sourceDepId = dep.name.toLowerCase();
+
+                    // もし「重複CREATE TABLE非表示」がONで、参照元が重複テーブルの場合：
+                    // そのテーブルにINSERTしているプロシージャが存在すれば、プロシージャから直接接続！
+                    if (state.hideDuplicateTables && duplicateTableIds.has(sourceDepId)) {
+                        const producerProcId = insertProducerMap.get(sourceDepId);
+                        if (producerProcId && state.nodes.has(producerProcId) && state.nodes.has(targetId)) {
+                            addEdge(producerProcId, targetId);
+                            return;
+                        }
+                    }
+
+                    if (state.nodes.has(sourceDepId) && state.nodes.has(targetId)) {
+                        addEdge(sourceDepId, targetId);
+                    }
                 });
+
+                // INSERT INTO の接続 (プロシージャ ──▶ 投入先テーブル)
+                if (file.insertTargets && file.insertTargets.length > 0) {
+                    file.insertTargets.forEach(target => {
+                        const insTargetId = target.name.toLowerCase();
+                        // 重複非表示ONの場合はテーブルノードが存在しないのでエッジは作らない（プロシージャ自身が現在地）
+                        if (state.hideDuplicateTables && duplicateTableIds.has(insTargetId)) {
+                            return;
+                        }
+                        if (state.nodes.has(targetId) && state.nodes.has(insTargetId)) {
+                            addEdge(targetId, insTargetId);
+                        }
+                    });
+                }
             });
 
             // 入次数・出次数の計算
@@ -1281,6 +1759,7 @@ END;`
             // 6. レンダリング
             renderGraph();
             renderSidebar();
+            renderDuplicatesSidebar();
             updateStats();
         }
 
@@ -1317,11 +1796,11 @@ END;`
          * ノード自動配置レイアウト
          */
         function layoutNodes() {
-            const nodeWidth = 280;
+            const nodeWidth = 290;
             const horizontalGap = 130;
-            const colWidth = nodeWidth + horizontalGap; // 410px
+            const colWidth = nodeWidth + horizontalGap; // 420px
 
-            const rowHeight = 150; // ノード高さ約100px + 垂直マージン50px
+            const rowHeight = 155;
             const startX = 80;
             const startY = 80;
 
@@ -1406,6 +1885,17 @@ END;`
                 iconClass = 'fa-solid fa-code';
             }
 
+            // INSERT投入先テーブルのバッジ表示 (プロシージャがINSERTを持つ場合)
+            let insertBadgeHtml = '';
+            if (node.insertTargets && node.insertTargets.length > 0) {
+                const targetNames = node.insertTargets.map(t => escapeHtml(t.name)).join(', ');
+                insertBadgeHtml = `
+                    <div class="node-insert-badge" title="INSERT投入先テーブル (現在地): ${targetNames}">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> 投入先: ${targetNames}
+                    </div>
+                `;
+            }
+
             el.innerHTML = `
                 <div class="node-header">
                     <span class="badge ${badgeClass}"><i class="${iconClass}"></i> ${node.type}</span>
@@ -1414,6 +1904,7 @@ END;`
                 <div class="node-body">
                     ${node.schema ? `<div class="node-schema">${escapeHtml(node.schema)}.</div>` : ''}
                     <div class="node-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</div>
+                    ${insertBadgeHtml}
                 </div>
                 <div class="node-footer">
                     <span class="stat-item" title="依存元 (参照している元)">
@@ -1426,14 +1917,14 @@ END;`
                 </div>
             `;
 
-            // ドラッグ移動 & クリック（ドラッグ時は選択解除・トグルを防止）
+            // ドラッグ移動 & クリック（ドラッグ時は選択トグルを防止）
             setupNodeDrag(el, node);
 
             return el;
         }
 
         /**
-         * [4] 依存関係の探索
+         * [4] 依存関係の探索 (上流 / 下流)
          */
         function getLineageInfo(targetNodeId) {
             const upstreamNodeIds = new Set();
@@ -1496,8 +1987,8 @@ END;`
                     svgLayer.appendChild(pathEl);
                 }
 
-                const nodeWidth = 280;
-                const nodeHeight = 88;
+                const nodeWidth = 290;
+                const nodeHeight = 92;
 
                 const fromX = source.x + nodeWidth;
                 const fromY = source.y + (nodeHeight / 2);
@@ -1637,7 +2128,7 @@ END;`
         });
 
         /**
-         * ノードドラッグ移動（移動時は選択解除・トグルを防止）
+         * ノードドラッグ移動（移動時は選択トグルを防止）
          */
         function setupNodeDrag(element, node) {
             let isDragging = false;
@@ -1681,7 +2172,6 @@ END;`
                 }
             });
 
-            // クリック時: ドラッグ移動していなければ選択トグル
             element.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (hasMoved) {
@@ -1693,7 +2183,7 @@ END;`
         }
 
         /**
-         * キャンバスのパン＆ズーム（ドラッグ移動中はハイライトを解除しない）
+         * キャンバスのパン＆ズーム
          */
         function updateTransform() {
             canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
@@ -1712,14 +2202,13 @@ END;`
             state.startX = e.clientX - state.panX;
             state.startY = e.clientY - state.panY;
             canvasWrapper.classList.add('grabbing');
-            // ここでは clearSelection() を呼ばない（ドラッグでハイライトが外れるのを防止）
         });
 
         window.addEventListener('mousemove', (e) => {
             if (!state.isPanning) return;
             const movedDist = Math.hypot(e.clientX - panStartMouseX, e.clientY - panStartMouseY);
             if (movedDist > 4) {
-                isPanningMove = true; // 4px以上動いた場合はドラッグ移動と判定
+                isPanningMove = true;
             }
             state.panX = e.clientX - state.startX;
             state.panY = e.clientY - state.startY;
@@ -1730,7 +2219,6 @@ END;`
             if (state.isPanning) {
                 state.isPanning = false;
                 canvasWrapper.classList.remove('grabbing');
-                // ドラッグ移動ではなく、背景をその場でクリックしたときだけ選択解除
                 if (!isPanningMove) {
                     clearSelection();
                 }
@@ -1786,7 +2274,7 @@ END;`
             state.nodes.forEach(node => {
                 minX = Math.min(minX, node.x);
                 minY = Math.min(minY, node.y);
-                maxX = Math.max(maxX, node.x + 280);
+                maxX = Math.max(maxX, node.x + 290);
                 maxY = Math.max(maxY, node.y + 120);
             });
 
@@ -1809,7 +2297,7 @@ END;`
         function centerOnNode(node) {
             const viewW = canvasWrapper.clientWidth;
             const viewH = canvasWrapper.clientHeight;
-            state.panX = (viewW / 2) - ((node.x + 140) * state.zoom);
+            state.panX = (viewW / 2) - ((node.x + 145) * state.zoom);
             state.panY = (viewH / 2) - ((node.y + 50) * state.zoom);
             updateTransform();
         }
@@ -1860,7 +2348,7 @@ END;`
         }
 
         /**
-         * ドラッグ＆ドロップ対応（フォルダ/ファイル）
+         * ドラッグ＆ドロップ対応
          */
         ['dragenter', 'dragover'].forEach(eventName => {
             canvasWrapper.addEventListener(eventName, (e) => {
@@ -1952,7 +2440,7 @@ END;`
         document.getElementById('empty-load-sample').addEventListener('click', loadSampleData);
 
         /**
-         * サイドバー & 統計
+         * 上段: 解析済みSQLファイル一覧の描画
          */
         function renderSidebar() {
             sidebarFiles.innerHTML = '';
@@ -1961,15 +2449,27 @@ END;`
             state.parsedFiles.forEach(file => {
                 const card = document.createElement('div');
                 card.className = 'file-card';
+
+                let badgeClass = 'badge-table';
+                if (file.objType === 'VIEW') badgeClass = 'badge-view';
+                else if (file.objType === 'PROCEDURE') badgeClass = 'badge-procedure';
+                else if (file.objType === 'FUNCTION') badgeClass = 'badge-function';
+
+                let insertHtml = '';
+                if (file.insertTargets && file.insertTargets.length > 0) {
+                    insertHtml = file.insertTargets.map(t => `<span class="insert-pill"><i class="fa-solid fa-arrow-right-to-bracket"></i> INSERT: ${escapeHtml(t.name)}</span>`).join('');
+                }
+
                 card.innerHTML = `
                     <div class="file-card-title">
                         <span><i class="fa-regular fa-file-lines"></i> ${escapeHtml(file.name)}</span>
-                        <span class="badge ${file.objType === 'PROCEDURE' ? 'badge-procedure' : file.objType === 'FUNCTION' ? 'badge-function' : 'badge-view'}">${file.objType}</span>
+                        <span class="badge ${badgeClass}">${file.objType}</span>
                     </div>
                     <div class="file-card-deps">
+                        ${insertHtml}
                         ${file.dependencies.length > 0 
                             ? file.dependencies.map(d => `<span class="dep-pill"><i class="fa-solid fa-link"></i> ${escapeHtml(d.name)}</span>`).join('') 
-                            : '<span style="color:#64748b;">(依存なし)</span>'}
+                            : (!insertHtml ? '<span style="color:#64748b;">(依存なし)</span>' : '')}
                     </div>
                 `;
 
@@ -1985,14 +2485,126 @@ END;`
             });
         }
 
-        function updateStats() {
-            statsPill.innerHTML = `<i class="fa-solid fa-database"></i> ${state.nodes.size} ノード / ${state.edges.length} 依存関係`;
+        /**
+         * 下段: 重複テーブル一覧の描画
+         */
+        function renderDuplicatesSidebar() {
+            sidebarDuplicates.innerHTML = '';
+
+            if (state.duplicateTables.length === 0) {
+                sidebarDuplicates.innerHTML = `
+                    <div style="text-align:center; padding: 24px 10px; color: var(--text-sub); font-size: 12px;">
+                        <i class="fa-solid fa-circle-check" style="font-size: 20px; color: #34d399; margin-bottom: 8px; display:block;"></i>
+                        INSERT投入先とCREATE TABLEの重複はありません
+                    </div>
+                `;
+                return;
+            }
+
+            state.duplicateTables.forEach(dup => {
+                const card = document.createElement('div');
+                card.className = 'duplicate-card';
+                card.innerHTML = `
+                    <div class="dup-table-name">
+                        <i class="fa-solid fa-clone" style="color: #ea580c;"></i>
+                        <span>${escapeHtml(dup.schema ? dup.schema + '.' : '')}${escapeHtml(dup.tableName)}</span>
+                    </div>
+                    <div class="dup-detail">
+                        <div class="dup-row">
+                            <span class="badge badge-procedure" style="font-size:9px;">PROC</span>
+                            <span style="color:var(--text-main); font-weight:600;">${escapeHtml(dup.procedureName)}</span>
+                            <span style="font-size:10px; color:#94a3b8;">(投入元)</span>
+                        </div>
+                        <div class="dup-row">
+                            <span class="badge badge-table" style="font-size:9px;">TABLE</span>
+                            <span style="color:var(--text-main); font-weight:600;">${escapeHtml(dup.tableFileName)}</span>
+                            <span style="font-size:10px; color:#94a3b8;">(定義元)</span>
+                        </div>
+                    </div>
+                `;
+
+                // クリックで該当ノードへジャンプ
+                card.addEventListener('click', () => {
+                    const targetNode = state.nodes.get(dup.procedureId) || state.nodes.get(dup.tableId);
+                    if (targetNode) {
+                        centerOnNode(targetNode);
+                        toggleNodeSelection(targetNode.id);
+                    }
+                });
+
+                sidebarDuplicates.appendChild(card);
+            });
         }
 
-        // サイドバー開閉（margin-rightでスムーズに伸縮し、キャンバス描画領域が右端まで拡大）
+        /**
+         * 重複CREATE TABLE非表示トグルの変更イベント
+         */
+        toggleHideDuplicates.addEventListener('change', (e) => {
+            state.hideDuplicateTables = e.target.checked;
+            buildGraph(state.parsedFiles);
+            fitToScreen();
+        });
+
+        /**
+         * 右サイドバーの開閉トグル
+         */
         document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
         });
+
+        /**
+         * 各一覧のハンバーガーメニュー風折りたたみトグル
+         */
+        const sectionFiles = document.getElementById('section-files');
+        const sectionDuplicates = document.getElementById('section-duplicates');
+
+        document.getElementById('btn-toggle-section-files').addEventListener('click', () => {
+            sectionFiles.classList.toggle('is-collapsed');
+        });
+
+        document.getElementById('btn-toggle-section-duplicates').addEventListener('click', () => {
+            sectionDuplicates.classList.toggle('is-collapsed');
+        });
+
+        /**
+         * スプリッターによる上下リサイズ機能
+         */
+        const resizer = document.getElementById('sidebar-resizer');
+        let isResizing = false;
+        let startY = 0;
+        let startHeight = 0;
+
+        resizer.addEventListener('mousedown', (e) => {
+            if (sectionFiles.classList.contains('is-collapsed') || sectionDuplicates.classList.contains('is-collapsed')) {
+                return;
+            }
+            isResizing = true;
+            startY = e.clientY;
+            startHeight = sectionFiles.getBoundingClientRect().height;
+            resizer.classList.add('resizing');
+            document.body.style.cursor = 'row-resize';
+            e.preventDefault();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const deltaY = e.clientY - startY;
+            const newHeight = Math.max(90, Math.min(sidebar.clientHeight - 130, startHeight + deltaY));
+            sectionFiles.style.height = `${newHeight}px`;
+            sectionFiles.style.flex = 'none';
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                resizer.classList.remove('resizing');
+                document.body.style.cursor = '';
+            }
+        });
+
+        function updateStats() {
+            statsPill.innerHTML = `<i class="fa-solid fa-database"></i> ${state.nodes.size} ノード / ${state.edges.length} 依存関係`;
+        }
 
         /**
          * SQLモーダル表示

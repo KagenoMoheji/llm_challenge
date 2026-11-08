@@ -57,7 +57,7 @@
             </button>
 
             <!-- サイドバー表示切替 -->
-            <button class="btn" id="btn-toggle-sidebar" title="SQLファイル一覧の表示切替">
+            <button class="btn" id="btn-toggle-sidebar" title="右サイドバーの開閉">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
             </button>
         </div>
@@ -94,7 +94,7 @@
                 </div>
                 <h2 class="empty-title">SQLファイルが見つかりません</h2>
                 <p class="empty-desc">
-                    <code>CREATE PROCEDURE</code> / <code>CREATE FUNCTION</code> / <code>CREATE VIEW</code> のDDLが書かれたSQLファイルを含むフォルダを開いてください。
+                    <code>CREATE PROCEDURE</code> / <code>CREATE FUNCTION</code> / <code>CREATE VIEW</code> / <code>CREATE TABLE</code> のDDLが書かれたSQLファイルを含むフォルダを開いてください。
                 </p>
                 <button class="btn btn-primary" onclick="requestSelectFolder()">
                     <span>フォルダを選択</span>
@@ -110,14 +110,50 @@
             </div>
         </div>
 
-        <!-- サイドバー（ファイル一覧） -->
+        <!-- 右サイドバー（上下分割: ファイル一覧 & 重複テーブル一覧） -->
         <aside id="sidebar">
-            <div class="sidebar-header">
-                <span>解析済みSQLファイル</span>
-                <span id="file-count-badge" class="badge badge-table">0 件</span>
+            <!-- 上段: 解析済みSQLファイル一覧 -->
+            <div class="sidebar-section" id="section-files">
+                <div class="sidebar-section-header" id="header-files">
+                    <div class="section-title-wrap">
+                        <button class="section-toggle-btn" id="btn-toggle-section-files" title="折りたたみ切り替え">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                        </button>
+                        <span>解析済みファイル</span>
+                    </div>
+                    <span id="file-count-badge" class="badge badge-table">0 件</span>
+                </div>
+                <div class="sidebar-section-body" id="sidebar-files">
+                    <!-- 動的生成 -->
+                </div>
             </div>
-            <div class="sidebar-content" id="sidebar-files">
-                <!-- 動的に生成 -->
+
+            <!-- 上下リサイズ用スプリッターハンドル -->
+            <div class="sidebar-resizer" id="sidebar-resizer" title="ドラッグして上下の高さを調整">
+                <div class="resizer-line"></div>
+            </div>
+
+            <!-- 下段: 重複テーブル一覧（INSERT投入先 vs CREATE TABLE） -->
+            <div class="sidebar-section" id="section-duplicates">
+                <div class="sidebar-section-header" id="header-duplicates">
+                    <div class="section-title-wrap">
+                        <button class="section-toggle-btn" id="btn-toggle-section-duplicates" title="折りたたみ切り替え">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                        </button>
+                        <span>重複TABLE</span>
+                    </div>
+                    <!-- 重複CREATE TABLE 非表示トグルボタン -->
+                    <div class="duplicate-toggle-wrap">
+                        <label class="switch" title="重複する「CREATE TABLE」のノードをマインドマップから非表示にし、投入先プロシージャを現在地として直接接続します">
+                            <input type="checkbox" id="toggle-hide-duplicates">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label" id="toggle-hide-label">TABLE非表示</span>
+                    </div>
+                </div>
+                <div class="sidebar-section-body" id="sidebar-duplicates">
+                    <!-- 動的生成 -->
+                </div>
             </div>
         </aside>
     </main>

@@ -490,6 +490,43 @@ body, html {
     line-height: 1.35;
 }
 
+/* INSERT投入先バッジ */
+.node-insert-badge {
+    margin-top: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(249, 115, 22, 0.15);
+    color: #fb923c;
+    border: 1px solid rgba(249, 115, 22, 0.3);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.node.node-selected .node-insert-badge {
+    background: rgba(234, 88, 12, 0.2);
+    color: #7c2d12;
+    border-color: rgba(234, 88, 12, 0.4);
+}
+
+.node.node-upstream .node-insert-badge {
+    background: rgba(22, 163, 74, 0.2);
+    color: #14532d;
+    border-color: rgba(22, 163, 74, 0.4);
+}
+
+.node.node-downstream .node-insert-badge {
+    background: rgba(220, 38, 38, 0.2);
+    color: #7f1d1d;
+    border-color: rgba(220, 38, 38, 0.4);
+}
+
 .node-footer {
     padding: 6px 12px;
     background: rgba(0, 0, 0, 0.22);
@@ -530,10 +567,10 @@ body, html {
     filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.7));
 }
 
-/* サイドバー（margin-rightでスムーズにスライドアウトし、キャンバス幅を拡張） */
+/* サイドバー（上下分割 & スプリッターリサイズ対応） */
 #sidebar {
-    width: 330px;
-    min-width: 330px;
+    width: 360px;
+    min-width: 360px;
     background: var(--panel-bg);
     backdrop-filter: blur(12px);
     border-left: 1px solid var(--panel-border);
@@ -541,34 +578,174 @@ body, html {
     flex-direction: column;
     transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 90;
+    overflow: hidden;
 }
 
 #sidebar.collapsed {
-    margin-right: -330px;
+    margin-right: -360px;
 }
 
-.sidebar-header {
-    padding: 14px 16px;
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: flex 0.2s ease, height 0.2s ease;
+}
+
+#section-files {
+    height: 52%;
+    min-height: 90px;
+}
+
+#section-duplicates {
+    flex: 1;
+    min-height: 90px;
+}
+
+.sidebar-section.is-collapsed {
+    height: 44px !important;
+    min-height: 44px !important;
+    flex: none !important;
+}
+
+.sidebar-section.is-collapsed .sidebar-section-body {
+    display: none !important;
+}
+
+.sidebar-section-header {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 14px;
     border-bottom: 1px solid var(--panel-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 600;
+    background: rgba(255, 255, 255, 0.02);
 }
 
-.sidebar-content {
+.section-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-toggle-btn {
+    background: none;
+    border: none;
+    color: var(--text-sub);
+    cursor: pointer;
+    padding: 4px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.section-toggle-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-section-body {
     flex: 1;
     overflow-y: auto;
-    padding: 12px;
+    padding: 10px 12px;
 }
 
+/* スプリッター（水平リサイズハンドル） */
+.sidebar-resizer {
+    height: 6px;
+    min-height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: row-resize;
+    position: relative;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.sidebar-resizer:hover, .sidebar-resizer.resizing {
+    background: var(--accent-primary);
+}
+
+.resizer-line {
+    width: 32px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 1px;
+}
+
+/* スイッチトグルボタン */
+.duplicate-toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 18px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.2);
+    transition: .25s;
+    border-radius: 18px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .25s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #ea580c;
+}
+
+input:checked + .slider:before {
+    transform: translateX(16px);
+}
+
+.toggle-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-sub);
+}
+
+/* ファイルカード */
 .file-card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
-    padding: 10px 12px;
-    margin-bottom: 10px;
+    padding: 9px 11px;
+    margin-bottom: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -583,9 +760,9 @@ body, html {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 600;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
 }
 
 .file-card-deps {
@@ -603,6 +780,58 @@ body, html {
     display: inline-flex;
     align-items: center;
     gap: 3px;
+}
+
+.insert-pill {
+    background: rgba(249, 115, 22, 0.15);
+    color: #fb923c;
+    border: 1px solid rgba(249, 115, 22, 0.3);
+    padding: 1px 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+/* 重複テーブルカード */
+.duplicate-card {
+    background: rgba(234, 88, 12, 0.08);
+    border: 1px solid rgba(234, 88, 12, 0.25);
+    border-radius: 8px;
+    padding: 9px 11px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.duplicate-card:hover {
+    background: rgba(234, 88, 12, 0.15);
+    border-color: rgba(234, 88, 12, 0.45);
+    transform: translateY(-1px);
+}
+
+.dup-table-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fed7aa;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dup-detail {
+    font-size: 11px;
+    color: var(--text-sub);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.dup-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 /* 画面右下コントロール（キャンバスラッパー基準で常に右下に固定配置） */
