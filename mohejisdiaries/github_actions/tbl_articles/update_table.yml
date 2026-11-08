@@ -1,0 +1,66 @@
+name: Update Articles Table
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'articles/**'
+      - 'github_actions/tbl_articles/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-table:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch (Articles Source)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: repo-main
+
+      - name: Checkout main-github_actions branch (Deliverable Target)
+        uses: actions/checkout@v4
+        with:
+          ref: main-github_actions
+          path: repo-dest
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'repo-main/github_actions/tbl_articles/requirements.txt'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r repo-main/github_actions/tbl_articles/requirements.txt
+
+      - name: Run unit tests
+        run: |
+          cd repo-main/github_actions/tbl_articles
+          python -m pytest test_generate_table.py -v
+
+      - name: Generate table.json
+        run: |
+          python repo-main/github_actions/tbl_articles/generate_table.py \
+            --articles-dir repo-main/articles \
+            --output repo-dest/github_actions/deliverable/tbl_articles/table.json
+
+      - name: Commit and push changes to main-github_actions
+        working-directory: repo-dest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add github_actions/deliverable/tbl_articles/table.json
+          if git diff --staged --quiet; then
+            echo "No changes in table.json. Skipping commit."
+          else
+            git commit -m "chore: auto-update table.json from main articles [skip ci]"
+            git push origin main-github_actions
+          fi
