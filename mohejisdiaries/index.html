@@ -641,10 +641,125 @@
             color: var(--accent);
         }
 
-        /* 空タイル */
+        /* 空タイル: 中身が無いタイルは左と下の線およびアニメーションを表示しない */
         .empty-tile {
+            border-left: none !important;
+            border-bottom: none !important;
             pointer-events: none;
             background-color: transparent;
+        }
+
+        .empty-tile::before,
+        .empty-tile::after {
+            display: none !important;
+        }
+
+        /* ===================================================
+           PC/タブレット版 vs スマホ版スライダー
+           =================================================== */
+
+        /* PC/タブレット版スライダーコンテナ */
+        .articles-slider-desktop {
+            display: block;
+            width: 855px;
+        }
+
+        /* スマホ版スライダーコンテナ（通常時は非表示） */
+        .articles-slider-mobile {
+            display: none;
+            width: 100%;
+        }
+
+        /* スマホ版レスポンシブスタイル (max-width: 768px) */
+        @media (max-width: 768px) {
+            .articles-slider-desktop {
+                display: none !important;
+            }
+
+            .articles-slider-mobile {
+                display: block !important;
+            }
+
+            .top-page-layout {
+                grid-template-columns: 1fr;
+                gap: 32px;
+                padding: 10px 0 60px;
+                width: 100%;
+            }
+
+            .top-main-column {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .section-header-bar {
+                width: 100%;
+                font-size: 20px;
+                padding: 10px 16px;
+            }
+
+            /* スマホ版スライダービューポート & トラック */
+            .mobile-viewport {
+                width: 100%;
+                overflow: hidden;
+                position: relative;
+            }
+
+            .mobile-track {
+                display: flex;
+                transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+                width: 100%;
+            }
+
+            /* スマホ版: 1ページ縦一列 (10記事/ページ) */
+            .mobile-slider-page {
+                width: 100%;
+                flex-shrink: 0;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* スマホ版記事アイテム: ナビタイル・続きを読むボタン・赤線アニメーション無し */
+            .mobile-article-item {
+                width: 100%;
+                padding: 18px 14px;
+                border-bottom: 1px solid #e0ddd5;
+                box-sizing: border-box;
+                cursor: pointer;
+                background-color: transparent;
+                transition: background-color 0.15s ease;
+                position: relative;
+            }
+
+            .mobile-article-item:first-child {
+                border-top: 1px solid #e0ddd5;
+            }
+
+            .mobile-article-item:active {
+                background-color: rgba(0, 0, 0, 0.04);
+            }
+
+            .mobile-article-title {
+                font-size: 18px;
+                font-weight: 700;
+                line-height: 1.5;
+                color: var(--ink);
+                margin-bottom: 6px;
+            }
+
+            .mobile-article-meta {
+                font-size: 13px;
+                color: var(--muted);
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+
+            .mobile-pagination {
+                width: 100%;
+                padding: 12px 0 16px;
+            }
         }
     </style>
 </head>
@@ -893,10 +1008,48 @@
                 `;
             }
 
-            // ドットインジケーターのHTML生成
+            // ドットインジケーターのHTML生成 (PC/タブレット版)
             let dotsHtml = '';
             for (let p = 0; p < totalPages; p++) {
-                dotsHtml += `<div class="slider-dot ${p === 0 ? 'active' : ''}" data-dot-index="${p}"></div>`;
+                dotsHtml += `<div class="slider-dot desktop-dot ${p === 0 ? 'active' : ''}" data-dot-index="${p}"></div>`;
+            }
+
+            // ==========================================
+            // スマホ版スライダー生成 (縦一列、10記事/ページ、ナビタイル/ボタン/赤線アニメ無し)
+            // ==========================================
+            const MOBILE_ARTICLES_PER_PAGE = 10;
+            const mobileTotalPages = Math.max(1, Math.ceil(mergedArticles.length / MOBILE_ARTICLES_PER_PAGE));
+
+            let mobilePagesHtml = '';
+            for (let mp = 0; mp < mobileTotalPages; mp++) {
+                const pageArticles = mergedArticles.slice(mp * MOBILE_ARTICLES_PER_PAGE, (mp + 1) * MOBILE_ARTICLES_PER_PAGE);
+                let itemsHtml = '';
+                for (const article of pageArticles) {
+                    let targetPath = '/articles/2019/1';
+                    if (article.id) {
+                        const yMatch = article.id.match(/^(\d{4})(\d+)$/);
+                        if (yMatch) {
+                            targetPath = `/articles/${yMatch[1]}/${parseInt(yMatch[2], 10)}`;
+                        }
+                    }
+                    const formattedDate = article.createDate ? formatDate(article.createDate) : '';
+                    itemsHtml += `
+                        <div class="mobile-article-item" data-path="${targetPath}">
+                            <div class="mobile-article-title">${escapeHtml(article.title)}</div>
+                            ${formattedDate ? `<div class="mobile-article-meta"><span class="meta-date">${formattedDate}</span></div>` : ''}
+                        </div>
+                    `;
+                }
+                mobilePagesHtml += `
+                    <div class="mobile-slider-page" data-page-index="${mp}">
+                        ${itemsHtml}
+                    </div>
+                `;
+            }
+
+            let mobileDotsHtml = '';
+            for (let mp = 0; mp < mobileTotalPages; mp++) {
+                mobileDotsHtml += `<div class="slider-dot mobile-dot ${mp === 0 ? 'active' : ''}" data-dot-index="${mp}"></div>`;
             }
 
             // トップページレイアウト全体のHTML構築
@@ -909,12 +1062,28 @@
                                 <span>記事一覧</span>
                                 <span class="filter-label">[All]</span>
                             </div>
-                            <div class="slider-pagination" id="slider-pagination">
-                                ${dotsHtml}
+
+                            <!-- PC/タブレット版スライダー (3x3 グリッド: 7記事/ページ) -->
+                            <div class="articles-slider-desktop">
+                                <div class="slider-pagination" id="slider-pagination-desktop">
+                                    ${dotsHtml}
+                                </div>
+                                <div class="slider-viewport">
+                                    <div class="slider-track" id="articles-slider-track">
+                                        ${pagesHtml}
+                                    </div>
+                                </div>
                             </div>
-                            <div class="slider-viewport">
-                                <div class="slider-track" id="articles-slider-track">
-                                    ${pagesHtml}
+
+                            <!-- スマホ版スライダー (縦一列: 10記事/ページ) -->
+                            <div class="articles-slider-mobile">
+                                <div class="slider-pagination mobile-pagination" id="slider-pagination-mobile">
+                                    ${mobileDotsHtml}
+                                </div>
+                                <div class="mobile-viewport" id="mobile-slider-viewport">
+                                    <div class="mobile-track" id="articles-slider-track-mobile">
+                                        ${mobilePagesHtml}
+                                    </div>
                                 </div>
                             </div>
                         </section>
@@ -927,10 +1096,12 @@
                 </div>
             `;
 
-            // スライダー制御ロジック
+            // ==========================================
+            // PC/タブレット版スライダー制御ロジック
+            // ==========================================
             let currentPage = 0;
             const track = document.getElementById('articles-slider-track');
-            const dots = mainContent.querySelectorAll('.slider-dot');
+            const desktopDots = mainContent.querySelectorAll('.desktop-dot');
 
             function goToPage(pageIndex) {
                 if (pageIndex < 0 || pageIndex >= totalPages) return;
@@ -938,13 +1109,13 @@
                 if (track) {
                     track.style.transform = `translateX(-${currentPage * 100}%)`;
                 }
-                dots.forEach((dot, idx) => {
+                desktopDots.forEach((dot, idx) => {
                     dot.classList.toggle('active', idx === currentPage);
                 });
             }
 
-            // ドットのクリックイベント
-            dots.forEach(dot => {
+            // PCドットのクリックイベント
+            desktopDots.forEach(dot => {
                 dot.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const targetPage = parseInt(this.getAttribute('data-dot-index'), 10);
@@ -962,7 +1133,7 @@
                 });
             });
 
-            // 記事タイルのクリックイベント（タイル全体 & 続きを読むボタン）
+            // PC記事タイルのクリックイベント（タイル全体 & 続きを読むボタン）
             const articleTiles = mainContent.querySelectorAll('.article-tile, .tile-readmore-btn');
             articleTiles.forEach(elem => {
                 elem.addEventListener('click', function(e) {
@@ -973,6 +1144,71 @@
                     }
                 });
             });
+
+            // ==========================================
+            // スマホ版スライダー制御ロジック
+            // ==========================================
+            let currentMobilePage = 0;
+            const mobileTrack = document.getElementById('articles-slider-track-mobile');
+            const mobileDots = mainContent.querySelectorAll('.mobile-dot');
+
+            function goToMobilePage(pageIndex) {
+                if (pageIndex < 0 || pageIndex >= mobileTotalPages) return;
+                currentMobilePage = pageIndex;
+                if (mobileTrack) {
+                    mobileTrack.style.transform = `translateX(-${currentMobilePage * 100}%)`;
+                }
+                mobileDots.forEach((dot, idx) => {
+                    dot.classList.toggle('active', idx === currentMobilePage);
+                });
+            }
+
+            // スマホドットクリックイベント
+            mobileDots.forEach(dot => {
+                dot.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const targetPage = parseInt(this.getAttribute('data-dot-index'), 10);
+                    goToMobilePage(targetPage);
+                });
+            });
+
+            // スマホ記事アイテムのクリックイベント
+            const mobileArticleItems = mainContent.querySelectorAll('.mobile-article-item');
+            mobileArticleItems.forEach(elem => {
+                elem.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const path = this.getAttribute('data-path');
+                    if (path) {
+                        navigateTo(path);
+                    }
+                });
+            });
+
+            // スマホ用タッチスワイプ制御
+            const mobileViewport = document.getElementById('mobile-slider-viewport');
+            if (mobileViewport) {
+                let touchStartX = 0;
+                let touchStartY = 0;
+                mobileViewport.addEventListener('touchstart', function(e) {
+                    touchStartX = e.changedTouches[0].screenX;
+                    touchStartY = e.changedTouches[0].screenY;
+                }, { passive: true });
+
+                mobileViewport.addEventListener('touchend', function(e) {
+                    const touchEndX = e.changedTouches[0].screenX;
+                    const touchEndY = e.changedTouches[0].screenY;
+                    const diffX = touchEndX - touchStartX;
+                    const diffY = touchEndY - touchStartY;
+                    // 水平方向のスワイプ判定 (縦スクロールを妨げない)
+                    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+                        if (diffX < 0) {
+                            goToMobilePage(currentMobilePage + 1);
+                        } else {
+                            goToMobilePage(currentMobilePage - 1);
+                        }
+                    }
+                }, { passive: true });
+            }
         }
 
         // URLパラメータから記事IDを取得(旧実装・後方互換性のため残す)
