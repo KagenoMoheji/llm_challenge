@@ -355,13 +355,34 @@
             gap: 32px;
             width: 100%;
             justify-content: center;
+            align-items: start;
         }
 
+        /* タブレット版・スマホ版: サイドバーが記事一覧(.top-main-column)の下に回り込み、左右中央配置の一列で表示 */
         @media (max-width: 1200px) {
             .top-page-layout {
                 grid-template-columns: 1fr;
-                gap: 40px;
-                justify-content: start;
+                gap: 48px;
+                justify-items: center; /* 子要素を左右中央揃え */
+                justify-content: center;
+            }
+
+            .top-main-column {
+                width: 855px;
+                max-width: 100%;
+                margin: 0 auto;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .top-sidebar-column {
+                width: 100%;
+                max-width: 855px;
+                margin: 0 auto;
+                display: flex;
+                flex-direction: column;
+                align-items: center; /* サイドバーの各要素を左右中央配置の一列に */
             }
         }
 
@@ -375,7 +396,16 @@
         /* サイドバーカラム（今後のタグ一覧や検索用） */
         .top-sidebar-column {
             min-width: 0;
+            width: 280px;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .top-sidebar-column > * {
             width: 100%;
+            max-width: 280px;
         }
 
         /* 記事一覧セクション */
@@ -670,8 +700,8 @@
             width: 100%;
         }
 
-        /* スマホ版レスポンシブスタイル (max-width: 768px) */
-        @media (max-width: 768px) {
+        /* スマホ版レスポンシブスタイル (max-width: 855px) */
+        @media (max-width: 855px) {
             .articles-slider-desktop {
                 display: none !important;
             }
@@ -685,11 +715,22 @@
                 gap: 32px;
                 padding: 10px 0 60px;
                 width: 100%;
+                justify-items: center;
             }
 
             .top-main-column {
                 width: 100%;
                 max-width: 100%;
+                margin: 0 auto;
+            }
+
+            .top-sidebar-column {
+                width: 100%;
+                max-width: 100%;
+                margin: 0 auto;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
             }
 
             .section-header-bar {
@@ -760,6 +801,108 @@
                 width: 100%;
                 padding: 12px 0 16px;
             }
+        }
+
+        /* ===================================================
+           サイドバー: 検索 & タグ一覧 (Sidebar Widgets)
+           =================================================== */
+
+        .sidebar-widget {
+            width: 100%;
+            margin-bottom: 32px;
+        }
+
+        .sidebar-heading {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 16px;
+            letter-spacing: 0.05em;
+            line-height: 1.3;
+        }
+
+        /* 検索ブロック */
+        .sidebar-search-box {
+            padding-bottom: 24px;
+            border-bottom: 2px solid #e0ddd5;
+            margin-bottom: 32px;
+            width: 100%;
+        }
+
+        .search-text-main {
+            font-size: 14px;
+            color: var(--ink);
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .search-text-sub {
+            font-size: 14px;
+            color: #444444;
+            line-height: 1.6;
+        }
+
+        /* タグ一覧コンテナ */
+        .sidebar-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px 10px;
+            padding: 8px 4px 16px;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* 赤色の荷札風タグ */
+        .sidebar-tag-item {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            background-color: var(--accent);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 6px 14px 6px 20px;
+            border-radius: 12px 2px 2px 12px;
+            cursor: pointer;
+            user-select: none;
+            text-decoration: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+            transform-origin: center center;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        /* タグ左端の白い丸穴（パンチ穴） */
+        .sidebar-tag-item::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.25);
+        }
+
+        /* 添付図のような生き生きとした傾き (rotate) */
+        .sidebar-tag-item:nth-child(8n+1) { transform: rotate(-3.5deg); }
+        .sidebar-tag-item:nth-child(8n+2) { transform: rotate(4deg); }
+        .sidebar-tag-item:nth-child(8n+3) { transform: rotate(-2deg); }
+        .sidebar-tag-item:nth-child(8n+4) { transform: rotate(3.5deg); }
+        .sidebar-tag-item:nth-child(8n+5) { transform: rotate(-4.5deg); }
+        .sidebar-tag-item:nth-child(8n+6) { transform: rotate(2.5deg); }
+        .sidebar-tag-item:nth-child(8n+7) { transform: rotate(-1.5deg); }
+        .sidebar-tag-item:nth-child(8n+8) { transform: rotate(4.5deg); }
+
+        /* ホバー時: 少し拡大してまっすぐに戻り、影が強調される */
+        .sidebar-tag-item:hover {
+            transform: scale(1.08) rotate(0deg) !important;
+            background-color: #e23b16;
+            box-shadow: 0 4px 10px rgba(212, 83, 47, 0.35);
+            z-index: 5;
         }
     </style>
 </head>
@@ -909,6 +1052,15 @@
             { id: "2018003", title: "Go言語で作るCLIツールのアーキテクチャ設計", createDate: "2018-11-15", updateDate: "2018-11-15", tags: ["Go", "CLI"] }
         ];
 
+        // サイドバー表示用の初期ダミータグ一覧（添付図に基づく）
+        const DEFAULT_SIDEBAR_TAGS = [
+            "お知らせ", "フリートーク", "Java", "Python", "メモ",
+            "HTML", "CSS", "Javascript", "機械学習", "C",
+            "PHP", "jQuery", "企業", "就活・転職", "Crystal",
+            "環境構築", "自然言語処理", "SQL", "Mac", "React",
+            "TypeScript", "Chrome拡張", "個人開発"
+        ];
+
         // トップページをレンダリング
         async function renderTopPage() {
             const mainContent = document.getElementById('main-content');
@@ -1052,6 +1204,31 @@
                 mobileDotsHtml += `<div class="slider-dot mobile-dot ${mp === 0 ? 'active' : ''}" data-dot-index="${mp}"></div>`;
             }
 
+            // ==========================================
+            // サイドバーHTML生成（検索 & タグ一覧）
+            // ==========================================
+            let tagsHtml = '';
+            for (const tag of DEFAULT_SIDEBAR_TAGS) {
+                tagsHtml += `<span class="sidebar-tag-item" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`;
+            }
+
+            const sidebarHtml = `
+                <!-- 検索セクション -->
+                <section class="sidebar-widget sidebar-search-box">
+                    <h2 class="sidebar-heading">検索</h2>
+                    <p class="search-text-main">機械学習の勉強中です。</p>
+                    <p class="search-text-sub">タグ機能をご使用ください・・・( ´・ω・\` )</p>
+                </section>
+
+                <!-- タグ一覧セクション -->
+                <section class="sidebar-widget sidebar-tags-box">
+                    <h2 class="sidebar-heading">タグ一覧</h2>
+                    <div class="sidebar-tags-container">
+                        ${tagsHtml}
+                    </div>
+                </section>
+            `;
+
             // トップページレイアウト全体のHTML構築
             mainContent.innerHTML = `
                 <div class="top-page-layout">
@@ -1089,9 +1266,9 @@
                         </section>
                     </div>
 
-                    <!-- サイドバーカラム（今後のタグ一覧・検索・日報エリア） -->
+                    <!-- サイドバーカラム（検索・タグ一覧） -->
                     <aside class="top-sidebar-column">
-                        <!-- 次のステップでタグ一覧＆記事一覧フィルタ機能等を配置 -->
+                        ${sidebarHtml}
                     </aside>
                 </div>
             `;
@@ -1209,6 +1386,16 @@
                     }
                 }, { passive: true });
             }
+
+            // サイドバーのタグクリックイベント（将来のフィルタ機能との連携準備）
+            const tagElements = mainContent.querySelectorAll('.sidebar-tag-item');
+            tagElements.forEach(tagBtn => {
+                tagBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const tagName = this.getAttribute('data-tag');
+                    console.log('Selected tag:', tagName);
+                });
+            });
         }
 
         // URLパラメータから記事IDを取得(旧実装・後方互換性のため残す)
