@@ -1,0 +1,109 @@
+[
+  {
+    "id": "2020007",
+    "fileName": "2020007_sample.yml",
+    "title": "Go言語で作るCLIツールのアーキテクチャ設計",
+    "createDate": "2020-09-20",
+    "updateDate": "2020-09-20",
+    "tags": [
+      "Go",
+      "CLI"
+    ]
+  },
+  {
+    "id": "2020006",
+    "fileName": "2020006_sample.yml",
+    "title": "自然言語処理におけるBERTモデルのファインチューニング実践",
+    "createDate": "2020-07-10",
+    "updateDate": "2020-07-10",
+    "tags": [
+      "Python",
+      "機械学習"
+    ]
+  },
+  {
+    "id": "2020005",
+    "fileName": "2020005_sample.yml",
+    "title": "Dockerコンテナで構築する快適なローカル開発環境",
+    "createDate": "2020-03-13",
+    "updateDate": "2020-03-13",
+    "tags": [
+      "Docker"
+    ]
+  },
+  {
+    "id": "2020004",
+    "fileName": "2020004_sample.yml",
+    "title": "GraphQL入門：REST APIからの移行手順とスキーマ設計",
+    "createDate": "2020-03-13",
+    "updateDate": "2020-03-13",
+    "tags": [
+      "GraphQL",
+      "RestAPI"
+    ]
+  },
+  {
+    "id": "2020003",
+    "fileName": "2020003_sample.yml",
+    "title": "TypeScriptによる型安全なWebフロントエンド開発",
+    "createDate": "2020-02-01",
+    "updateDate": "2020-02-01",
+    "tags": [
+      "TypeScript"
+    ]
+  },
+  {
+    "id": "2020002",
+    "fileName": "2020002_sample.yml",
+    "title": "CSS GridレイアウトとFlexboxの使い分け完全ガイド",
+    "createDate": "2020-01-31",
+    "updateDate": "2020-01-31",
+    "tags": [
+      "CSS"
+    ]
+  },
+  {
+    "id": "2020001",
+    "fileName": "2020001_sample.yml",
+    "title": "【両OS対応】React Nativeで爆速プロトタイプアプリを作ろう",
+    "createDate": "2020-01-13",
+    "updateDate": "2020-01-13",
+    "tags": [
+      "TypeScript",
+      "独学"
+    ]
+  },
+  {
+    "id": "2019003",
+    "fileName": "2019003_sample.yml",
+    "title": "Macで欲しいアレコレをAutomatorで",
+    "createDate": "2019-09-02",
+    "updateDate": "2019-09-02",
+    "tags": [
+      "Mac"
+    ]
+  },
+  {
+    "id": "2019002",
+    "fileName": "2019002_sample.yml",
+    "title": "クリック座標をフラグメント識別子にして検索できるChrome拡張を開発した",
+    "createDate": "2019-07-17",
+    "updateDate": "2019-07-17",
+    "tags": [
+      "TypeScript",
+      "個人開発",
+      "Chrome拡張"
+    ]
+  },
+  {
+    "id": "2019001",
+    "fileName": "2019001_sample.yml",
+    "title": "matplotlibでガントチャートを実装する",
+    "createDate": "2019-07-13",
+    "updateDate": "2019-07-13",
+    "tags": [
+      "Python",
+      "個人開発"
+    ]
+  }
+]
