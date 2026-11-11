@@ -22,10 +22,10 @@ jobs:
           ref: main
           path: repo-main
 
-      - name: Checkout main-github_actions branch (Deliverable Target)
+      - name: Checkout db_mohejisdiaries branch (Deliverable Target)
         uses: actions/checkout@v4
         with:
-          ref: main-github_actions
+          ref: db_mohejisdiaries
           path: repo-dest
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -34,25 +34,25 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: 'repo-main/github_actions/tbl_articles/requirements.txt'
+          cache-dependency-path: 'repo-main/mohejisdiaries/github_actions/tbl_articles/requirements.txt'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r repo-main/github_actions/tbl_articles/requirements.txt
+          pip install -r repo-main/mohejisdiaries/github_actions/tbl_articles/requirements.txt
 
       - name: Run unit tests
         run: |
-          cd repo-main/github_actions/tbl_articles
+          cd repo-main/mohejisdiaries/github_actions/tbl_articles
           python -m pytest test_generate_table.py -v
 
       - name: Generate table.json
         run: |
-          python repo-main/github_actions/tbl_articles/generate_table.py \
+          python repo-main/mohejisdiaries/github_actions/tbl_articles/generate_table.py \
             --articles-dir repo-main/articles \
-            --output repo-dest/github_actions/deliverable/tbl_articles/table.json
+            --output repo-dest/mohejisdiaries/github_actions/deliverable/tbl_articles/table.json
 
-      - name: Commit and push changes to main-github_actions
+      - name: Commit and push changes to db_mohejisdiaries
         working-directory: repo-dest
         run: |
           git config user.name "github-actions[bot]"
@@ -62,5 +62,5 @@ jobs:
             echo "No changes in table.json. Skipping commit."
           else
             git commit -m "chore: auto-update table.json from main articles [skip ci]"
-            git push origin main-github_actions
+            git push origin db_mohejisdiaries
           fi
