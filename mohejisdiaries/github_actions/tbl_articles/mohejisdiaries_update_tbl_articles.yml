@@ -49,7 +49,7 @@ jobs:
       - name: Generate table.json
         run: |
           python repo-main/mohejisdiaries/github_actions/tbl_articles/generate_table.py \
-            --articles-dir repo-main/articles \
+            --articles-dir repo-main/mohejisdiaries/articles \
             --output repo-dest/mohejisdiaries/github_actions/deliverable/tbl_articles/table.json
 
       - name: Commit and push changes to db_mohejisdiaries
