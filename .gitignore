@@ -1,4 +1,14 @@
+.DS_Store
 *_v*_by_*.html
+*_v*_by_*.js
+*_v*_by_*.md
+*_v*_by_*.json
 *.pptx
 *.xlsx
 *.docx
+*.tgz
+node_modules/
+trash/
+.venv/
+__pycache__/
+.pytest_cache/
