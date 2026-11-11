@@ -461,6 +461,27 @@ JSON Schemaを使う理由は、次のとおりです。
 - 値の形式を制限したい場合は、`enum`(選択肢)、`minimum` / `maximum`(数値の範囲)、`minLength` / `maxLength`(文字数)を使ってください。
 - `pattern` という**名前のパラメータ**(検索パターンを受け取る、など)は、使えます。また、`default` や `examples` などの**値**の中に、`pattern` というキーがあっても、問題ありません。
 
+**`pattern` の「キーワード」と「パラメータの名前」は、別のものです。**
+
+- **キーワード `pattern`:** 「この文字列は、この正規表現に合うこと」という**制約**です。`pattern` は、JSON Schemaでは**任意**(必須ではない)のキーワードなので、CaPassサーバは、これを**受け付けない(登録を拒否する)仕様**にしています。CaPassサーバが、`pattern` による照合を行うことはありません(照合する場面が、そもそもありません)。
+- **パラメータの名前 `pattern`:** ツールが、「検索パターン」などを、`pattern` という名前の引数として受け取る場合の、名前です。これは制約ではないので、使えます。
+
+登録できる(OK):
+
+```json
+{"type": "object", "properties": {"pattern": {"type": "string", "description": "検索する文字列"}}, "required": ["pattern"]}
+```
+
+拒否される(422。キーワード `pattern` を使っている):
+
+```json
+{"type": "object", "properties": {"sql": {"type": "string", "description": "SQL文", "pattern": "^SELECT .*"}}}
+```
+
+```
+422 params_schema must not use "pattern" or "patternProperties" (regular expressions are not supported): $.properties.sql.pattern
+```
+
 AIエージェントが読みやすいスキーマにするコツ:
 
 - `description` に、**何を渡すか、どんな形式か、例**を書く(「SQL文」だけでなく「1文だけ指定する。例: `SELECT ...`」など)。単位や、使ってはいけない値もここに書く。
