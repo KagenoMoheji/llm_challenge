@@ -1,4 +1,4 @@
-name: Update Articles Table
+name: mohejisdiaries_update_tbl_articles
 
 on:
   push:
