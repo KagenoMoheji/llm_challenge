@@ -73,6 +73,24 @@
             width: 100%;
             height: 80px;
             background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #b0b0b0;
+            font-size: 13px;
+            letter-spacing: 0.05em;
+            user-select: none;
+            box-sizing: border-box;
+            padding: 0 16px;
+        }
+
+        .site-footer .footer-copyright {
+            margin: 0;
+            padding: 0;
+            color: #b0b0b0;
+            font-size: 13px;
+            letter-spacing: 0.05em;
+            text-align: center;
         }
 
         .container {
@@ -358,50 +376,6 @@
             align-items: start;
         }
 
-        /* タブレット版 (856px〜1200px): サイドバーが記事一覧の下に回り込み、検索(左)とタグ一覧(右)の2列で表示 */
-        @media (max-width: 1200px) {
-            .top-page-layout {
-                grid-template-columns: 1fr;
-                gap: 48px;
-                justify-items: center; /* 子要素を左右中央揃え */
-                justify-content: center;
-            }
-
-            .top-main-column {
-                width: 855px;
-                max-width: 100%;
-                margin: 0 auto;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-            }
-
-            /* タブレット版では検索(左)とタグ一覧(右)の2列配置 */
-            .top-sidebar-column {
-                width: 100%;
-                max-width: 855px;
-                margin: 0 auto;
-                display: grid;
-                grid-template-columns: 340px 1fr;
-                gap: 40px;
-                align-items: start;
-            }
-
-            .top-sidebar-column .sidebar-widget {
-                width: 100%;
-                max-width: 100%;
-                margin-bottom: 0;
-            }
-
-            .top-sidebar-column .sidebar-search-box {
-                border-bottom: none;
-                border-right: 2px solid #e0ddd5;
-                padding-right: 36px;
-                padding-bottom: 0;
-                margin-bottom: 0;
-            }
-        }
-
         /* メインカラム */
         .top-main-column {
             min-width: 0;
@@ -409,7 +383,7 @@
             max-width: 100%;
         }
 
-        /* サイドバーカラム（今後のタグ一覧や検索用） */
+        /* サイドバーカラム（検索・タグ一覧用）: PC版デフォルト (縦1列, 幅280px) */
         .top-sidebar-column {
             min-width: 0;
             width: 280px;
@@ -716,125 +690,6 @@
             width: 100%;
         }
 
-        /* スマホ版レスポンシブスタイル (max-width: 855px) */
-        @media (max-width: 855px) {
-            .articles-slider-desktop {
-                display: none !important;
-            }
-
-            .articles-slider-mobile {
-                display: block !important;
-            }
-
-            .top-page-layout {
-                grid-template-columns: 1fr;
-                gap: 32px;
-                padding: 10px 0 60px;
-                width: 100%;
-                justify-items: center;
-            }
-
-            .top-main-column {
-                width: 100%;
-                max-width: 100%;
-                margin: 0 auto;
-            }
-
-            .top-sidebar-column {
-                width: 100%;
-                max-width: 100%;
-                margin: 0 auto;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                grid-template-columns: none;
-                gap: 0;
-            }
-
-            .top-sidebar-column .sidebar-widget {
-                width: 100%;
-                max-width: 100%;
-                margin-bottom: 32px;
-            }
-
-            .top-sidebar-column .sidebar-search-box {
-                border-bottom: 2px solid #e0ddd5;
-                border-right: none;
-                padding-right: 0;
-                padding-bottom: 24px;
-                margin-bottom: 32px;
-            }
-
-            .section-header-bar {
-                width: 100%;
-                font-size: 20px;
-                padding: 10px 16px;
-            }
-
-            /* スマホ版スライダービューポート & トラック */
-            .mobile-viewport {
-                width: 100%;
-                overflow: hidden;
-                position: relative;
-            }
-
-            .mobile-track {
-                display: flex;
-                transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-                width: 100%;
-            }
-
-            /* スマホ版: 1ページ縦一列 (10記事/ページ) */
-            .mobile-slider-page {
-                width: 100%;
-                flex-shrink: 0;
-                box-sizing: border-box;
-                display: flex;
-                flex-direction: column;
-            }
-
-            /* スマホ版記事アイテム: ナビタイル・続きを読むボタン・赤線アニメーション無し */
-            .mobile-article-item {
-                width: 100%;
-                padding: 18px 14px;
-                border-bottom: 1px solid #e0ddd5;
-                box-sizing: border-box;
-                cursor: pointer;
-                background-color: transparent;
-                transition: background-color 0.15s ease;
-                position: relative;
-            }
-
-            .mobile-article-item:first-child {
-                border-top: 1px solid #e0ddd5;
-            }
-
-            .mobile-article-item:active {
-                background-color: rgba(0, 0, 0, 0.04);
-            }
-
-            .mobile-article-title {
-                font-size: 18px;
-                font-weight: 700;
-                line-height: 1.5;
-                color: var(--ink);
-                margin-bottom: 6px;
-            }
-
-            .mobile-article-meta {
-                font-size: 13px;
-                color: var(--muted);
-                display: flex;
-                gap: 10px;
-                align-items: center;
-            }
-
-            .mobile-pagination {
-                width: 100%;
-                padding: 12px 0 16px;
-            }
-        }
-
         /* ===================================================
            サイドバー: 検索 & タグ一覧 (Sidebar Widgets)
            =================================================== */
@@ -1013,6 +868,191 @@
             border-bottom: 2px solid #e0ddd5;
             box-sizing: border-box;
         }
+
+        /* ===================================================
+           レスポンシブメディアクエリ
+           =================================================== */
+
+        /* タブレット版 (856px〜1200px):
+           サイドバーが記事一覧の下に回り込み、検索(左)とタグ一覧(右)の2列で上揃え表示 */
+        @media (max-width: 1200px) {
+            .top-page-layout {
+                grid-template-columns: 1fr;
+                gap: 48px;
+                justify-items: center; /* 子要素を左右中央揃え */
+                justify-content: center;
+            }
+
+            .top-main-column {
+                width: 855px;
+                max-width: 100%;
+                margin: 0 auto;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            /* タブレット版では検索(左)とタグ一覧(右)の2列配置・上揃え */
+            .top-sidebar-column {
+                width: 100%;
+                max-width: 855px;
+                margin: 0 auto;
+                display: grid;
+                grid-template-columns: 320px 1fr;
+                gap: 48px;
+                align-items: start; /* 上揃え */
+            }
+
+            .top-sidebar-column > * {
+                max-width: 100%;
+            }
+
+            .top-sidebar-column .sidebar-widget {
+                width: 100%;
+                max-width: 100%;
+                margin-bottom: 0;
+            }
+
+            .top-sidebar-column .sidebar-search-box {
+                border-bottom: none;
+                border-right: 2px solid #e0ddd5;
+                padding-right: 44px;
+                padding-bottom: 0;
+                margin-bottom: 0;
+                box-sizing: border-box;
+                min-height: 180px;
+            }
+
+            .top-sidebar-column .sidebar-tags-box {
+                padding-top: 0;
+                margin-bottom: 0;
+            }
+        }
+
+        /* スマホ版 (max-width: 855px):
+           スライダー縦一列(10記事/ページ)、サイドバー縦一列 */
+        @media (max-width: 855px) {
+            .articles-slider-desktop {
+                display: none !important;
+            }
+
+            .articles-slider-mobile {
+                display: block !important;
+            }
+
+            .top-page-layout {
+                grid-template-columns: 1fr;
+                gap: 32px;
+                padding: 10px 0 60px;
+                width: 100%;
+                justify-items: center;
+            }
+
+            .top-main-column {
+                width: 100%;
+                max-width: 100%;
+                margin: 0 auto;
+            }
+
+            .top-sidebar-column {
+                width: 100%;
+                max-width: 100%;
+                margin: 0 auto;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                grid-template-columns: none;
+                gap: 0;
+            }
+
+            .top-sidebar-column > * {
+                max-width: 280px;
+            }
+
+            .top-sidebar-column .sidebar-widget {
+                width: 100%;
+                /* max-width: 280px; */
+                margin-bottom: 32px;
+            }
+
+            .top-sidebar-column .sidebar-search-box {
+                border-bottom: 2px solid #e0ddd5;
+                border-right: none;
+                padding-right: 0;
+                padding-bottom: 24px;
+                margin-bottom: 32px;
+                min-height: 0;
+            }
+
+            .section-header-bar {
+                width: 100%;
+                font-size: 20px;
+                padding: 10px 16px;
+            }
+
+            /* スマホ版スライダービューポート & トラック */
+            .mobile-viewport {
+                width: 100%;
+                overflow: hidden;
+                position: relative;
+            }
+
+            .mobile-track {
+                display: flex;
+                transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+                width: 100%;
+            }
+
+            /* スマホ版: 1ページ縦一列 (10記事/ページ) */
+            .mobile-slider-page {
+                width: 100%;
+                flex-shrink: 0;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* スマホ版記事アイテム: ナビタイル・続きを読むボタン・赤線アニメーション無し */
+            .mobile-article-item {
+                width: 100%;
+                padding: 18px 14px;
+                border-bottom: 1px solid #e0ddd5;
+                box-sizing: border-box;
+                cursor: pointer;
+                background-color: transparent;
+                transition: background-color 0.15s ease;
+                position: relative;
+            }
+
+            .mobile-article-item:first-child {
+                border-top: 1px solid #e0ddd5;
+            }
+
+            .mobile-article-item:active {
+                background-color: rgba(0, 0, 0, 0.04);
+            }
+
+            .mobile-article-title {
+                font-size: 18px;
+                font-weight: 700;
+                line-height: 1.5;
+                color: var(--ink);
+                margin-bottom: 6px;
+            }
+
+            .mobile-article-meta {
+                font-size: 13px;
+                color: var(--muted);
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+
+            .mobile-pagination {
+                width: 100%;
+                padding: 12px 0 16px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1026,6 +1066,7 @@
     </main>
     
     <footer class="site-footer">
+        <p class="footer-copyright">&copy;Copyright 2017 もへじの編綴. All rights reserved.</p>
     </footer>
 
     <!-- 画像モーダル -->
