@@ -358,7 +358,7 @@
             align-items: start;
         }
 
-        /* タブレット版・スマホ版: サイドバーが記事一覧(.top-main-column)の下に回り込み、左右中央配置の一列で表示 */
+        /* タブレット版 (856px〜1200px): サイドバーが記事一覧の下に回り込み、検索(左)とタグ一覧(右)の2列で表示 */
         @media (max-width: 1200px) {
             .top-page-layout {
                 grid-template-columns: 1fr;
@@ -376,13 +376,29 @@
                 align-items: center;
             }
 
+            /* タブレット版では検索(左)とタグ一覧(右)の2列配置 */
             .top-sidebar-column {
                 width: 100%;
                 max-width: 855px;
                 margin: 0 auto;
-                display: flex;
-                flex-direction: column;
-                align-items: center; /* サイドバーの各要素を左右中央配置の一列に */
+                display: grid;
+                grid-template-columns: 340px 1fr;
+                gap: 40px;
+                align-items: start;
+            }
+
+            .top-sidebar-column .sidebar-widget {
+                width: 100%;
+                max-width: 100%;
+                margin-bottom: 0;
+            }
+
+            .top-sidebar-column .sidebar-search-box {
+                border-bottom: none;
+                border-right: 2px solid #e0ddd5;
+                padding-right: 36px;
+                padding-bottom: 0;
+                margin-bottom: 0;
             }
         }
 
@@ -731,6 +747,22 @@
                 display: flex;
                 flex-direction: column;
                 align-items: center;
+                grid-template-columns: none;
+                gap: 0;
+            }
+
+            .top-sidebar-column .sidebar-widget {
+                width: 100%;
+                max-width: 100%;
+                margin-bottom: 32px;
+            }
+
+            .top-sidebar-column .sidebar-search-box {
+                border-bottom: 2px solid #e0ddd5;
+                border-right: none;
+                padding-right: 0;
+                padding-bottom: 24px;
+                margin-bottom: 32px;
             }
 
             .section-header-bar {
@@ -1079,7 +1111,7 @@
 
         let cachedArticles = null;
         let lastFetchTime = 0;
-        const CACHE_TTL_MS = 10000; // 10秒キャッシュ
+        const CACHE_TTL_MS = 600000; // 10分キャッシュ
 
         async function getArticlesTable(forceRefresh = false) {
             const now = Date.now();
@@ -1592,64 +1624,52 @@
             return params.get('id') || '201907001_sample'; // デフォルト値
         }
 
-        // GitHub APIから記事ファイル一覧を取得して記事IDにマッチするファイルを検索
+        // table.jsonから記事IDにマッチするfileNameを検索
         async function findArticleFile(articleId) {
-            const listUrl = 'https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/articles';
-            
             try {
-                const response = await fetch(listUrl);
-                if (!response.ok) {
-                    throw new Error(`ファイル一覧の取得に失敗しました (HTTP ${response.status})`);
-                }
-                
-                const files = await response.json();
-                
+                const articles = await getArticlesTable();
+
                 // 記事IDの先頭部分(yyyyNNN)を抽出
-                const idPrefix = articleId.match(/^(\d{4}\d{3})/);
-                if (!idPrefix) {
-                    throw new Error('記事IDの形式が正しくありません');
-                }
-                const prefix = idPrefix[1];
-                
-                // プレフィックスにマッチするファイルを検索
-                const matchedFile = files.find(file => 
-                    file.name.startsWith(prefix) && file.name.endsWith('.yml')
+                const idPrefixMatch = String(articleId).match(/^(\d{4}\d{3})/);
+                const prefix = idPrefixMatch ? idPrefixMatch[1] : String(articleId);
+
+                // id または fileName のプレフィックスにマッチする記事レコードを検索
+                const matched = articles.find(article => 
+                    article.id === prefix || (article.fileName && article.fileName.startsWith(prefix))
                 );
-                
-                if (!matchedFile) {
-                    // 404エラーとして扱う
+
+                if (!matched || !matched.fileName) {
                     return null;
                 }
-                
-                return matchedFile.name;
+
+                return matched.fileName;
             } catch (error) {
-                throw new Error(`ファイル検索に失敗しました: ${error.message}`);
+                console.error('ファイル検索エラー:', error);
+                return null;
             }
         }
 
-        // GitHub APIから記事データを取得
+        // GitHub Raw URLから記事データを取得 (GitHub APIを完全排除)
         async function fetchArticleData(articleId) {
             try {
-                // まずファイル名を検索
+                // まずtable.jsonからファイル名を検索
                 const fileName = await findArticleFile(articleId);
-                
+
                 // ファイルが見つからなかった場合
                 if (!fileName) {
                     return null;
                 }
-                
-                // ファイルの内容を取得
-                const url = `https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/articles/${fileName}`;
-                const response = await fetch(url);
-                
+
+                // GitHub Raw URLからYAMLファイルの内容を取得
+                const rawUrl = `https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/main/mohejisdiaries/articles/${encodeURIComponent(fileName)}`;
+                const response = await fetch(rawUrl);
+
                 if (!response.ok) {
                     throw new Error(`記事が見つかりません (HTTP ${response.status})`);
                 }
-                
-                const data = await response.json();
-                // Base64デコード(日本語対応)
-                const yamlContent = decodeURIComponent(escape(atob(data.content)));
-                return jsyaml.load(yamlContent);
+
+                const yamlText = await response.text();
+                return jsyaml.load(yamlText);
             } catch (error) {
                 throw new Error(`記事の読み込みに失敗しました: ${error.message}`);
             }
