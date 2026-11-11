@@ -66,7 +66,7 @@
 
 | サブコマンド | 役割 | 対応するAPI |
 |---|---|---|
-| `keygen` | 公開鍵/秘密鍵の作成(ツールサーバ、AIエージェント、管理者) | なし(ローカル) |
+| `keygen` | 公開鍵/秘密鍵の作成(ツールサーバ、AIエージェント、管理者)。**`capass toolserver keygen` は実装済み**(AIエージェント用、管理者用は未実装) | なし(ローカル) |
 | `regist` | ツールサーバ/AIエージェントの初回登録、ツール(ロール単位)の登録、AIエージェントへの割り当ての申請 | `toolservers/register`、`agents/register`、`tools/addtool`、`agents/{agent_id}/grant/{tool_endpoint}` |
 | `list executable` | 使用できるツールの一覧(AIエージェント側) | `agents/{agent_id}/tools` |
 | `exec` | ツールの実行(AIエージェント側) | `agents/{agent_id}/exec/{tool_endpoint}` |
@@ -77,7 +77,11 @@
 | 管理者用 | 承認(`approve`)、割り当ての承認・取り消し、予約(`replace/reserve`)、承認待ち一覧 | `toolservers/{toolserver_id}/approve`、`agents/{agent_id}/approve`、`agents/{agent_id}/grant/{tool_endpoint}/approve`、`agents/{agent_id}/revoke/{tool_endpoint}`、`toolservers/{toolserver_id}/replace/reserve` |
 
 - AIエージェント側のCLI(`list executable` / `exec`)は、**`params_schema` を、AIエージェントが使うツール定義(MCPの `inputSchema` など)へ、そのまま渡せる形で出力する**と、AIエージェントが扱いやすい。
-- 秘密鍵の保管場所(ファイル権限、OSのキーストアなど)を決める。
+- 秘密鍵の保管: いまは、`<CAPASS_HOME>/<役割>/keys/<役割>.key`(所有者だけが読み書きできる権限 0600)に、暗号化せずに保存している。パスフレーズでの保護や、OSのキーストアへの保存を検討する。
+- **役割の同居の防止(AIエージェントとツールサーバを、同じサーバに置かない):** 役割ごとのディレクトリと、役割ファイル(`<CAPASS_HOME>/role`)で、検出している。`capass toolserver keygen` は、AIエージェントなどが設定済みなら、エラーにする。次の課題がある。
+  - `capass agent keygen`(未実装)にも、同じ確認を入れる(ツールサーバが設定済みなら、エラー)。管理者用の鍵(`admin`)を、同じ規則にどう入れるかも決める。
+  - いまは、同じ `CAPASS_HOME`(同じユーザ)の中でしか、検出できない。**ユーザが違う、同じサーバ**での同居は、検出できない。サーバ全体の場所(`/etc/capass` など)に、役割ファイルを置く方法を検討する。
+  - 設定ミスを防ぐ仕組みで、悪意のある操作(ファイルの削除など)は、防げない。
 
 ## 3. サーバの未実装(シーケンス図のうち、まだ無いもの)
 
@@ -108,3 +112,4 @@
 - **ツール代理トークンの暗号鍵:** 環境変数ではなく、KMSなどで管理する。
 - **ツールサーバへの接続:** 接続の再利用(コネクションプール)や、非同期化が必要になったら、標準ライブラリの `urllib` から、HTTPクライアントのライブラリ(httpxなど)への置き換えを検討する。
 - **`params` のサイズ上限:** `exec` のボディのサイズに、上限を設ける。
+- **ツール実行結果のストリーミング中継:** いまの `exec` は、ツールサーバの応答を、全て受け取ってから、AIエージェントへ返す(最大サイズまで、メモリに溜める)。長い実行や、逐次の出力(SSEなど)が必要になったら、ツールサーバの応答を、受け取りながら、そのまま中継する形(チャンクのまま中継)にする。

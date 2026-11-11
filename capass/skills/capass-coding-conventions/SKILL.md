@@ -65,7 +65,8 @@ server/capass_server/
   schemas/           Pydanticのリクエスト/レスポンス
   common/            横断的な部品(config, globals, db, errors, crypto, signature, rate_limit, tool_client)
 server/tests/        ut_*.py(単体)、it_*.py(結合)、conftest.py、testlib.py
-cli/capass_cli/      CaPassクライアント(未実装)
+cli/capass_cli/      CaPassクライアント(CLI)。main.py、commands/(サブコマンド)、common/(部品)。詳しくは 11.
+cli/tests/           ut_*.py(単体)、it_*.py(結合)
 examples/            暫定クライアントと、ツールサーバの見本。skills/ AI向けスキル
 ```
 
@@ -155,7 +156,7 @@ examples/            暫定クライアントと、ツールサーバの見本�
 
 ## 9. バージョンと成果物
 
-- バージョンは `capass_server/__init__.py` の `__version__` だけに書く(`pyproject.toml` は動的に読む)。**利用者から指示がない限り変えない。**
+- バージョンは `capass_server/__init__.py` と `capass_cli/__init__.py` の `__version__` に書く(同じ値にそろえる。`pyproject.toml` は動的に読む)。**利用者から指示がない限り変えない。**
 - 成果物は、同名のトップディレクトリを持つzip(`capass-v0.1.3-1.zip` など)で渡し、**変更したファイルの一覧**も示す。
 - 利用者が依頼していない変更をした場合は、その旨と理由を伝える。
 
@@ -166,3 +167,14 @@ examples/            暫定クライアントと、ツールサーバの見本�
 3. 命名が規則(3.)に合っている。固定値は `globals.py`(長さの上限は、スキーマとエンティティで同じ定数)、環境変数は `config.py` 経由。
 4. 新しい業務エラーは `errors.py` と `_STATUS_BY_ERROR` に追加した。
 5. テストを足し、`QUICKSTART.md` など関連するドキュメントを更新した。
+
+## 11. CLI(`cli/`)
+
+- **構成:** `capass_cli/main.py`(エントリポイント。引数の解析と、エラーの表示だけ)→ `commands/`(サブコマンドごとに1モジュール。引数の定義と、表示)→ `common/`(部品: `paths.py` `roles.py` `keys.py` `fileio.py` `errors.py`)。**下の層から上の層をimportしない**。業務ルール(鍵の作成、役割の確認)は、`common/` に書き、`commands/` には書かない。
+- **サブコマンドの追加:** `commands/<グループ>.py` に `register(subparsers)` を作り、`main.py` の `build_parser` で呼ぶ。コマンドの関数は、終了コード(int)を返す。
+- **エラー:** 業務エラーは `common/errors.py` の `CapassCliError`(サブクラスが `exit_code` を持つ)を `raise` する。`main.py` が、`エラー: ...` を標準エラーに出して、`exit_code` で終了する。終了コード: 0=成功、1=エラー、2=使い方の誤り(argparse)、3=役割の同居、4=鍵が存在する、5=ホームディレクトリを使えない。
+- **表示は日本語。** ただし、秘密鍵などの機密は、表示しない(保存先だけ表示する)。
+- **ホームディレクトリ(`CAPASS_HOME`):** 優先順位は、`--home` > 環境変数 `CAPASS_HOME` > `~/.capass`。役割ごとのファイルは、`<home>/<役割>/` の下に置く(役割: `agent` / `toolserver` / `server`)。ファイル名にも、役割を入れる(例: `toolserver.key`)。ディレクトリは 0700、秘密鍵は 0600。
+- **役割の同居の防止:** 鍵などを作る前に、`ensure_role_available` で、別の役割が設定済みでないかを確認する(役割のディレクトリと、`<home>/role` を見る)。確認に失敗したら、何も作らない。鍵の作成は、`setup_role_keys`(確認 → 作成 → 役割ファイルの記録)を使う。
+- **鍵の形式:** Ed25519。秘密鍵・公開鍵とも、生の32バイトをBase64にした1行(CaPassサーバの署名の形式と同じ)。ファイルは、一時ファイルに書いてから置き換える(`write_atomic`)。
+- **テスト:** `cd cli && pip install -e ".[dev]" && pytest`。ファイルは、`tmp_path` の下だけに作り、環境変数は `monkeypatch` で変える。

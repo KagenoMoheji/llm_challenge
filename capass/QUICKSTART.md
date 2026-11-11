@@ -1,6 +1,6 @@
 # CaPass QUICKSTART(暫定版)
 
-> **この文書は暫定版です。** CaPassクライアント(CLI)がまだ未実装のため、キー作成(`keygen`)や各API呼び出しは、暫定クライアント [`examples/provisional_client.py`](examples/provisional_client.py) で代用しています。CLIの実装後に置き換えます。
+> **この文書は暫定版です。** CaPassクライアント(CLI)は、`capass toolserver keygen` だけが実装済みです(`cli/` を参照)。それ以外のキー作成(AIエージェント用、管理者用)と、各API呼び出しは、暫定クライアント [`examples/provisional_client.py`](examples/provisional_client.py) で代用しています。CLIの実装後に置き換えます。
 > 動作するAPIは、下表のとおりです(登録・承認・ツールの登録と割り当て、AIエージェントによるツール一覧の取得・実行、ツールサーバのリプレース(予約・切り替え・切り戻し)、ツール代理トークンの更新)。
 
 ## 0. 前提: CaPassが制御するものと、しないもの
@@ -284,6 +284,22 @@ export AGENT_PRIVATE_KEY='<AIエージェントのPRIVATE>'
 python provisional_client.py agent-register --agent-id agent-1 --email agent-owner@example.com
 # 201 {"agent_id": "agent-1", ..., "applicant_email": "agent-owner@example.com", "status": "pending", ...}
 ```
+
+**ツールサーバの鍵は、CLIでも作れます**(`capass toolserver keygen`)。`cli/` で `pip install -e .` すると、`capass` コマンドが使えます。
+
+```bash
+capass toolserver keygen
+# 秘密鍵: ~/.capass/toolserver/keys/toolserver.key  (このサーバだけで保管。権限は 0600)
+# 公開鍵: ~/.capass/toolserver/keys/toolserver.pub
+# 公開鍵(Base64)とフィンガープリントを表示する(管理者が、承認の前に、別の経路で照合する)
+
+# 暫定クライアントで使うときは、秘密鍵のファイルを、環境変数に読み込む
+export TOOL_SERVER_PRIVATE_KEY="$(cat ~/.capass/toolserver/keys/toolserver.key)"
+```
+
+- 鍵は、`<CAPASS_HOME>/toolserver/keys/` に保存されます(`CAPASS_HOME` の既定は `~/.capass`。`--home` でも指定できます)。
+- **AIエージェントとツールサーバを、同じサーバに同居させないための確認があります。** このサーバが、AIエージェントなどとして設定済み(`<CAPASS_HOME>/agent/` や `<CAPASS_HOME>/role` がある)の場合は、エラー(終了コード3)になります。同居すると、AIエージェントが、ツールサーバの秘密鍵や認証情報に直接アクセスでき、CaPassサーバの承認と署名の確認を、迂回できてしまうためです。開発・テストで、同じ端末で試す場合は、役割ごとに、別の `CAPASS_HOME` を指定してください。
+- 鍵が存在する場合は、エラー(終了コード4)になります。作り直すと、CaPassサーバに登録した公開鍵が使えなくなるので、作り直す場合だけ `--force` を指定してください。
 
 秘密鍵は、ツールサーバ/AIエージェント上だけで保管します。CaPassにも管理者にも渡しません。
 

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "capass-cli"
+dynamic = ["version"]
+requires-python = ">=3.10"
+dependencies = [
+  "cryptography",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+capass = "capass_cli.main:run"
+
+[tool.setuptools.packages.find]
+include = ["capass_cli*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# ut=unit test, it=integration test, st=system test, uat=user acceptance test
+python_files = ["ut_*.py", "it_*.py", "st_*.py", "uat_*.py"]
+
+[tool.setuptools.dynamic]
+version = {attr = "capass_cli.__version__"}
