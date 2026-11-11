@@ -7,8 +7,8 @@ CaPassサーバからのツール実行の依頼(POST)を受け取り、ツー�
     ボディ(JSON): {"agent_id": "...", "tool_endpoint": "...", "params": {...}}
   応答: 成功は2xx(ボディはそのままAIエージェントへ中継される)。トークンや権限が不正なら403(または4xx)を返す。
 
-  # 環境変数 FAKE_TOOL_TOKENS に、「トークン: {agent_id, tool_endpoint}」のJSONを渡して起動する(トークンは、addtoolで登録したもの)
-  FAKE_TOOL_TOKENS='{"<トークン>": {"agent_id": "agent-1", "tool_endpoint": "psql_manager"}}' \
+  # 環境変数 FAKE_TOOL_TOKENS に、「トークン: {tool_endpoint}」のJSONを渡して起動する(トークンは、tools/addtoolで登録したもの。ロール単位なので、AIエージェントには紐づかない)
+  FAKE_TOOL_TOKENS='{"<トークン>": {"tool_endpoint": "psql_manager"}}' \
   python fake_tool_server.py 9000
   # CaPassサーバ側は CAPASS_SERVER_TOOL_SERVER_ALLOW_HTTP=true にして、実行URL http://127.0.0.1:9000/capass/exec で登録する
 """
@@ -36,11 +36,13 @@ class Handler(BaseHTTPRequestHandler):
         auth = self.headers.get("Authorization", "")
         token = auth[len("Bearer "):] if auth.startswith("Bearer ") else ""
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
-        # ツール代理トークンに対応する認証情報(ここでは、許可するagent_idとtool_endpoint)を引く。トークンの比較は、タイミング攻撃を避けるため定数時間で行う
+        # ツール代理トークンに対応する認証情報(ここでは、許可するtool_endpoint)を引く。トークンの比較は、タイミング攻撃を避けるため定数時間で行う
         entry = next((v for k, v in TOKENS.items() if hmac.compare_digest(k.encode(), token.encode())), None)
-        if entry is None or entry["agent_id"] != body.get("agent_id") or entry["tool_endpoint"] != body.get("tool_endpoint"):
+        if entry is None or entry["tool_endpoint"] != body.get("tool_endpoint"):
             return self._send(403, {"detail": "permission denied"})
-        self._send(200, {"result": "ok", "tool_endpoint": body["tool_endpoint"], "echo": body.get("params")})
+        # agent_id は、ロール単位のトークンには紐づかない。どのAIエージェントの実行かを、ログに残す(リソース側のログには、ロールの主体しか残らないため)
+        print(f"exec: agent_id={body.get('agent_id')} tool_endpoint={body['tool_endpoint']}", file=sys.stderr)
+        self._send(200, {"result": "ok", "tool_endpoint": body["tool_endpoint"], "agent_id": body.get("agent_id"), "echo": body.get("params")})
 
     def _send(self, status, obj):
         data = json.dumps(obj, ensure_ascii=False).encode("utf-8")

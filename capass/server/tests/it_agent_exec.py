@@ -17,8 +17,8 @@ from sqlalchemy import select
 from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
 from capass_server.common.errors import ToolServerTimeoutError, ToolServerUnavailableError
 from capass_server.common.tool_client import ToolServerResponse
-from capass_server.models.entities import ApprovalStatus, TblAgentTool, TblRequestNonce
-from testlib import EXEC_URL, PARAMS_SCHEMA, exec_body, seed_agent, seed_agent_tool, seed_tool_server
+from capass_server.models.entities import ApprovalStatus, TblAgentTool, TblRequestNonce, TblTool, TblToolServer
+from testlib import EXEC_URL, PARAMS_SCHEMA, exec_body, seed_agent, seed_agent_tool, seed_grant, seed_tool, seed_tool_server
 
 
 def _post(client, agent_id, tool_endpoint, body):
@@ -35,8 +35,10 @@ def _setup(session_factory, agent_id="agent-1", tool_endpoint="psql_manager", to
 
 
 def _used_at(session_factory, agent_id="agent-1", tool_endpoint="psql_manager"):
+    """AIエージェントごとの、そのツールの利用日時(割り当てごとに持つ)。"""
     with session_factory() as db:
-        return db.execute(select(TblAgentTool).where(TblAgentTool.agent_id == agent_id, TblAgentTool.tool_endpoint == tool_endpoint)).scalar_one().tool_used_at
+        stmt = select(TblAgentTool).join(TblTool, TblTool.id == TblAgentTool.tool_id).where(TblAgentTool.agent_id == agent_id, TblTool.tool_endpoint == tool_endpoint)
+        return db.execute(stmt).scalar_one().tool_used_at
 
 
 # ---------- 成功 ----------
@@ -178,6 +180,45 @@ def test_exec_invalid_params_consume_the_nonce(client, session_factory, fake_too
     assert _post(client, "agent-1", "psql_manager", body).status_code == 401  # 同じnonceの再送は、リプレイとして拒否される
 
 
+# ---------- 割り当て(承認・ロック)と、ロール単位のツール ----------
+def test_exec_requires_approved_grant(client, session_factory, fake_tool_server):
+    agent_priv, ts_priv = _setup(session_factory)
+    pending_priv = Ed25519PrivateKey.generate()
+    seed_agent(session_factory, pending_priv, "agent-pending-grant")
+    seed_agent_tool(session_factory, "agent-pending-grant", "psql_manager", ts_priv, grant_status=ApprovalStatus.PENDING)
+    revoked_priv = Ed25519PrivateKey.generate()
+    seed_agent(session_factory, revoked_priv, "agent-revoked-grant")
+    seed_agent_tool(session_factory, "agent-revoked-grant", "psql_manager", ts_priv, grant_status=ApprovalStatus.REVOKED)
+    for agent_id, priv in (("agent-pending-grant", pending_priv), ("agent-revoked-grant", revoked_priv)):
+        assert _post(client, agent_id, "psql_manager", exec_body(priv, agent_id, "psql_manager")).status_code == 403  # 承認済みの割り当てだけが、使える
+    assert fake_tool_server.calls == []
+
+
+def test_exec_is_forbidden_when_the_grant_is_locked(client, session_factory, fake_tool_server):
+    agent_priv, ts_priv = _setup(session_factory)
+    other_priv = Ed25519PrivateKey.generate()
+    seed_agent(session_factory, other_priv, "agent-2")
+    with session_factory() as db:
+        tool_server_id = db.execute(select(TblToolServer.id)).scalar_one()
+    tool_id = seed_tool(session_factory, "tool_grant_locked", tool_server_id)
+    seed_grant(session_factory, "agent-1", tool_id, locked=True)  # このAIエージェントへの割り当てだけが、ロックされている
+    seed_grant(session_factory, "agent-2", tool_id)
+    assert _post(client, "agent-1", "tool_grant_locked", exec_body(agent_priv, "agent-1", "tool_grant_locked")).status_code == 403
+    assert _post(client, "agent-2", "tool_grant_locked", exec_body(other_priv, "agent-2", "tool_grant_locked")).status_code == 200
+
+
+def test_one_tool_is_shared_by_agents_and_used_at_is_per_agent(client, session_factory, fake_tool_server):
+    agent_priv, ts_priv = _setup(session_factory)
+    agent2_priv = Ed25519PrivateKey.generate()
+    seed_agent(session_factory, agent2_priv, "agent-2")
+    seed_agent_tool(session_factory, "agent-2", "psql_manager", ts_priv)  # 同じツール(ロール単位のトークン)を、別のAIエージェントにも割り当てる
+    assert _post(client, "agent-1", "psql_manager", exec_body(agent_priv, "agent-1", "psql_manager")).status_code == 200
+    assert _used_at(session_factory, "agent-1") is not None
+    assert _used_at(session_factory, "agent-2") is None  # 利用日時は、AIエージェントごと
+    assert _post(client, "agent-2", "psql_manager", exec_body(agent2_priv, "agent-2", "psql_manager")).status_code == 200
+    assert [c["token"] for c in fake_tool_server.calls] == ["proxy-token-1", "proxy-token-1"]  # 同じトークンを使う
+
+
 # ---------- 権限ありません(ツールが無い/ロック/ツールサーバ未承認) ----------
 def test_exec_unknown_endpoint_is_forbidden(client, session_factory, fake_tool_server):
     agent_priv, _ = _setup(session_factory)
@@ -301,7 +342,7 @@ def test_exec_deletes_expired_nonces(client, session_factory, fake_tool_server):
     from datetime import datetime, timedelta, timezone
     agent_priv, _ = _setup(session_factory)
     with session_factory() as db:
-        db.add(TblRequestNonce(agent_id="agent-1", nonce="expired-nonce-0123456789", expires_at=datetime.now(timezone.utc) - timedelta(seconds=1)))
+        db.add(TblRequestNonce(scope="agent:agent-1", nonce="expired-nonce-0123456789", expires_at=datetime.now(timezone.utc) - timedelta(seconds=1)))
         db.commit()
     assert _post(client, "agent-1", "psql_manager", exec_body(agent_priv, "agent-1", "psql_manager")).status_code == 200
     with session_factory() as db:

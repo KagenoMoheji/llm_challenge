@@ -1,0 +1,59 @@
+{
+  "name": "datlinx",
+  "displayName": "datlinx - SQL Lineage Mindmap",
+  "description": "CREATE PROCEDURE/VIEW/FUNCTIONのSQLファイルからFROM/JOINを解析し、依存関係マインドマップを自動生成・検索するVS Code拡張機能",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onCommand:datlinx.openFolder",
+    "onCommand:datlinx.openWorkspace",
+    "onCommand:datlinx.openSample"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "datlinx.openFolder",
+        "title": "datlinx: SQLフォルダを解析してマインドマップを開く (Analyze SQL Folder)",
+        "category": "datlinx"
+      },
+      {
+        "command": "datlinx.openWorkspace",
+        "title": "datlinx: ワークスペースの全SQLを解析して開く (Analyze Workspace SQL)",
+        "category": "datlinx"
+      },
+      {
+        "command": "datlinx.openSample",
+        "title": "datlinx: サンプルSQLデータで開く (Open Sample SQL Mindmap)",
+        "category": "datlinx"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "datlinx.openFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "datlinx.openFolder"
+        },
+        {
+          "command": "datlinx.openWorkspace"
+        },
+        {
+          "command": "datlinx.openSample"
+        }
+      ]
+    }
+  }
+}

@@ -18,11 +18,7 @@ from capass_server.common.globals import (
     NONCE_MAX_LEN,
     NONCE_MIN_LEN,
     NONCE_PATTERN,
-    TOOL_ENDPOINT_MAX_LEN,
-    TOOL_ENDPOINT_PATTERN,
-    TOOL_PROXY_TOKEN_MAX_LEN,
 )
-from capass_server.common.params_schema import validate_params_schema_definition
 from capass_server.schemas.base import SignedRequest, validate_public_key_format
 
 
@@ -60,45 +56,54 @@ class AgentApproveResponse(BaseModel):
     approved_at: datetime | None
 
 
-class AgentAddToolRequest(SignedRequest):
-    """AIエージェントへのツール追加リクエスト(agents/{agent_id}/addtool)。承認済みツールサーバの秘密鍵で署名する。
+class AgentGrantRequest(SignedRequest):
+    """AIエージェントへのツールの割り当ての申請(agents/{agent_id}/grant/{tool_endpoint})。AIエージェント自身の秘密鍵で署名する。
+    申請は承認待ち(pending)になり、承認(agents/{agent_id}/grant/{tool_endpoint}/approve)されると、AIエージェントがツールを使えるようになる。
 
-    署名プレフィックス: SIGN_CONTEXT_AGENT_ADDTOOL
-    署名対象: tool_endpoint, context, params_schema, tool_proxy_token, tool_server_public_key, signed_at + URLパスのagent_id
+    署名プレフィックス: SIGN_CONTEXT_AGENT_GRANT
+    署名対象: applicant_email, signed_at + URLパスの agent_id, tool_endpoint
     """
 
-    tool_endpoint: str = Field(
-        min_length=1,
-        max_length=TOOL_ENDPOINT_MAX_LEN,
-        pattern=TOOL_ENDPOINT_PATTERN,
-        description="ツールエンドポイント(URLパス exec/{tool_endpoint} に使うため、スラッシュ・空白・制御文字は不可)",
-    )
-    context: str = Field(min_length=1, description="ツールのコンテキスト(説明)")
-    params_schema: dict[str, Any] = Field(
-        description=(
-            "ツールパラメータ(params)のスキーマ(JSON Schema)。AIエージェントへの一覧に含まれ、実行時にCaPassサーバがparamsを検証する。"
-            '{"type": "object", "properties": {...}} の形で、各パラメータに "description" が必要(パラメータが無い場合は "properties": {} )'
-        )
-    )
-    tool_proxy_token: str = Field(min_length=1, max_length=TOOL_PROXY_TOKEN_MAX_LEN, description="ツール代理トークン")
-    tool_server_public_key: str = Field(description="ツールサーバ公開鍵(Base64。Ed25519の生32バイト)。承認済みである必要がある")
+    applicant_email: str = Field(max_length=EMAIL_MAX_LEN, pattern=EMAIL_PATTERN, description="申請者(AIエージェントの利用者)のメールアドレス")
 
-    @field_validator("tool_server_public_key")
+
+class AgentGrantResponse(BaseModel):
+    agent_id: str
+    tool_endpoint: str
+    status: str
+    applicant_email: str
+    created_at: datetime
+
+
+class AgentGrantApproveResponse(BaseModel):
+    agent_id: str
+    tool_endpoint: str
+    status: str
+    applicant_email: str
+    approver_email: str | None
+    approved_at: datetime | None
+
+
+class AgentRevokeRequest(SignedRequest):
+    """AIエージェントへのツールの割り当ての取り消し(agents/{agent_id}/revoke/{tool_endpoint})。
+    CaPassサーバ管理者、または、そのツールを登録したツールサーバが、署名する。
+
+    署名プレフィックス: SIGN_CONTEXT_AGENT_REVOKE
+    署名対象: signer_public_key, signed_at + URLパスの agent_id, tool_endpoint
+    """
+
+    signer_public_key: str = Field(description="署名した人の公開鍵(Base64。Ed25519の生32バイト)。管理者(tbl_admin)、または、そのツールを登録した承認済みツールサーバの公開鍵")
+
+    @field_validator("signer_public_key")
     @classmethod
-    def _validate_tool_server_public_key(cls, v: str) -> str:
+    def _validate_signer_public_key(cls, v: str) -> str:
         return validate_public_key_format(v)
 
-    @field_validator("params_schema")
-    @classmethod
-    def _validate_params_schema(cls, v: dict[str, Any]) -> dict[str, Any]:
-        validate_params_schema_definition(v)
-        return v
 
-
-class AgentAddToolResponse(BaseModel):
-    tool_endpoint: str
+class AgentRevokeResponse(BaseModel):
     agent_id: str
-    created_at: datetime
+    tool_endpoint: str
+    status: str
 
 
 class AgentToolItem(BaseModel):

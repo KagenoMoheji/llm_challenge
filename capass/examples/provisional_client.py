@@ -9,11 +9,17 @@ CLIの `keygen` / `regist` などの代わりに、CaPassサーバのRestAPIを�
   python provisional_client.py toolserver-approve  --toolserver-id 1                   # 環境変数 ADMIN_PRIVATE_KEY
   python provisional_client.py agent-register      --agent-id agent-1 --email you@example.com          # 環境変数 AGENT_PRIVATE_KEY
   python provisional_client.py agent-approve       --agent-id agent-1                  # 環境変数 ADMIN_PRIVATE_KEY
-  python provisional_client.py agent-addtool       --agent-id agent-1 \
-      --endpoint psql_manager --context "..." --params-schema @schema.json             # 環境変数 TOOL_SERVER_PRIVATE_KEY
-  # ツールサーバのリプレース: 新ツールサーバで handoff を作り(PRIVATEは新ツールサーバの鍵)、旧ツールサーバで chkey する(PRIVATEは旧ツールサーバの鍵)
-  python provisional_client.py toolserver-chkey-prepare --toolserver-id 1 --old-public-key <旧公開鍵>   # 新ツールサーバ: 環境変数 TOOL_SERVER_PRIVATE_KEY
-  python provisional_client.py toolserver-chkey --toolserver-id 1 --handoff @handoff.json              # 旧ツールサーバ: 環境変数 TOOL_SERVER_PRIVATE_KEY
+  # ツールサーバのリプレース(予約 → 切り替え → 切り戻し)
+  python provisional_client.py toolserver-replace-reserve --toolserver-id 1 --new-public-key <新の公開鍵> --new-name "新ツールサーバ" --new-exec-url https://new.example.com/capass/exec --email you@example.com   # ADMIN_PRIVATE_KEY
+  python provisional_client.py toolserver-replace-sign-old --toolserver-id 1 --new-public-key <新の公開鍵> > handoff.json   # 旧ツールサーバ: TOOL_SERVER_PRIVATE_KEY
+  python provisional_client.py toolserver-replace-activate --toolserver-id 1 --handoff @handoff.json                       # 新ツールサーバ: TOOL_SERVER_PRIVATE_KEY
+  python provisional_client.py toolserver-replace-rollback --toolserver-id 1                                               # 旧ツールサーバ: TOOL_SERVER_PRIVATE_KEY
+  # ツール(ロール単位)の登録と、AIエージェントへの割り当て(申請 → 承認 / 取り消し)
+  python provisional_client.py tool-add            --endpoint psql_manager --context "..." --params-schema @schema.json   # TOOL_SERVER_PRIVATE_KEY
+  python provisional_client.py agent-grant         --agent-id agent-1 --endpoint psql_manager --email you@example.com     # AGENT_PRIVATE_KEY(申請)
+  python provisional_client.py agent-grant-approve --agent-id agent-1 --endpoint psql_manager                             # ADMIN_PRIVATE_KEY(承認)
+  python provisional_client.py agent-revoke        --agent-id agent-1 --endpoint psql_manager [--as toolserver]           # ADMIN_PRIVATE_KEY(または TOOL_SERVER_PRIVATE_KEY)
+  python provisional_client.py tool-chtkn          --endpoint psql_manager              # TOOL_SERVER_PRIVATE_KEY(トークンの更新。割り当てられた全AIエージェントに反映)
   python provisional_client.py agent-tools         --agent-id agent-1                  # 環境変数 AGENT_PRIVATE_KEY(list executable の代用)
   python provisional_client.py agent-exec          --agent-id agent-1 \
       --endpoint psql_manager --params '{"sql": "SELECT 1"}'                           # 環境変数 AGENT_PRIVATE_KEY(exec の代用)
@@ -44,11 +50,17 @@ CAPASS_URL = os.environ.get("CAPASS_URL", "http://127.0.0.1:8000")
 # 署名メッセージのプレフィックス。サーバ(capass_server/common/signature.py)のSIGN_CONTEXT_*と一致させること
 SIGN_CONTEXT_TOOLSERVER_REGISTER = b"capass-toolserver-register-v1\n"
 SIGN_CONTEXT_TOOLSERVER_APPROVE = b"capass-toolserver-approve-v1\n"
-SIGN_CONTEXT_TOOLSERVER_CHKEY_OLD = b"capass-toolserver-chkey-old-v1\n"
-SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW = b"capass-toolserver-chkey-new-v1\n"
+SIGN_CONTEXT_TOOLSERVER_REPLACE_RESERVE = b"capass-toolserver-replace-reserve-v1\n"
+SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_OLD = b"capass-toolserver-replace-activate-old-v1\n"
+SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW = b"capass-toolserver-replace-activate-new-v1\n"
+SIGN_CONTEXT_TOOLSERVER_REPLACE_ROLLBACK = b"capass-toolserver-replace-rollback-v1\n"
 SIGN_CONTEXT_AGENT_REGISTER = b"capass-agent-register-v1\n"
 SIGN_CONTEXT_AGENT_APPROVE = b"capass-agent-approve-v1\n"
-SIGN_CONTEXT_AGENT_ADDTOOL = b"capass-agent-addtool-v1\n"
+SIGN_CONTEXT_TOOL_ADDTOOL = b"capass-tool-addtool-v1\n"
+SIGN_CONTEXT_TOOL_CHTKN = b"capass-tool-chtkn-v1\n"
+SIGN_CONTEXT_AGENT_GRANT = b"capass-agent-grant-v1\n"
+SIGN_CONTEXT_AGENT_GRANT_APPROVE = b"capass-agent-grant-approve-v1\n"
+SIGN_CONTEXT_AGENT_REVOKE = b"capass-agent-revoke-v1\n"
 SIGN_CONTEXT_AGENT_LISTTOOLS = b"capass-agent-listtools-v1\n"
 SIGN_CONTEXT_AGENT_EXEC = b"capass-agent-exec-v1\n"
 
@@ -133,7 +145,62 @@ def build_agent_approve(admin: Ed25519PrivateKey, agent_id: str) -> tuple[str, d
     return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/approve", body
 
 
-def build_agent_addtool(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, context: str, token: str, params_schema: dict) -> tuple[str, dict]:
+def _sign_canonical(priv: Ed25519PrivateKey, sign_context: bytes, payload: dict) -> str:
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return base64.b64encode(priv.sign(sign_context + canonical)).decode()
+
+
+def build_replace_reserve(admin: Ed25519PrivateKey, toolserver_id: int, new_public_key: str, new_name: str, new_exec_url: str, email: str) -> tuple[str, dict]:
+    fields = {
+        "admin_public_key": _public_key_b64(admin),
+        "new_tool_server_public_key": new_public_key,
+        "new_tool_server_name": new_name,
+        "new_tool_server_exec_url": new_exec_url,
+        "applicant_email": email,
+    }
+    return f"/api/v1/toolservers/{toolserver_id}/replace/reserve", _signed_body(admin, SIGN_CONTEXT_TOOLSERVER_REPLACE_RESERVE, fields, {"toolserver_id": toolserver_id})
+
+
+def build_replace_handoff(old_priv: Ed25519PrivateKey, toolserver_id: int, new_public_key: str) -> dict:
+    """旧ツールサーバが、切り替え(activate)の署名を作る。新ツールサーバへ渡す(handoff)。署名時刻は、新ツールサーバの署名にも使う。"""
+    signed_at = int(time.time())
+    payload = {"toolserver_id": toolserver_id, "old_tool_server_public_key": _public_key_b64(old_priv), "new_tool_server_public_key": new_public_key, "signed_at": signed_at}
+    return {
+        "old_tool_server_public_key": payload["old_tool_server_public_key"],
+        "new_tool_server_public_key": new_public_key,
+        "signed_at": signed_at,
+        "signature": _sign_canonical(old_priv, SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_OLD, payload),
+    }
+
+
+def build_replace_activate(new_priv: Ed25519PrivateKey, toolserver_id: int, handoff: dict) -> tuple[str, dict]:
+    """新ツールサーバが、handoffと同じ内容に署名して、切り替えのリクエストを作る。"""
+    if handoff["new_tool_server_public_key"] != _public_key_b64(new_priv):
+        sys.exit("handoff の new_tool_server_public_key が、この秘密鍵(新ツールサーバ)の公開鍵と、一致しません")
+    payload = {
+        "toolserver_id": toolserver_id,
+        "old_tool_server_public_key": handoff["old_tool_server_public_key"],
+        "new_tool_server_public_key": handoff["new_tool_server_public_key"],
+        "signed_at": handoff["signed_at"],
+    }
+    body = {
+        "new_tool_server_public_key": handoff["new_tool_server_public_key"],
+        "signed_at": handoff["signed_at"],
+        "signature": handoff["signature"],
+        "new_key_signature": _sign_canonical(new_priv, SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW, payload),
+    }
+    return f"/api/v1/toolservers/{toolserver_id}/replace/activate", body
+
+
+def build_replace_rollback(old_priv: Ed25519PrivateKey, toolserver_id: int) -> tuple[str, dict]:
+    """旧ツールサーバ(切り戻し先)が、自分の署名だけで、切り戻しのリクエストを作る。"""
+    signed_at = int(time.time())
+    payload = {"toolserver_id": toolserver_id, "tool_server_public_key": _public_key_b64(old_priv), "signed_at": signed_at}
+    body = {"signed_at": signed_at, "signature": _sign_canonical(old_priv, SIGN_CONTEXT_TOOLSERVER_REPLACE_ROLLBACK, payload)}
+    return f"/api/v1/toolservers/{toolserver_id}/replace/rollback", body
+
+
+def build_tool_add(priv: Ed25519PrivateKey, endpoint: str, context: str, token: str, params_schema: dict) -> tuple[str, dict]:
     fields = {
         "tool_endpoint": endpoint,
         "context": context,
@@ -141,41 +208,28 @@ def build_agent_addtool(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, c
         "tool_proxy_token": token,
         "tool_server_public_key": _public_key_b64(priv),
     }
-    body = _signed_body(priv, SIGN_CONTEXT_AGENT_ADDTOOL, fields, {"agent_id": agent_id})
-    return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/addtool", body
+    return "/api/v1/tools/addtool", _signed_body(priv, SIGN_CONTEXT_TOOL_ADDTOOL, fields)
 
 
-def _sign_canonical(priv: Ed25519PrivateKey, sign_context: bytes, payload: dict) -> str:
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return base64.b64encode(priv.sign(sign_context + canonical)).decode()
+def build_tool_chtkn(priv: Ed25519PrivateKey, endpoint: str, token: str) -> tuple[str, dict]:
+    fields = {"tool_proxy_token": token, "tool_server_public_key": _public_key_b64(priv), "nonce": secrets.token_urlsafe(16)}  # nonceは、リクエストごとに必ず新しく作る
+    body = _signed_body(priv, SIGN_CONTEXT_TOOL_CHTKN, fields, {"tool_endpoint": endpoint})
+    return f"/api/v1/tools/{urllib.parse.quote(endpoint, safe='')}/chtkn", body
 
 
-def build_chkey_handoff(new_priv: Ed25519PrivateKey, toolserver_id: int, old_public_key: str) -> dict:
-    """新ツールサーバが、自分の鍵の所持を証明する署名を作る。旧ツールサーバへ渡す(handoff)。署名時刻は、旧ツールサーバの署名にも使う。"""
-    signed_at = int(time.time())
-    payload = {
-        "toolserver_id": toolserver_id,
-        "old_tool_server_public_key": old_public_key,
-        "new_tool_server_public_key": _public_key_b64(new_priv),
-        "signed_at": signed_at,
-    }
-    return {
-        "new_tool_server_public_key": payload["new_tool_server_public_key"],
-        "signed_at": signed_at,
-        "new_key_signature": _sign_canonical(new_priv, SIGN_CONTEXT_TOOLSERVER_CHKEY_NEW, payload),
-    }
+def build_agent_grant(priv: Ed25519PrivateKey, agent_id: str, endpoint: str, email: str) -> tuple[str, dict]:
+    body = _signed_body(priv, SIGN_CONTEXT_AGENT_GRANT, {"applicant_email": email}, {"agent_id": agent_id, "tool_endpoint": endpoint})
+    return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/grant/{urllib.parse.quote(endpoint, safe='')}", body
 
 
-def build_chkey(old_priv: Ed25519PrivateKey, toolserver_id: int, handoff: dict) -> tuple[str, dict]:
-    """旧ツールサーバが、handoffと同じ内容に署名して、リクエストを作る。"""
-    payload = {
-        "toolserver_id": toolserver_id,
-        "old_tool_server_public_key": _public_key_b64(old_priv),
-        "new_tool_server_public_key": handoff["new_tool_server_public_key"],
-        "signed_at": handoff["signed_at"],
-    }
-    body = {**handoff, "signature": _sign_canonical(old_priv, SIGN_CONTEXT_TOOLSERVER_CHKEY_OLD, payload)}
-    return f"/api/v1/toolservers/{toolserver_id}/chkey", body
+def build_agent_grant_approve(admin: Ed25519PrivateKey, agent_id: str, endpoint: str) -> tuple[str, dict]:
+    body = _signed_body(admin, SIGN_CONTEXT_AGENT_GRANT_APPROVE, {"admin_public_key": _public_key_b64(admin)}, {"agent_id": agent_id, "tool_endpoint": endpoint})
+    return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/grant/{urllib.parse.quote(endpoint, safe='')}/approve", body
+
+
+def build_agent_revoke(signer: Ed25519PrivateKey, agent_id: str, endpoint: str) -> tuple[str, dict]:
+    body = _signed_body(signer, SIGN_CONTEXT_AGENT_REVOKE, {"signer_public_key": _public_key_b64(signer)}, {"agent_id": agent_id, "tool_endpoint": endpoint})
+    return f"/api/v1/agents/{urllib.parse.quote(agent_id, safe='')}/revoke/{urllib.parse.quote(endpoint, safe='')}", body
 
 
 def build_agent_tools(priv: Ed25519PrivateKey, agent_id: str) -> tuple[str, dict]:
@@ -209,20 +263,46 @@ def cmd_agent_approve(a: argparse.Namespace) -> None:
     _post(*build_agent_approve(_load_private_key("ADMIN_PRIVATE_KEY"), a.agent_id))
 
 
-def cmd_agent_addtool(a: argparse.Namespace) -> None:
-    token = a.token or secrets.token_urlsafe(32)  # ツール代理トークン。省略時は自動発行する
-    print("tool_proxy_token(ツールサーバ側のDBにも [認証情報/トークン/エージェント] として保存すること):", token)
-    _post(*build_agent_addtool(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.agent_id, a.endpoint, a.context, token, _load_json_object(a.params_schema, "--params-schema")))
+def cmd_toolserver_replace_reserve(a: argparse.Namespace) -> None:
+    _post(*build_replace_reserve(_load_private_key("ADMIN_PRIVATE_KEY"), a.toolserver_id, a.new_public_key, a.new_name, a.new_exec_url, a.email))
 
 
-def cmd_toolserver_chkey_prepare(a: argparse.Namespace) -> None:
-    handoff = build_chkey_handoff(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.toolserver_id, a.old_public_key)
-    print(json.dumps(handoff, ensure_ascii=False))
-    print("# 上のJSONを、旧ツールサーバへ渡してください(署名時刻から、数分以内に chkey を実行すること)", file=sys.stderr)
+def cmd_toolserver_replace_sign_old(a: argparse.Namespace) -> None:
+    print(json.dumps(build_replace_handoff(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.toolserver_id, a.new_public_key), ensure_ascii=False))
+    print("# 上のJSONを、新ツールサーバへ渡してください(署名時刻から、数分以内に activate を実行すること)", file=sys.stderr)
 
 
-def cmd_toolserver_chkey(a: argparse.Namespace) -> None:
-    _post(*build_chkey(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.toolserver_id, _load_json_object(a.handoff, "--handoff")))
+def cmd_toolserver_replace_activate(a: argparse.Namespace) -> None:
+    _post(*build_replace_activate(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.toolserver_id, _load_json_object(a.handoff, "--handoff")))
+
+
+def cmd_toolserver_replace_rollback(a: argparse.Namespace) -> None:
+    _post(*build_replace_rollback(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.toolserver_id))
+
+
+def cmd_tool_add(a: argparse.Namespace) -> None:
+    token = a.token or secrets.token_urlsafe(32)  # ツール代理トークン(ロール単位)。省略時は自動発行する
+    print("tool_proxy_token(ツールサーバ側のDBに、[認証情報(ロール)/トークン]として保存すること):", token)
+    _post(*build_tool_add(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.endpoint, a.context, token, _load_json_object(a.params_schema, "--params-schema")))
+
+
+def cmd_tool_chtkn(a: argparse.Namespace) -> None:
+    token = a.token or secrets.token_urlsafe(32)  # 新しいツール代理トークン。省略時は自動発行する
+    print("new tool_proxy_token(ツールサーバ側のDBに、先に保存しておくこと。更新が完了するまでは、古いトークンと両方で受け付けると安全):", token)
+    _post(*build_tool_chtkn(_load_private_key("TOOL_SERVER_PRIVATE_KEY"), a.endpoint, token))
+
+
+def cmd_agent_grant(a: argparse.Namespace) -> None:
+    _post(*build_agent_grant(_load_private_key("AGENT_PRIVATE_KEY"), a.agent_id, a.endpoint, a.email))
+
+
+def cmd_agent_grant_approve(a: argparse.Namespace) -> None:
+    _post(*build_agent_grant_approve(_load_private_key("ADMIN_PRIVATE_KEY"), a.agent_id, a.endpoint))
+
+
+def cmd_agent_revoke(a: argparse.Namespace) -> None:
+    env_name = "ADMIN_PRIVATE_KEY" if a.as_signer == "admin" else "TOOL_SERVER_PRIVATE_KEY"
+    _post(*build_agent_revoke(_load_private_key(env_name), a.agent_id, a.endpoint))
 
 
 def cmd_agent_tools(a: argparse.Namespace) -> None:
@@ -261,23 +341,56 @@ def main() -> None:
     p.add_argument("--agent-id", required=True)
     p.set_defaults(func=cmd_agent_approve)
 
-    p = sub.add_parser("agent-addtool", help="AIエージェントへのツール追加(承認済みツールサーバ)")
+    p = sub.add_parser("toolserver-replace-reserve", help="ツールサーバのリプレース(1/3): 新ツールサーバを、後継として予約する(管理者)")
+    p.add_argument("--toolserver-id", type=int, required=True, help="置き換えられる(旧)ツールサーバのid")
+    p.add_argument("--new-public-key", required=True, help="新ツールサーバの公開鍵")
+    p.add_argument("--new-name", required=True, help="新ツールサーバの名称")
+    p.add_argument("--new-exec-url", required=True, help="新ツールサーバの実行URL")
+    p.add_argument("--email", required=True, help="リプレースを申告したツールサーバ管理者のメールアドレス")
+    p.set_defaults(func=cmd_toolserver_replace_reserve)
+
+    p = sub.add_parser("toolserver-replace-sign-old", help="ツールサーバのリプレース(2/3の準備): 旧ツールサーバで、切り替えの署名(handoff)を作る")
+    p.add_argument("--toolserver-id", type=int, required=True, help="旧ツールサーバのid")
+    p.add_argument("--new-public-key", required=True, help="新ツールサーバの公開鍵(予約済みのもの)")
+    p.set_defaults(func=cmd_toolserver_replace_sign_old)
+
+    p = sub.add_parser("toolserver-replace-activate", help="ツールサーバのリプレース(2/3): 新ツールサーバで、handoffに署名して、切り替えを実行する")
+    p.add_argument("--toolserver-id", type=int, required=True, help="旧ツールサーバのid")
+    p.add_argument("--handoff", required=True, help="旧ツールサーバが作ったhandoff(JSON文字列、または @ファイルパス)")
+    p.set_defaults(func=cmd_toolserver_replace_activate)
+
+    p = sub.add_parser("toolserver-replace-rollback", help="ツールサーバのリプレース(3/3): 旧ツールサーバへ、切り戻す")
+    p.add_argument("--toolserver-id", type=int, required=True, help="切り戻し先の、旧ツールサーバのid")
+    p.set_defaults(func=cmd_toolserver_replace_rollback)
+
+    p = sub.add_parser("tool-add", help="ツール(ロール単位のツールエンドポイント)を登録する(承認済みツールサーバ)")
+    p.add_argument("--endpoint", required=True, help="ツールエンドポイント(全体で一意)")
+    p.add_argument("--context", required=True, help="ツールのコンテキスト(説明)")
+    p.add_argument("--params-schema", required=True, help="ツールのparamsのスキーマ(JSON Schema)。JSON文字列、または @ファイルパス。各パラメータに description が必要。pattern は使えない")
+    p.add_argument("--token", help="ツール代理トークン(省略時は自動発行)")
+    p.set_defaults(func=cmd_tool_add)
+
+    p = sub.add_parser("tool-chtkn", help="ツール代理トークンを更新する(ツールサーバの定期更新ジョブ。割り当てられた全AIエージェントに反映される)")
+    p.add_argument("--endpoint", required=True, help="ツールエンドポイント")
+    p.add_argument("--token", help="新しいツール代理トークン(省略時は自動発行)")
+    p.set_defaults(func=cmd_tool_chtkn)
+
+    p = sub.add_parser("agent-grant", help="AIエージェントへのツールの割り当てを申請する(AIエージェント)")
     p.add_argument("--agent-id", required=True)
     p.add_argument("--endpoint", required=True, help="ツールエンドポイント")
-    p.add_argument("--context", required=True, help="ツールのコンテキスト(説明)")
-    p.add_argument("--params-schema", required=True, help="ツールのparamsのスキーマ(JSON Schema)。JSON文字列、または @ファイルパス。各パラメータに description が必要")
-    p.add_argument("--token", help="ツール代理トークン(省略時は自動発行)")
-    p.set_defaults(func=cmd_agent_addtool)
+    p.add_argument("--email", required=True, help="申請者のメールアドレス")
+    p.set_defaults(func=cmd_agent_grant)
 
-    p = sub.add_parser("toolserver-chkey-prepare", help="ツールサーバのリプレース: 新ツールサーバで、鍵の所持を証明する署名(handoff)を作る")
-    p.add_argument("--toolserver-id", type=int, required=True)
-    p.add_argument("--old-public-key", required=True, help="旧ツールサーバの公開鍵(現在登録されているもの)")
-    p.set_defaults(func=cmd_toolserver_chkey_prepare)
+    p = sub.add_parser("agent-grant-approve", help="ツールの割り当ての申請を承認する(管理者)")
+    p.add_argument("--agent-id", required=True)
+    p.add_argument("--endpoint", required=True, help="ツールエンドポイント")
+    p.set_defaults(func=cmd_agent_grant_approve)
 
-    p = sub.add_parser("toolserver-chkey", help="ツールサーバのリプレース: 旧ツールサーバで、handoffに署名して、公開鍵の更新を依頼する")
-    p.add_argument("--toolserver-id", type=int, required=True)
-    p.add_argument("--handoff", required=True, help="新ツールサーバが作ったhandoff(JSON文字列、または @ファイルパス)")
-    p.set_defaults(func=cmd_toolserver_chkey)
+    p = sub.add_parser("agent-revoke", help="ツールの割り当てを取り消す(管理者、またはツールを登録したツールサーバ)")
+    p.add_argument("--agent-id", required=True)
+    p.add_argument("--endpoint", required=True, help="ツールエンドポイント")
+    p.add_argument("--as", dest="as_signer", choices=["admin", "toolserver"], default="admin", help="署名する人。admin=ADMIN_PRIVATE_KEY、toolserver=TOOL_SERVER_PRIVATE_KEY")
+    p.set_defaults(func=cmd_agent_revoke)
 
     p = sub.add_parser("agent-tools", help="使用できるツールの一覧を取得する(AIエージェント)")
     p.add_argument("--agent-id", required=True)

@@ -36,6 +36,43 @@ def test_valid_definitions_are_accepted():
         "properties": {"user": {"$ref": "#/$defs/user", "description": "対象のユーザ"}},
         "$defs": {"user": {"type": "object", "properties": {"id": {"type": "integer"}}}},
     })
+    validate_params_schema_definition({
+        "type": "object",
+        "properties": {"node": {"$ref": "#", "description": "再帰的な構造"}},
+    })
+    validate_params_schema_definition({
+        "type": "object",
+        "properties": {"user": {"$ref": "#/definitions/user", "description": "対象のユーザ"}},
+        "definitions": {"user": {"type": "object", "properties": {"id": {"type": "integer"}}}},
+    })
+
+
+def test_parameter_named_pattern_is_allowed():
+    # "pattern" という名前のパラメータ(例: grepのような検索パターン)は、キーワードではないので使える
+    validate_params_schema_definition({
+        "type": "object",
+        "properties": {
+            "pattern": {"type": "string", "description": "検索する文字列"},
+            "patternProperties": {"type": "string", "description": "名前が紛らわしいパラメータ"},
+        },
+        "required": ["pattern"],
+    })
+    validate_params_schema_definition({
+        "type": "object",
+        "properties": {"options": {"type": "object", "description": "オプション", "properties": {"pattern": {"type": "string", "description": "検索パターン"}}}},
+    })
+
+
+def test_pattern_inside_data_keywords_is_allowed():
+    # enum / const / default / examples の中の値は、データ(スキーマではない)。"pattern" というキーがあっても、キーワードではない
+    validate_params_schema_definition({
+        "type": "object",
+        "properties": {
+            "options": {"type": "object", "description": "オプション", "default": {"pattern": "TODO"}, "enum": [{"pattern": "a"}, {"pattern": "b"}]},
+            "mode": {"type": "string", "description": "モード", "const": "grep"},
+        },
+        "examples": [{"options": {"pattern": "TODO"}, "mode": "grep"}],
+    })
 
 
 @pytest.mark.parametrize("schema, message", [
@@ -54,6 +91,55 @@ def test_invalid_definitions_are_rejected(schema, message):
     with pytest.raises(ValueError) as e:
         validate_params_schema_definition(schema)
     assert message in str(e.value)
+
+
+def test_pattern_keywords_are_rejected_in_every_subschema_position():
+    described = {"type": "string", "description": "x"}
+    regex = {"type": "string", "pattern": "^a$"}
+    cases = {
+        "property": {"type": "object", "properties": {"a": {**described, "pattern": "^a$"}}},
+        "nested property": {"type": "object", "properties": {"a": {"type": "object", "description": "x", "properties": {"b": {**described, "pattern": "^a$"}}}}},
+        "items": {"type": "object", "properties": {"a": {"type": "array", "description": "x", "items": regex}}},
+        "prefixItems": {"type": "object", "properties": {"a": {"type": "array", "description": "x", "prefixItems": [described, regex]}}},
+        "additionalProperties": {"type": "object", "properties": {}, "additionalProperties": regex},
+        "anyOf": {"type": "object", "properties": {"a": {"description": "x", "anyOf": [{"type": "integer"}, regex]}}},
+        "allOf": {"type": "object", "properties": {}, "allOf": [regex]},
+        "oneOf": {"type": "object", "properties": {}, "oneOf": [regex]},
+        "not": {"type": "object", "properties": {}, "not": regex},
+        "if/then/else": {"type": "object", "properties": {}, "if": {"properties": {}}, "then": regex},
+        "propertyNames": {"type": "object", "properties": {}, "propertyNames": {"pattern": "^[a-z]+$"}},
+        "$defs": {"type": "object", "properties": {}, "$defs": {"s": regex}},
+        "definitions": {"type": "object", "properties": {}, "definitions": {"s": regex}},
+        "dependentSchemas": {"type": "object", "properties": {}, "dependentSchemas": {"a": regex}},
+        "patternProperties": {"type": "object", "properties": {}, "patternProperties": {"^x_": {"type": "string"}}},
+    }
+    for label, schema in cases.items():
+        with pytest.raises(ValueError) as e:
+            validate_params_schema_definition(schema)
+        assert "pattern" in str(e.value), label
+
+
+def test_pattern_error_message_tells_where():
+    schema = {"type": "object", "properties": {"sql": {"type": "string", "description": "SQL", "pattern": "^SELECT"}}}
+    with pytest.raises(ValueError) as e:
+        validate_params_schema_definition(schema)
+    assert "$.properties.sql.pattern" in str(e.value)
+
+
+def test_refs_other_than_root_and_defs_are_rejected():
+    # "$ref" で、examples などの中のデータを、スキーマとして評価させることで、正規表現の禁止を迂回できてしまうため、参照できる場所を限る
+    bypass = {
+        "type": "object",
+        "properties": {"a": {"$ref": "#/examples/0", "description": "x"}},
+        "examples": [{"type": "string", "pattern": "(a+)+$"}],
+    }
+    for ref in ("#/examples/0", "#/properties/a", "#foo", "#/$defs/a/b", "#/$defs/", "#/$defs", "https://example.com/s.json", "other.json", ""):
+        schema = {"type": "object", "properties": {"a": {"$ref": ref, "description": "x"}}}
+        with pytest.raises(ValueError) as e:
+            validate_params_schema_definition(schema)
+        assert "disallowed reference" in str(e.value), ref
+    with pytest.raises(ValueError):
+        validate_params_schema_definition(bypass)
 
 
 def test_external_refs_are_rejected_anywhere():

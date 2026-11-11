@@ -1,0 +1,2647 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>datlinx - SQL依存関係マインドマップ (Data Lineage Lynx)</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #0b1120;
+            --grid-color: rgba(255, 255, 255, 0.04);
+            --panel-bg: rgba(15, 23, 42, 0.88);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --accent-primary: #3b82f6;
+
+            /* [4] 選択した要素 (薄い橙色) */
+            --node-selected-bg: #ffedd5;
+            --node-selected-border: #ea580c;
+            --node-selected-text: #7c2d12;
+            --node-selected-sub: #9a3412;
+
+            /* [4] 依存元の要素・線 (薄い緑色 / 緑線) */
+            --upstream-bg: #dcfce7;
+            --upstream-border: #16a34a;
+            --upstream-text: #14532d;
+            --upstream-sub: #15803d;
+            --upstream-line: #22c55e;
+
+            /* [4] 依存先の要素・線 (薄い赤色 / 赤線) */
+            --downstream-bg: #fee2e2;
+            --downstream-border: #dc2626;
+            --downstream-text: #7f1d1d;
+            --downstream-sub: #991b1b;
+            --downstream-line: #ef4444;
+
+            --edge-default: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+        }
+
+        /* ツールバー */
+        #toolbar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            font-size: 20px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa 0%, #c084fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-badge {
+            font-size: 10.5px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(99, 102, 241, 0.2);
+            color: #a5b4fc;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        /* 凡例バナー */
+        .legend-bar {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 5px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 11.5px;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+            color: var(--text-sub);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+
+        .dot-upstream {
+            background-color: #86efac;
+            border: 1px solid #16a34a;
+            box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+        }
+
+        .dot-selected {
+            background-color: #fdba74;
+            border: 1px solid #ea580c;
+            box-shadow: 0 0 6px rgba(249, 115, 22, 0.5);
+        }
+
+        .dot-downstream {
+            background-color: #fca5a5;
+            border: 1px solid #dc2626;
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+        }
+
+        .tool-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 13px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border-color: #3b82f6;
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+
+        .btn-sample {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            border-color: #8b5cf6;
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-sample:hover {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        }
+
+        /* 検索ボックス [3] */
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-box i.search-icon {
+            position: absolute;
+            left: 11px;
+            color: var(--text-sub);
+            font-size: 13px;
+            pointer-events: none;
+        }
+
+        .search-input {
+            padding: 7px 32px 7px 32px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(15, 23, 42, 0.7);
+            color: var(--text-main);
+            font-size: 13px;
+            width: 200px;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .search-input:focus {
+            width: 250px;
+            border-color: var(--node-selected-border);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25);
+            background: rgba(15, 23, 42, 0.95);
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 10px;
+            cursor: pointer;
+            color: var(--text-sub);
+            font-size: 12px;
+            display: none;
+        }
+
+        .search-clear:hover {
+            color: var(--text-main);
+        }
+
+        .search-count {
+            margin-left: 6px;
+            font-size: 11.5px;
+            color: #f97316;
+            font-weight: 700;
+        }
+
+        /* メインコンテナ */
+        #main-container {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* キャンバス（サイドバー開閉に応じて右端まで伸縮） */
+        #canvas-wrapper {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 1px 1px, var(--grid-color) 1px, transparent 0);
+            background-size: 28px 28px;
+            cursor: grab;
+        }
+
+        #canvas-wrapper.grabbing {
+            cursor: grabbing;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform-origin: 0 0;
+        }
+
+        #svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 30000px;
+            height: 30000px;
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        #nodes-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 30000px;
+            height: 30000px;
+            pointer-events: none;
+        }
+
+        /* ノードスタイル */
+        .node {
+            position: absolute;
+            pointer-events: auto;
+            width: 290px;
+            background: #1e293b;
+            border: 1.5px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+            overflow: hidden;
+        }
+
+        .node:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.35);
+            box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55);
+        }
+
+        /* [4] 選択した要素 (薄い橙色背景) */
+        .node.node-selected {
+            background-color: var(--node-selected-bg) !important;
+            border-color: var(--node-selected-border) !important;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.45), 0 14px 30px rgba(234, 88, 12, 0.35) !important;
+        }
+
+        .node.node-selected .node-header {
+            background: rgba(251, 146, 60, 0.3) !important;
+            border-bottom: 1px solid rgba(234, 88, 12, 0.25) !important;
+        }
+
+        .node.node-selected .node-name {
+            color: var(--node-selected-text) !important;
+        }
+
+        .node.node-selected .node-schema,
+        .node.node-selected .node-level-tag {
+            color: var(--node-selected-sub) !important;
+        }
+
+        .node.node-selected .node-footer {
+            background: rgba(251, 146, 60, 0.18) !important;
+            color: var(--node-selected-text) !important;
+            border-top: 1px solid rgba(234, 88, 12, 0.25) !important;
+        }
+
+        /* [4] そこに至るまでの依存元の要素 (薄い緑色背景) */
+        .node.node-upstream {
+            background-color: var(--upstream-bg) !important;
+            border-color: var(--upstream-border) !important;
+            box-shadow: 0 0 0 2.5px var(--upstream-border), 0 12px 28px rgba(22, 163, 74, 0.35) !important;
+        }
+
+        .node.node-upstream .node-header {
+            background: rgba(74, 222, 128, 0.3) !important;
+            border-bottom: 1px solid rgba(22, 163, 74, 0.25) !important;
+        }
+
+        .node.node-upstream .node-name {
+            color: var(--upstream-text) !important;
+        }
+
+        .node.node-upstream .node-schema,
+        .node.node-upstream .node-level-tag {
+            color: var(--upstream-sub) !important;
+        }
+
+        .node.node-upstream .node-footer {
+            background: rgba(74, 222, 128, 0.18) !important;
+            color: var(--upstream-text) !important;
+            border-top: 1px solid rgba(22, 163, 74, 0.25) !important;
+        }
+
+        /* [4] その後ろの依存先の要素 (薄い赤色背景) */
+        .node.node-downstream {
+            background-color: var(--downstream-bg) !important;
+            border-color: var(--downstream-border) !important;
+            box-shadow: 0 0 0 2.5px var(--downstream-border), 0 12px 28px rgba(220, 38, 38, 0.35) !important;
+        }
+
+        .node.node-downstream .node-header {
+            background: rgba(248, 113, 113, 0.3) !important;
+            border-bottom: 1px solid rgba(220, 38, 38, 0.25) !important;
+        }
+
+        .node.node-downstream .node-name {
+            color: var(--downstream-text) !important;
+        }
+
+        .node.node-downstream .node-schema,
+        .node.node-downstream .node-level-tag {
+            color: var(--downstream-sub) !important;
+        }
+
+        .node.node-downstream .node-footer {
+            background: rgba(248, 113, 113, 0.18) !important;
+            color: var(--downstream-text) !important;
+            border-top: 1px solid rgba(220, 38, 38, 0.25) !important;
+        }
+
+        /* [3] 検索フォーム一致時のハイライト */
+        .node.node-search-match {
+            background-color: var(--node-selected-bg) !important;
+            border-color: var(--node-selected-border) !important;
+            box-shadow: 0 0 0 2.5px #f97316, 0 10px 24px rgba(234, 88, 12, 0.35) !important;
+        }
+
+        .node.node-search-match .node-header {
+            background: rgba(251, 146, 60, 0.25) !important;
+        }
+
+        .node.node-search-match .node-name {
+            color: var(--node-selected-text) !important;
+        }
+
+        .node.node-search-match .node-schema,
+        .node.node-search-match .node-level-tag {
+            color: var(--node-selected-sub) !important;
+        }
+
+        /* ディミング */
+        .dimmed {
+            opacity: 0.18 !important;
+        }
+
+        .node-header {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .node-level-tag {
+            font-size: 10px;
+            color: #64748b;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .badge-table {
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .badge-view {
+            background: rgba(52, 211, 153, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+        }
+
+        .badge-procedure {
+            background: rgba(192, 132, 252, 0.15);
+            color: #c084fc;
+            border: 1px solid rgba(192, 132, 252, 0.3);
+        }
+
+        .badge-function {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
+
+        .node-body {
+            padding: 10px 12px 12px 12px;
+        }
+
+        .node-schema {
+            font-size: 11px;
+            color: var(--text-sub);
+            margin-bottom: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .node-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-main);
+            word-break: break-all;
+            line-height: 1.35;
+        }
+
+        /* INSERT投入先バッジ */
+        .node-insert-badge {
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(249, 115, 22, 0.15);
+            color: #fb923c;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .node.node-selected .node-insert-badge {
+            background: rgba(234, 88, 12, 0.2);
+            color: #7c2d12;
+            border-color: rgba(234, 88, 12, 0.4);
+        }
+
+        .node.node-upstream .node-insert-badge {
+            background: rgba(22, 163, 74, 0.2);
+            color: #14532d;
+            border-color: rgba(22, 163, 74, 0.4);
+        }
+
+        .node.node-downstream .node-insert-badge {
+            background: rgba(220, 38, 38, 0.2);
+            color: #7f1d1d;
+            border-color: rgba(220, 38, 38, 0.4);
+        }
+
+        .node-footer {
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.22);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-sub);
+        }
+
+        .stat-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* 接続線 (SVG Paths) */
+        .edge-path {
+            fill: none;
+            stroke: var(--edge-default);
+            stroke-width: 2px;
+            stroke-linecap: round;
+            transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+        }
+
+        /* [4] 依存元の線 (緑色) */
+        .edge-path.edge-upstream {
+            stroke: var(--upstream-line) !important;
+            stroke-width: 3.5px !important;
+            filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.7));
+        }
+
+        /* [4] 依存先の線 (赤色) */
+        .edge-path.edge-downstream {
+            stroke: var(--downstream-line) !important;
+            stroke-width: 3.5px !important;
+            filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.7));
+        }
+
+        /* サイドバー（上下分割 & スプリッターリサイズ対応） */
+        #sidebar {
+            width: 360px;
+            min-width: 360px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border-left: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 90;
+            overflow: hidden;
+        }
+
+        #sidebar.collapsed {
+            margin-right: -360px;
+        }
+
+        .sidebar-section {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: flex 0.2s ease, height 0.2s ease;
+        }
+
+        #section-files {
+            height: 52%;
+            min-height: 90px;
+        }
+
+        #section-duplicates {
+            flex: 1;
+            min-height: 90px;
+        }
+
+        .sidebar-section.is-collapsed {
+            height: 44px !important;
+            min-height: 44px !important;
+            flex: none !important;
+        }
+
+        .sidebar-section.is-collapsed .sidebar-section-body {
+            display: none !important;
+        }
+
+        .sidebar-section-header {
+            height: 44px;
+            min-height: 44px;
+            padding: 0 14px;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .section-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-toggle-btn {
+            background: none;
+            border: none;
+            color: var(--text-sub);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: color 0.2s ease, background 0.2s ease;
+        }
+
+        .section-toggle-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .sidebar-section-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 12px;
+        }
+
+        /* スプリッター（水平リサイズハンドル） */
+        .sidebar-resizer {
+            height: 6px;
+            min-height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: row-resize;
+            position: relative;
+            transition: background 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .sidebar-resizer:hover, .sidebar-resizer.resizing {
+            background: var(--accent-primary);
+        }
+
+        .resizer-line {
+            width: 32px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 1px;
+        }
+
+        /* スイッチトグルボタン */
+        .duplicate-toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 18px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.2);
+            transition: .25s;
+            border-radius: 18px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .25s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #ea580c;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(16px);
+        }
+
+        .toggle-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-sub);
+        }
+
+        /* ファイルカード */
+        .file-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 9px 11px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .file-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .file-card-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12.5px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .file-card-deps {
+            font-size: 11px;
+            color: var(--text-sub);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .dep-pill {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 1px 6px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .insert-pill {
+            background: rgba(249, 115, 22, 0.15);
+            color: #fb923c;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+            padding: 1px 6px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        /* 重複テーブルカード */
+        .duplicate-card {
+            background: rgba(234, 88, 12, 0.08);
+            border: 1px solid rgba(234, 88, 12, 0.25);
+            border-radius: 8px;
+            padding: 9px 11px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .duplicate-card:hover {
+            background: rgba(234, 88, 12, 0.15);
+            border-color: rgba(234, 88, 12, 0.45);
+            transform: translateY(-1px);
+        }
+
+        .dup-table-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #fed7aa;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dup-detail {
+            font-size: 11px;
+            color: var(--text-sub);
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .dup-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* 画面右下コントロール */
+        .controls-overlay {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 80;
+        }
+
+        .control-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
+        }
+
+        /* 空状態 / ドロップゾーン */
+        #empty-state {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            max-width: 540px;
+            padding: 40px;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            z-index: 50;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        #empty-state.dragover {
+            border-color: var(--accent-primary);
+            background: rgba(59, 130, 246, 0.15);
+        }
+
+        .empty-icon {
+            font-size: 54px;
+            color: #60a5fa;
+            margin-bottom: 16px;
+        }
+
+        .empty-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .empty-desc {
+            font-size: 13px;
+            color: var(--text-sub);
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #folder-input, #file-input {
+            display: none;
+        }
+
+        .info-pill {
+            font-size: 12px;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            color: var(--text-sub);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* SQLモーダル */
+        #sql-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .modal-card {
+            width: 760px;
+            max-width: 90vw;
+            max-height: 85vh;
+            background: #1e293b;
+            border: 1px solid var(--panel-border);
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.7);
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+            font-family: "Fira Code", Consolas, Monaco, monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            background: #0b1120;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 上部ツールバー -->
+    <header id="toolbar">
+        <div class="brand-section">
+            <div class="brand-logo">
+                <i class="fa-solid fa-diagram-project"></i> datlinx
+            </div>
+            <span class="brand-badge">Lineage Mindmap</span>
+            <div class="info-pill" id="stats-pill">
+                <i class="fa-solid fa-database"></i> 0 ノード / 0 依存関係
+            </div>
+        </div>
+
+        <!-- [4] 配色ガイド凡例 -->
+        <div class="legend-bar">
+            <span class="legend-item"><span class="legend-dot dot-upstream"></span> 依存元 (薄緑 / 緑線)</span>
+            <span class="legend-item"><span class="legend-dot dot-selected"></span> 選択要素 (薄橙)</span>
+            <span class="legend-item"><span class="legend-dot dot-downstream"></span> 依存先 (薄赤 / 赤線)</span>
+        </div>
+
+        <div class="tool-group">
+            <!-- [1] フォルダ選択 -->
+            <button class="btn btn-primary" id="btn-select-folder" title="SQLファイル(*.sql)が入ったフォルダを選択">
+                <i class="fa-regular fa-folder-open"></i> フォルダを開く
+            </button>
+            <input type="file" id="folder-input" webkitdirectory directory multiple>
+
+            <button class="btn" id="btn-select-files" title="SQLファイル(*.sql)を個別に追加">
+                <i class="fa-regular fa-file-code"></i> ファイル選択
+            </button>
+            <input type="file" id="file-input" multiple accept=".sql">
+
+            <!-- サンプルデータ読込 -->
+            <button class="btn btn-sample" id="btn-load-sample" title="準備されたサンプルSQLを一発読込">
+                <i class="fa-solid fa-flask"></i> サンプル読込
+            </button>
+
+            <!-- [3] 検索フォーム -->
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="search-input" class="search-input" placeholder="テーブル/プロシージャ/ビューを検索...">
+                <i class="fa-solid fa-circle-xmark search-clear" id="search-clear"></i>
+                <span class="search-count" id="search-count"></span>
+            </div>
+
+            <!-- 自動整列 -->
+            <button class="btn" id="btn-auto-layout" title="マインドマップを綺麗に再整列">
+                <i class="fa-solid fa-network-wired"></i> 再整列
+            </button>
+
+            <!-- サイドバー切替 -->
+            <button class="btn" id="btn-toggle-sidebar" title="右サイドバーの開閉">
+                <i class="fa-solid fa-table-columns"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main id="main-container">
+        <!-- キャンバス -->
+        <div id="canvas-wrapper">
+            <div id="canvas">
+                <svg id="svg-layer">
+                    <defs>
+                        <!-- 通常の矢印マーカー -->
+                        <marker id="arrow-default" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#475569" />
+                        </marker>
+                        <!-- [4] 依存元の緑色矢印マーカー -->
+                        <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                            <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#22c55e" />
+                        </marker>
+                        <!-- [4] 依存先の赤色矢印マーカー -->
+                        <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                            <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#ef4444" />
+                        </marker>
+                    </defs>
+                </svg>
+                <div id="nodes-layer"></div>
+            </div>
+
+            <!-- 空状態 / ドロップゾーン案内 -->
+            <div id="empty-state">
+                <div class="empty-icon">
+                    <i class="fa-solid fa-folder-tree"></i>
+                </div>
+                <h2 class="empty-title">SQLフォルダまたはファイルを読み込み</h2>
+                <p class="empty-desc">
+                    <code>CREATE PROCEDURE</code> / <code>CREATE FUNCTION</code> / <code>CREATE VIEW</code> / <code>CREATE TABLE</code> のDDLが書かれたSQLファイルフォルダをドラッグ＆ドロップするか、上部ボタンから選択してください。<br>
+                    FROM / JOIN / INSERT INTO を解析して依存関係マインドマップを自動生成します。
+                </p>
+                <div style="display:flex; justify-content:center; gap:12px;">
+                    <button class="btn btn-primary" onclick="document.getElementById('folder-input').click()">
+                        <i class="fa-regular fa-folder-open"></i> フォルダを選択
+                    </button>
+                    <button class="btn btn-sample" id="empty-load-sample">
+                        <i class="fa-solid fa-flask"></i> サンプルSQLで試す
+                    </button>
+                </div>
+            </div>
+
+            <!-- ズーム/パン コントローラー -->
+            <div class="controls-overlay" id="controls-overlay">
+                <button class="control-btn" id="btn-zoom-in" title="ズームイン"><i class="fa-solid fa-plus"></i></button>
+                <button class="control-btn" id="btn-zoom-out" title="ズームアウト"><i class="fa-solid fa-minus"></i></button>
+                <button class="control-btn" id="btn-zoom-reset" title="全体表示 (フィット)"><i class="fa-solid fa-expand"></i></button>
+                <button class="control-btn" id="btn-clear-selection" title="選択ハイライト解除"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
+        </div>
+
+        <!-- 右サイドバー（上下分割: ファイル一覧 & 重複テーブル一覧） -->
+        <aside id="sidebar">
+            <!-- 上段: 解析済みSQLファイル一覧 -->
+            <div class="sidebar-section" id="section-files">
+                <div class="sidebar-section-header" id="header-files">
+                    <div class="section-title-wrap">
+                        <button class="section-toggle-btn" id="btn-toggle-section-files" title="折りたたみ切り替え">
+                            <i class="fa-solid fa-bars"></i>
+                        </button>
+                        <span><i class="fa-solid fa-file-code"></i> 解析済みファイル</span>
+                    </div>
+                    <span id="file-count-badge" class="badge badge-table">0 件</span>
+                </div>
+                <div class="sidebar-section-body" id="sidebar-files">
+                    <!-- 動的生成 -->
+                </div>
+            </div>
+
+            <!-- 上下リサイズ用スプリッターハンドル -->
+            <div class="sidebar-resizer" id="sidebar-resizer" title="ドラッグして上下の高さを調整">
+                <div class="resizer-line"></div>
+            </div>
+
+            <!-- 下段: 重複テーブル一覧（INSERT投入先 vs CREATE TABLE） -->
+            <div class="sidebar-section" id="section-duplicates">
+                <div class="sidebar-section-header" id="header-duplicates">
+                    <div class="section-title-wrap">
+                        <button class="section-toggle-btn" id="btn-toggle-section-duplicates" title="折りたたみ切り替え">
+                            <i class="fa-solid fa-bars"></i>
+                        </button>
+                        <span><i class="fa-solid fa-clone"></i> 重複TABLE</span>
+                    </div>
+                    <!-- 重複CREATE TABLE 非表示トグルボタン -->
+                    <div class="duplicate-toggle-wrap">
+                        <label class="switch" title="重複する「CREATE TABLE」のノードをマインドマップから非表示にし、投入先プロシージャを現在地として直接接続します">
+                            <input type="checkbox" id="toggle-hide-duplicates">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label" id="toggle-hide-label">TABLE非表示</span>
+                    </div>
+                </div>
+                <div class="sidebar-section-body" id="sidebar-duplicates">
+                    <!-- 動的生成 -->
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- SQL内容表示モーダル -->
+    <div id="sql-modal" class="hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span id="modal-title" style="font-weight:700; font-size:15px;">SQL詳細</span>
+                <button class="btn" id="btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <pre class="modal-body" id="modal-content"></pre>
+        </div>
+    </div>
+
+    <!-- アプリケーションロジック -->
+    <script>
+        /**
+         * サンプルSQLデータ (13ファイル: CREATE TABLE / INSERT INTO を含む)
+         */
+        const SAMPLE_SQL_FILES = [
+            {
+                name: "create_table_daily_sales_summary.sql",
+                content: `CREATE TABLE dbo.daily_sales_summary (
+    summary_date DATE NOT NULL,
+    product_id INT NOT NULL,
+    product_name NVARCHAR(100),
+    total_sales DECIMAL(18, 2),
+    order_count INT,
+    created_at DATETIME DEFAULT GETDATE()
+);`
+            },
+            {
+                name: "sp_calc_and_insert_daily_summary.sql",
+                content: `CREATE PROCEDURE dbo.sp_calc_and_insert_daily_summary
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- 日次売上集計を計算し、daily_sales_summaryテーブルへ投入
+    INSERT INTO dbo.daily_sales_summary (summary_date, product_id, product_name, total_sales, order_count)
+    SELECT
+        CAST(d.order_date AS DATE) AS summary_date,
+        d.product_id,
+        d.product_name,
+        SUM(d.subtotal) AS total_sales,
+        COUNT(d.order_id) AS order_count
+    FROM
+        dbo.v_order_details d
+    INNER JOIN
+        dbo.v_active_users u
+        ON d.user_id = u.user_id
+    GROUP BY
+        CAST(d.order_date AS DATE),
+        d.product_id,
+        d.product_name;
+END;`
+            },
+            {
+                name: "v_daily_sales_dashboard.sql",
+                content: `CREATE VIEW dbo.v_daily_sales_dashboard AS
+SELECT
+    s.summary_date,
+    s.product_id,
+    s.product_name,
+    s.total_sales,
+    s.order_count,
+    CASE
+        WHEN s.total_sales >= 100000 THEN 'TARGET_ACHIEVED'
+        ELSE 'IN_PROGRESS'
+    END AS sales_status
+FROM
+    dbo.daily_sales_summary s
+WHERE
+    s.summary_date >= DATEADD(day, -30, CAST(GETDATE() AS DATE));`
+            },
+            {
+                name: "v_active_users.sql",
+                content: `CREATE VIEW v_active_users AS
+SELECT
+    user_id,
+    user_name,
+    email,
+    created_at
+FROM m_users
+WHERE status = 'ACTIVE'
+  AND is_deleted = 0;`
+            },
+            {
+                name: "v_order_details.sql",
+                content: `CREATE VIEW dbo.v_order_details AS
+SELECT
+    o.order_id,
+    o.user_id,
+    o.order_date,
+    oi.product_id,
+    p.product_name,
+    oi.quantity,
+    oi.unit_price,
+    (oi.quantity * oi.unit_price) AS subtotal
+FROM
+    dbo.t_orders o
+INNER JOIN dbo.t_order_items oi
+    ON o.order_id = oi.order_id
+LEFT JOIN
+    dbo.m_products p
+    ON oi.product_id = p.product_id;`
+            },
+            {
+                name: "v_user_order_summary.sql",
+                content: `CREATE VIEW v_user_order_summary AS
+SELECT
+    u.user_id,
+    u.user_name,
+    COUNT(d.order_id) AS total_orders,
+    SUM(d.subtotal) AS total_spent
+FROM v_active_users u
+LEFT JOIN v_order_details d
+    ON u.user_id = d.user_id
+GROUP BY
+    u.user_id,
+    u.user_name;`
+            },
+            {
+                name: "v_low_stock_products.sql",
+                content: `CREATE VIEW v_low_stock_products AS
+SELECT
+    p.product_id,
+    p.product_name,
+    i.current_stock,
+    i.safety_stock
+FROM
+    m_products p
+JOIN
+    t_inventory i
+    ON p.product_id = i.product_id
+WHERE
+    i.current_stock < i.safety_stock;`
+            },
+            {
+                name: "fn_get_user_discount.sql",
+                content: `CREATE FUNCTION dbo.fn_get_user_discount (
+    @user_id INT
+)
+RETURNS DECIMAL(5, 2)
+AS
+BEGIN
+    DECLARE @discount DECIMAL(5, 2) = 0.00;
+
+    SELECT
+        @discount = CASE
+            WHEN total_spent > 100000 THEN 0.15
+            WHEN total_spent > 50000  THEN 0.10
+            ELSE 0.05
+        END
+    FROM dbo.v_user_order_summary
+    WHERE user_id = @user_id;
+
+    RETURN @discount;
+END;`
+            },
+            {
+                name: "sp_generate_monthly_sales_report.sql",
+                content: `CREATE PROCEDURE dbo.sp_generate_monthly_sales_report
+    @target_year INT,
+    @target_month INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        d.product_id,
+        d.product_name,
+        COUNT(d.order_id) AS monthly_order_count,
+        SUM(d.subtotal) AS total_monthly_sales
+    FROM
+        dbo.v_order_details d
+    INNER JOIN
+        dbo.v_user_order_summary s
+        ON d.user_id = s.user_id
+    WHERE
+        YEAR(d.order_date) = @target_year
+        AND MONTH(d.order_date) = @target_month
+    GROUP BY
+        d.product_id,
+        d.product_name;
+END;`
+            },
+            {
+                name: "sp_refresh_daily_kpi.sql",
+                content: `CREATE PROCEDURE sp_refresh_daily_kpi
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Daily KPI calculation from user order summary and active users
+    SELECT
+        CAST(GETDATE() AS DATE) AS calculation_date,
+        COUNT(DISTINCT u.user_id) AS active_user_count,
+        SUM(s.total_spent) AS daily_turnover
+    FROM v_active_users u
+    JOIN v_user_order_summary s
+        ON u.user_id = s.user_id;
+END;`
+            },
+            {
+                name: "sp_inventory_alert.sql",
+                content: `CREATE PROCEDURE sp_inventory_alert
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Extract low stock products needing immediate reorder
+    SELECT
+        product_id,
+        product_name,
+        current_stock,
+        safety_stock,
+        (safety_stock - current_stock) AS reorder_quantity
+    FROM
+        v_low_stock_products
+    WHERE current_stock <= safety_stock;
+END;`
+            },
+            {
+                name: "sp_customer_churn_analysis.sql",
+                content: `CREATE PROCEDURE sp_customer_churn_analysis
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        u.user_id,
+        u.user_name,
+        MAX(o.order_date) AS last_order_date,
+        DATEDIFF(day, MAX(o.order_date), GETDATE()) AS days_since_last_order
+    FROM v_active_users u
+    LEFT JOIN t_orders o
+        ON u.user_id = o.user_id
+    GROUP BY
+        u.user_id,
+        u.user_name
+    HAVING
+        DATEDIFF(day, MAX(o.order_date), GETDATE()) > 90;
+END;`
+            },
+            {
+                name: "sp_full_audit_process.sql",
+                content: `CREATE PROCEDURE dbo.sp_full_audit_process
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Full audit joining order details, users, and inventory
+    SELECT
+        d.order_id,
+        d.product_name,
+        d.quantity,
+        i.current_stock,
+        u.user_name
+    FROM
+        dbo.v_order_details d
+    INNER JOIN
+        dbo.v_active_users u
+        ON d.user_id = u.user_id
+    INNER JOIN
+        dbo.t_inventory i
+        ON d.product_id = i.product_id;
+END;`
+            }
+        ];
+
+        /**
+         * 状態管理
+         */
+        const state = {
+            parsedFiles: [],
+            nodes: new Map(),
+            edges: [],
+            duplicateTables: [],  // 重複テーブル情報一覧
+            hideDuplicateTables: false, // 重複「CREATE TABLE」の非表示トグル状態
+            selectedNodeId: null, // [4] 選択中ノード
+            searchQuery: "",      // [3] 検索クエリ
+            zoom: 1,
+            panX: 40,
+            panY: 40,
+            isPanning: false,
+            startX: 0,
+            startY: 0
+        };
+
+        // DOM要素
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        const canvas = document.getElementById('canvas');
+        const svgLayer = document.getElementById('svg-layer');
+        const nodesLayer = document.getElementById('nodes-layer');
+        const emptyState = document.getElementById('empty-state');
+        const searchInput = document.getElementById('search-input');
+        const searchClear = document.getElementById('search-clear');
+        const searchCount = document.getElementById('search-count');
+        const statsPill = document.getElementById('stats-pill');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarFiles = document.getElementById('sidebar-files');
+        const fileCountBadge = document.getElementById('file-count-badge');
+        const sidebarDuplicates = document.getElementById('sidebar-duplicates');
+        const toggleHideDuplicates = document.getElementById('toggle-hide-duplicates');
+
+        /**
+         * コメントを除去するヘルパー
+         */
+        function stripSqlComments(sql) {
+            return sql
+                .replace(/\/\*[\s\S]*?\*\//g, ' ')
+                .replace(/--.*$/gm, ' ');
+        }
+
+        /**
+         * [2] SQLパーサー (CREATE PROCEDURE / VIEW / FUNCTION / TABLE + FROM / JOIN + INSERT INTO)
+         */
+        function parseSqlContent(fileName, sqlContent) {
+            const cleanSql = stripSqlComments(sqlContent);
+
+            // 1. CREATE PROCEDURE / FUNCTION / VIEW / TABLE のオブジェクト定義抽出
+            const createRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?(?:DEFENDER\s+|SECURITY\s+DEFINER\s+)?(PROCEDURE|FUNCTION|VIEW|TABLE)\s+(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/i;
+            const matchCreate = cleanSql.match(createRegex);
+
+            let objType = 'VIEW';
+            let schema = '';
+            let objName = '';
+
+            if (matchCreate) {
+                objType = matchCreate[1].toUpperCase();
+                schema = matchCreate[2] || '';
+                objName = matchCreate[3];
+            } else {
+                const baseName = fileName.replace(/\.[^/.]+$/, "");
+                objName = baseName;
+                if (/^sp_/i.test(baseName)) objType = 'PROCEDURE';
+                else if (/^fn_/i.test(baseName)) objType = 'FUNCTION';
+                else if (/^v_/i.test(baseName)) objType = 'VIEW';
+                else if (/^(?:tbl_|t_|m_|create_table_)/i.test(baseName)) objType = 'TABLE';
+            }
+
+            // 2. FROM / JOIN からの依存元抽出
+            const fromJoinRegex = /(?:\bFROM|\bJOIN)(?: ?\r?\n[ \t]*|[ \t]+)(?:\r?\n[ \t]*)?(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi;
+            
+            const dependencies = [];
+            let match;
+            const reservedKeywords = new Set([
+                'SELECT', 'WHERE', 'ON', 'AS', 'AND', 'OR', 'SET', 'GROUP', 'ORDER', 'HAVING',
+                'LIMIT', 'TOP', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS', 'OUTER', 'UNION',
+                'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'INTO', 'VALUES', 'UPDATE', 'DELETE', 'INSERT',
+                'LATERAL', 'UNNEST', 'APPLY'
+            ]);
+
+            while ((match = fromJoinRegex.exec(cleanSql)) !== null) {
+                const depSchema = match[1] || '';
+                const depName = match[2];
+
+                if (!depName) continue;
+                if (reservedKeywords.has(depName.toUpperCase())) continue;
+                if (/^\d+$/.test(depName)) continue;
+
+                if (depName.toLowerCase() !== objName.toLowerCase()) {
+                    if (!dependencies.some(d => d.name.toLowerCase() === depName.toLowerCase())) {
+                        dependencies.push({
+                            schema: depSchema,
+                            name: depName
+                        });
+                    }
+                }
+            }
+
+            // 3. INSERT INTO 投入先テーブルの抽出 (プロシージャ用)
+            const insertRegex = /\bINSERT\s+(?:INTO\s+)?(?:\[?([a-zA-Z0-9_]+)\]?\.)?\[?([a-zA-Z0-9_]+)\]?/gi;
+            const insertTargets = [];
+            let insertMatch;
+
+            while ((insertMatch = insertRegex.exec(cleanSql)) !== null) {
+                const insSchema = insertMatch[1] || '';
+                const insName = insertMatch[2];
+
+                if (!insName) continue;
+                if (reservedKeywords.has(insName.toUpperCase())) continue;
+
+                if (!insertTargets.some(t => t.name.toLowerCase() === insName.toLowerCase())) {
+                    insertTargets.push({
+                        schema: insSchema,
+                        name: insName
+                    });
+                }
+            }
+
+            return {
+                fileName,
+                content: sqlContent,
+                objType,
+                schema,
+                name: objName,
+                dependencies,
+                insertTargets
+            };
+        }
+
+        /**
+         * 重複テーブル一覧の検出
+         * INSERTも行っているプロシージャの投入先テーブルと、CREATE TABLEされたテーブルの間で同名テーブルを検出
+         */
+        function detectDuplicateTables(parsedFiles) {
+            const tableDefinitions = new Map(); // tableNameLower -> file
+            parsedFiles.forEach(file => {
+                if (file.objType === 'TABLE') {
+                    tableDefinitions.set(file.name.toLowerCase(), file);
+                }
+            });
+
+            const duplicates = [];
+            parsedFiles.forEach(file => {
+                if (file.insertTargets && file.insertTargets.length > 0) {
+                    file.insertTargets.forEach(target => {
+                        const targetLower = target.name.toLowerCase();
+                        if (tableDefinitions.has(targetLower)) {
+                            const tableFile = tableDefinitions.get(targetLower);
+                            duplicates.push({
+                                tableName: target.name,
+                                schema: target.schema || tableFile.schema,
+                                procedureName: file.name,
+                                procedureFileName: file.fileName,
+                                procedureId: file.name.toLowerCase(),
+                                tableFileName: tableFile.fileName,
+                                tableId: targetLower
+                            });
+                        }
+                    });
+                }
+            });
+
+            state.duplicateTables = duplicates;
+        }
+
+        /**
+         * 依存関係グラフの構築
+         */
+        function buildGraph(parsedFiles) {
+            state.nodes.clear();
+            state.edges = [];
+
+            // 重複テーブルの検出
+            detectDuplicateTables(parsedFiles);
+
+            // 定義済みTABLEのセット
+            const definedTableIds = new Set();
+            parsedFiles.forEach(file => {
+                if (file.objType === 'TABLE') {
+                    definedTableIds.add(file.name.toLowerCase());
+                }
+            });
+
+            // 重複テーブル名セット
+            const duplicateTableIds = new Set(state.duplicateTables.map(d => d.tableId));
+
+            // プロシージャ投入先マップ: targetTableLower -> [procedureId, ...]
+            const insertProducerMap = new Map();
+            parsedFiles.forEach(file => {
+                if (file.insertTargets) {
+                    file.insertTargets.forEach(target => {
+                        const tId = target.name.toLowerCase();
+                        if (!insertProducerMap.has(tId)) {
+                            insertProducerMap.set(tId, []);
+                        }
+                        insertProducerMap.get(tId).push(file.name.toLowerCase());
+                    });
+                }
+            });
+
+            // 1. 各ファイルで定義されているオブジェクトをノード登録
+            parsedFiles.forEach(file => {
+                const id = file.name.toLowerCase();
+
+                // 「重複CREATE TABLEを非表示」がONかつ自身が重複TABLEの場合、マインドマップノードから除外
+                if (state.hideDuplicateTables && file.objType === 'TABLE' && duplicateTableIds.has(id)) {
+                    return;
+                }
+
+                state.nodes.set(id, {
+                    id,
+                    name: file.name,
+                    schema: file.schema,
+                    type: file.objType,
+                    fileName: file.fileName,
+                    content: file.content,
+                    insertTargets: file.insertTargets || [],
+                    isDuplicateTable: duplicateTableIds.has(id) && file.objType === 'TABLE',
+                    x: 0,
+                    y: 0,
+                    level: 0,
+                    inDegree: 0,
+                    outDegree: 0
+                });
+            });
+
+            // 2. FROM / JOIN で参照されているが未定義のオブジェクトを TABLE ノードとして登録
+            // （※INSERT投入先テーブルでCREATE TABLEが無いものはプロシージャ自身が現在地となるためノード作成しない）
+            parsedFiles.forEach(file => {
+                file.dependencies.forEach(dep => {
+                    const depId = dep.name.toLowerCase();
+                    if (!state.nodes.has(depId)) {
+                        // 重複テーブルかつ非表示ONなら作成しない
+                        if (state.hideDuplicateTables && duplicateTableIds.has(depId)) return;
+                        // プロシージャの投入先でCREATE TABLEが無い場合も、プロシージャが現在地となるため作成しない
+                        if (insertProducerMap.has(depId) && !definedTableIds.has(depId)) return;
+
+                        state.nodes.set(depId, {
+                            id: depId,
+                            name: dep.name,
+                            schema: dep.schema,
+                            type: 'TABLE',
+                            fileName: '(Database Table)',
+                            content: null,
+                            insertTargets: [],
+                            isDuplicateTable: false,
+                            x: 0,
+                            y: 0,
+                            level: 0,
+                            inDegree: 0,
+                            outDegree: 0
+                        });
+                    }
+                });
+            });
+
+            // 3. エッジの構築
+            let edgeCounter = 0;
+            const addedEdgeSet = new Set();
+
+            function addEdge(sourceId, targetId) {
+                if (sourceId === targetId) return;
+                const key = `${sourceId}___${targetId}`;
+                if (addedEdgeSet.has(key)) return;
+                addedEdgeSet.add(key);
+
+                state.edges.push({
+                    id: `edge_${sourceId}_to_${targetId}_${edgeCounter++}`,
+                    from: sourceId,
+                    to: targetId
+                });
+            }
+
+            parsedFiles.forEach(file => {
+                const targetId = file.name.toLowerCase();
+
+                // FROM / JOIN の接続
+                file.dependencies.forEach(dep => {
+                    const sourceDepId = dep.name.toLowerCase();
+
+                    // もし参照元テーブルにINSERTしているプロシージャが存在する場合:
+                    // A) 重複CREATE TABLEがあり非表示トグルがONの場合
+                    // B) そもそも重複するCREATE TABLEが存在しない（CREATE TABLEが無い）場合
+                    // ──▶ プロシージャから直接接続（プロシージャ自身が投入先テーブルの現在地）
+                    if (insertProducerMap.has(sourceDepId)) {
+                        const isDupAndHidden = state.hideDuplicateTables && duplicateTableIds.has(sourceDepId);
+                        const isNotCreated = !definedTableIds.has(sourceDepId);
+
+                        if (isDupAndHidden || isNotCreated) {
+                            const producers = insertProducerMap.get(sourceDepId);
+                            producers.forEach(producerProcId => {
+                                if (state.nodes.has(producerProcId) && state.nodes.has(targetId)) {
+                                    addEdge(producerProcId, targetId);
+                                }
+                            });
+                            return;
+                        }
+                    }
+
+                    if (state.nodes.has(sourceDepId) && state.nodes.has(targetId)) {
+                        addEdge(sourceDepId, targetId);
+                    }
+                });
+
+                // INSERT INTO の接続 (プロシージャ ──▶ 投入先テーブル)
+                // ※CREATE TABLE が存在し、かつ非表示トグルがOFFの時のみエッジを作成
+                if (file.insertTargets && file.insertTargets.length > 0) {
+                    file.insertTargets.forEach(target => {
+                        const insTargetId = target.name.toLowerCase();
+                        // CREATE TABLE が無い場合、または非表示トグルONの場合はエッジを作らない
+                        if (!definedTableIds.has(insTargetId) || (state.hideDuplicateTables && duplicateTableIds.has(insTargetId))) {
+                            return;
+                        }
+                        if (state.nodes.has(targetId) && state.nodes.has(insTargetId)) {
+                            addEdge(targetId, insTargetId);
+                        }
+                    });
+                }
+            });
+
+            // 入次数・出次数の計算
+            state.edges.forEach(edge => {
+                const sourceNode = state.nodes.get(edge.from);
+                const targetNode = state.nodes.get(edge.to);
+                if (sourceNode) sourceNode.outDegree++;
+                if (targetNode) targetNode.inDegree++;
+            });
+
+            // 4. トポロジカル階層計算
+            computeNodeLevels();
+
+            // 5. 座標自動配置
+            layoutNodes();
+
+            // 6. レンダリング
+            renderGraph();
+            renderSidebar();
+            renderDuplicatesSidebar();
+            updateStats();
+        }
+
+        /**
+         * 階層（Level）の計算
+         */
+        function computeNodeLevels() {
+            state.nodes.forEach(node => {
+                node.level = (node.inDegree === 0) ? 0 : 0;
+            });
+
+            let changed = true;
+            let iteration = 0;
+            const maxIterations = 50;
+
+            while (changed && iteration < maxIterations) {
+                changed = false;
+                iteration++;
+
+                state.edges.forEach(edge => {
+                    const source = state.nodes.get(edge.from);
+                    const target = state.nodes.get(edge.to);
+                    if (source && target) {
+                        if (target.level <= source.level) {
+                            target.level = source.level + 1;
+                            changed = true;
+                        }
+                    }
+                });
+            }
+        }
+
+        /**
+         * ノード自動配置レイアウト
+         */
+        function layoutNodes() {
+            const nodeWidth = 290;
+            const horizontalGap = 130;
+            const colWidth = nodeWidth + horizontalGap; // 420px
+
+            const rowHeight = 155;
+            const startX = 80;
+            const startY = 80;
+
+            const levelGroups = new Map();
+            state.nodes.forEach(node => {
+                if (!levelGroups.has(node.level)) {
+                    levelGroups.set(node.level, []);
+                }
+                levelGroups.get(node.level).push(node);
+            });
+
+            const typePriority = { 'TABLE': 0, 'VIEW': 1, 'FUNCTION': 2, 'PROCEDURE': 3 };
+            
+            let maxCount = 0;
+            levelGroups.forEach(nodes => {
+                if (nodes.length > maxCount) maxCount = nodes.length;
+            });
+            const maxColumnHeight = maxCount * rowHeight;
+
+            levelGroups.forEach((nodesInLevel, level) => {
+                nodesInLevel.sort((a, b) => {
+                    const pA = typePriority[a.type] ?? 99;
+                    const pB = typePriority[b.type] ?? 99;
+                    if (pA !== pB) return pA - pB;
+                    return a.name.localeCompare(b.name);
+                });
+
+                const colHeight = nodesInLevel.length * rowHeight;
+                const levelStartY = startY + Math.max(0, (maxColumnHeight - colHeight) / 2);
+
+                nodesInLevel.forEach((node, idx) => {
+                    node.x = startX + (level * colWidth);
+                    node.y = levelStartY + (idx * rowHeight);
+                });
+            });
+        }
+
+        /**
+         * グラフのレンダリング
+         */
+        function renderGraph() {
+            nodesLayer.innerHTML = '';
+            
+            const existingPaths = svgLayer.querySelectorAll('.edge-path');
+            existingPaths.forEach(p => p.remove());
+
+            if (state.nodes.size === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            state.nodes.forEach(node => {
+                const nodeEl = createNodeElement(node);
+                nodesLayer.appendChild(nodeEl);
+                node.element = nodeEl;
+            });
+
+            updateEdges();
+        }
+
+        /**
+         * 個別ノード要素の作成
+         */
+        function createNodeElement(node) {
+            const el = document.createElement('div');
+            el.className = 'node';
+            el.id = `node-${node.id}`;
+            el.style.left = `${node.x}px`;
+            el.style.top = `${node.y}px`;
+
+            let badgeClass = 'badge-table';
+            let iconClass = 'fa-solid fa-table';
+            if (node.type === 'VIEW') {
+                badgeClass = 'badge-view';
+                iconClass = 'fa-solid fa-eye';
+            } else if (node.type === 'PROCEDURE') {
+                badgeClass = 'badge-procedure';
+                iconClass = 'fa-solid fa-bolt';
+            } else if (node.type === 'FUNCTION') {
+                badgeClass = 'badge-function';
+                iconClass = 'fa-solid fa-code';
+            }
+
+            // INSERT投入先テーブルのバッジ表示 (プロシージャがINSERTを持つ場合)
+            let insertBadgeHtml = '';
+            if (node.insertTargets && node.insertTargets.length > 0) {
+                const targetNames = node.insertTargets.map(t => escapeHtml(t.name)).join(', ');
+                insertBadgeHtml = `
+                    <div class="node-insert-badge" title="INSERT投入先テーブル (現在地): ${targetNames}">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> 投入先: ${targetNames}
+                    </div>
+                `;
+            }
+
+            el.innerHTML = `
+                <div class="node-header">
+                    <span class="badge ${badgeClass}"><i class="${iconClass}"></i> ${node.type}</span>
+                    <span class="node-level-tag">Level ${node.level}</span>
+                </div>
+                <div class="node-body">
+                    ${node.schema ? `<div class="node-schema">${escapeHtml(node.schema)}.</div>` : ''}
+                    <div class="node-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</div>
+                    ${insertBadgeHtml}
+                </div>
+                <div class="node-footer">
+                    <span class="stat-item" title="依存元 (参照している元)">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> In: ${node.inDegree}
+                    </span>
+                    <span class="stat-item" title="依存先 (参照されている先)">
+                        Out: ${node.outDegree} <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    </span>
+                    ${node.content ? `<i class="fa-solid fa-file-lines" title="SQLプレビュー" style="cursor:pointer;" onclick="event.stopPropagation(); showSqlModal('${node.id}');"></i>` : ''}
+                </div>
+            `;
+
+            // ドラッグ移動 & クリック（ドラッグ時は選択トグルを防止）
+            setupNodeDrag(el, node);
+
+            return el;
+        }
+
+        /**
+         * [4] 依存関係の探索 (上流 / 下流)
+         */
+        function getLineageInfo(targetNodeId) {
+            const upstreamNodeIds = new Set();
+            const upstreamEdgeIds = new Set();
+            const queueUp = [targetNodeId];
+
+            while (queueUp.length > 0) {
+                const currentId = queueUp.shift();
+                const incomingEdges = state.edges.filter(e => e.to === currentId);
+                for (const edge of incomingEdges) {
+                    upstreamEdgeIds.add(edge.id);
+                    if (edge.from !== targetNodeId && !upstreamNodeIds.has(edge.from)) {
+                        upstreamNodeIds.add(edge.from);
+                        queueUp.push(edge.from);
+                    }
+                }
+            }
+
+            const downstreamNodeIds = new Set();
+            const downstreamEdgeIds = new Set();
+            const queueDown = [targetNodeId];
+
+            while (queueDown.length > 0) {
+                const currentId = queueDown.shift();
+                const outgoingEdges = state.edges.filter(e => e.from === currentId);
+                for (const edge of outgoingEdges) {
+                    downstreamEdgeIds.add(edge.id);
+                    if (edge.to !== targetNodeId && !downstreamNodeIds.has(edge.to)) {
+                        downstreamNodeIds.add(edge.to);
+                        queueDown.push(edge.to);
+                    }
+                }
+            }
+
+            return {
+                selectedNodeId: targetNodeId,
+                upstreamNodeIds,
+                upstreamEdgeIds,
+                downstreamNodeIds,
+                downstreamEdgeIds
+            };
+        }
+
+        /**
+         * エッジ（ベジェ曲線）の更新
+         */
+        function updateEdges() {
+            const lineage = state.selectedNodeId ? getLineageInfo(state.selectedNodeId) : null;
+
+            state.edges.forEach(edge => {
+                const source = state.nodes.get(edge.from);
+                const target = state.nodes.get(edge.to);
+                if (!source || !target) return;
+
+                let pathEl = document.getElementById(edge.id);
+                if (!pathEl) {
+                    pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    pathEl.setAttribute('id', edge.id);
+                    pathEl.setAttribute('class', 'edge-path');
+                    svgLayer.appendChild(pathEl);
+                }
+
+                const nodeWidth = 290;
+                const nodeHeight = 92;
+
+                const fromX = source.x + nodeWidth;
+                const fromY = source.y + (nodeHeight / 2);
+                const toX = target.x;
+                const toY = target.y + (nodeHeight / 2);
+
+                const dx = Math.max(60, (toX - fromX) * 0.5);
+                const d = `M ${fromX} ${fromY} C ${fromX + dx} ${fromY}, ${toX - dx} ${toY}, ${toX} ${toY}`;
+                pathEl.setAttribute('d', d);
+
+                // [4] 色分けスタイル適用
+                if (lineage) {
+                    if (lineage.upstreamEdgeIds.has(edge.id)) {
+                        pathEl.classList.add('edge-upstream');
+                        pathEl.classList.remove('edge-downstream', 'dimmed');
+                        pathEl.setAttribute('marker-end', 'url(#arrow-green)');
+                    } else if (lineage.downstreamEdgeIds.has(edge.id)) {
+                        pathEl.classList.add('edge-downstream');
+                        pathEl.classList.remove('edge-upstream', 'dimmed');
+                        pathEl.setAttribute('marker-end', 'url(#arrow-red)');
+                    } else {
+                        pathEl.classList.remove('edge-upstream', 'edge-downstream');
+                        pathEl.classList.add('dimmed');
+                        pathEl.setAttribute('marker-end', 'url(#arrow-default)');
+                    }
+                } else {
+                    pathEl.classList.remove('edge-upstream', 'edge-downstream', 'dimmed');
+                    pathEl.setAttribute('marker-end', 'url(#arrow-default)');
+                }
+            });
+        }
+
+        function toggleNodeSelection(nodeId) {
+            if (state.selectedNodeId === nodeId) {
+                clearSelection();
+                return;
+            }
+            state.selectedNodeId = nodeId;
+            applySelectionStyles();
+        }
+
+        function clearSelection() {
+            state.selectedNodeId = null;
+            applySelectionStyles();
+        }
+
+        /**
+         * [3] 検索ハイライト & [4] 依存関係ハイライトの適用
+         */
+        function applySelectionStyles() {
+            const lineage = state.selectedNodeId ? getLineageInfo(state.selectedNodeId) : null;
+            const query = state.searchQuery.trim().toLowerCase();
+
+            state.nodes.forEach(node => {
+                const el = node.element;
+                if (!el) return;
+
+                let isSelected = false;
+                let isUpstream = false;
+                let isDownstream = false;
+                let isSearchMatch = false;
+                let isDimmed = false;
+
+                if (lineage) {
+                    if (node.id === lineage.selectedNodeId) {
+                        isSelected = true;
+                    } else if (lineage.upstreamNodeIds.has(node.id)) {
+                        isUpstream = true;
+                    } else if (lineage.downstreamNodeIds.has(node.id)) {
+                        isDownstream = true;
+                    } else {
+                        isDimmed = true;
+                    }
+                }
+
+                if (query) {
+                    const matchName = node.name.toLowerCase().includes(query);
+                    const matchSchema = (node.schema || '').toLowerCase().includes(query);
+                    if (matchName || matchSchema) {
+                        isSearchMatch = true;
+                        isDimmed = false;
+                    } else if (!lineage) {
+                        isDimmed = true;
+                    }
+                }
+
+                el.classList.toggle('node-selected', isSelected);
+                el.classList.toggle('node-upstream', isUpstream);
+                el.classList.toggle('node-downstream', isDownstream);
+                el.classList.toggle('node-search-match', isSearchMatch && !isSelected && !isUpstream && !isDownstream);
+                el.classList.toggle('dimmed', isDimmed);
+            });
+
+            updateEdges();
+        }
+
+        /**
+         * [3] 検索入力のハンドリング
+         */
+        searchInput.addEventListener('input', (e) => {
+            state.searchQuery = e.target.value;
+            const query = state.searchQuery.trim().toLowerCase();
+
+            if (query) {
+                searchClear.style.display = 'block';
+                let matchCount = 0;
+                let firstMatchNode = null;
+
+                state.nodes.forEach(node => {
+                    const matchName = node.name.toLowerCase().includes(query);
+                    const matchSchema = (node.schema || '').toLowerCase().includes(query);
+                    if (matchName || matchSchema) {
+                        matchCount++;
+                        if (!firstMatchNode) firstMatchNode = node;
+                    }
+                });
+
+                searchCount.textContent = `${matchCount} 件`;
+
+                if (firstMatchNode && matchCount > 0) {
+                    centerOnNode(firstMatchNode);
+                }
+            } else {
+                searchClear.style.display = 'none';
+                searchCount.textContent = '';
+            }
+
+            applySelectionStyles();
+        });
+
+        searchClear.addEventListener('click', () => {
+            searchInput.value = '';
+            state.searchQuery = '';
+            searchClear.style.display = 'none';
+            searchCount.textContent = '';
+            applySelectionStyles();
+        });
+
+        /**
+         * ノードドラッグ移動（移動時は選択トグルを防止）
+         */
+        function setupNodeDrag(element, node) {
+            let isDragging = false;
+            let dragStartX = 0;
+            let dragStartY = 0;
+            let nodeStartX = 0;
+            let nodeStartY = 0;
+            let hasMoved = false;
+
+            element.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.fa-file-lines')) return;
+                isDragging = true;
+                hasMoved = false;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+                nodeStartX = node.x;
+                nodeStartY = node.y;
+                element.style.zIndex = 50;
+                e.stopPropagation();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const movedDist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
+                if (movedDist > 4) {
+                    hasMoved = true;
+                }
+                const dx = (e.clientX - dragStartX) / state.zoom;
+                const dy = (e.clientY - dragStartY) / state.zoom;
+                node.x = nodeStartX + dx;
+                node.y = nodeStartY + dy;
+                element.style.left = `${node.x}px`;
+                element.style.top = `${node.y}px`;
+                updateEdges();
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    element.style.zIndex = '';
+                }
+            });
+
+            element.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (hasMoved) {
+                    hasMoved = false;
+                    return;
+                }
+                toggleNodeSelection(node.id);
+            });
+        }
+
+        /**
+         * キャンバスのパン＆ズーム
+         */
+        function updateTransform() {
+            canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+        }
+
+        let isPanningMove = false;
+        let panStartMouseX = 0;
+        let panStartMouseY = 0;
+
+        canvasWrapper.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.node') || e.target.closest('.controls-overlay')) return;
+            state.isPanning = true;
+            isPanningMove = false;
+            panStartMouseX = e.clientX;
+            panStartMouseY = e.clientY;
+            state.startX = e.clientX - state.panX;
+            state.startY = e.clientY - state.panY;
+            canvasWrapper.classList.add('grabbing');
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!state.isPanning) return;
+            const movedDist = Math.hypot(e.clientX - panStartMouseX, e.clientY - panStartMouseY);
+            if (movedDist > 4) {
+                isPanningMove = true;
+            }
+            state.panX = e.clientX - state.startX;
+            state.panY = e.clientY - state.startY;
+            updateTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (state.isPanning) {
+                state.isPanning = false;
+                canvasWrapper.classList.remove('grabbing');
+                if (!isPanningMove) {
+                    clearSelection();
+                }
+            }
+        });
+
+        canvasWrapper.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = 1.08;
+            const mouseX = e.clientX - canvasWrapper.getBoundingClientRect().left;
+            const mouseY = e.clientY - canvasWrapper.getBoundingClientRect().top;
+
+            let newZoom;
+            if (e.deltaY < 0) {
+                newZoom = Math.min(2.5, state.zoom * zoomFactor);
+            } else {
+                newZoom = Math.max(0.2, state.zoom / zoomFactor);
+            }
+
+            state.panX = mouseX - (mouseX - state.panX) * (newZoom / state.zoom);
+            state.panY = mouseY - (mouseY - state.panY) * (newZoom / state.zoom);
+            state.zoom = newZoom;
+            updateTransform();
+        });
+
+        document.getElementById('btn-zoom-in').addEventListener('click', () => {
+            state.zoom = Math.min(2.5, state.zoom * 1.2);
+            updateTransform();
+        });
+        document.getElementById('btn-zoom-out').addEventListener('click', () => {
+            state.zoom = Math.max(0.2, state.zoom / 1.2);
+            updateTransform();
+        });
+        document.getElementById('btn-zoom-reset').addEventListener('click', () => {
+            fitToScreen();
+        });
+        document.getElementById('btn-clear-selection').addEventListener('click', () => {
+            clearSelection();
+        });
+        document.getElementById('btn-auto-layout').addEventListener('click', () => {
+            layoutNodes();
+            renderGraph();
+            fitToScreen();
+        });
+
+        /**
+         * 全体表示 (Fit to Screen)
+         */
+        function fitToScreen() {
+            if (state.nodes.size === 0) return;
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            state.nodes.forEach(node => {
+                minX = Math.min(minX, node.x);
+                minY = Math.min(minY, node.y);
+                maxX = Math.max(maxX, node.x + 290);
+                maxY = Math.max(maxY, node.y + 120);
+            });
+
+            const padding = 80;
+            const contentW = (maxX - minX) + padding * 2;
+            const contentH = (maxY - minY) + padding * 2;
+            const viewW = canvasWrapper.clientWidth;
+            const viewH = canvasWrapper.clientHeight;
+
+            const scaleX = viewW / contentW;
+            const scaleY = viewH / contentH;
+            state.zoom = Math.min(1.1, Math.max(0.25, Math.min(scaleX, scaleY)));
+
+            state.panX = (viewW - contentW * state.zoom) / 2 - minX * state.zoom + padding * state.zoom;
+            state.panY = (viewH - contentH * state.zoom) / 2 - minY * state.zoom + padding * state.zoom;
+
+            updateTransform();
+        }
+
+        function centerOnNode(node) {
+            const viewW = canvasWrapper.clientWidth;
+            const viewH = canvasWrapper.clientHeight;
+            state.panX = (viewW / 2) - ((node.x + 145) * state.zoom);
+            state.panY = (viewH / 2) - ((node.y + 50) * state.zoom);
+            updateTransform();
+        }
+
+        /**
+         * [1] フォルダ入力・ファイル入力
+         */
+        const folderInput = document.getElementById('folder-input');
+        const fileInput = document.getElementById('file-input');
+
+        document.getElementById('btn-select-folder').addEventListener('click', () => {
+            folderInput.click();
+        });
+        document.getElementById('btn-select-files').addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        folderInput.addEventListener('change', handleFileInput);
+        fileInput.addEventListener('change', handleFileInput);
+
+        async function handleFileInput(e) {
+            const files = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.sql'));
+            if (files.length === 0) {
+                alert('選択されたフォルダまたはファイルの中に .sql ファイルが見つかりませんでした。');
+                return;
+            }
+
+            const parsedList = [];
+            for (const file of files) {
+                const text = await readFileAsText(file);
+                const parsed = parseSqlContent(file.name, text);
+                parsedList.push(parsed);
+            }
+
+            state.parsedFiles = parsedList;
+            buildGraph(parsedList);
+            fitToScreen();
+            e.target.value = '';
+        }
+
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+        }
+
+        /**
+         * ドラッグ＆ドロップ対応
+         */
+        ['dragenter', 'dragover'].forEach(eventName => {
+            canvasWrapper.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                emptyState.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            canvasWrapper.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                emptyState.classList.remove('dragover');
+            });
+        });
+
+        canvasWrapper.addEventListener('drop', async (e) => {
+            const items = e.dataTransfer.items;
+            const files = [];
+
+            if (items) {
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    if (item.kind === 'file') {
+                        const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+                        if (entry) {
+                            await traverseFileTree(entry, files);
+                        } else {
+                            const file = item.getAsFile();
+                            if (file && file.name.toLowerCase().endsWith('.sql')) files.push(file);
+                        }
+                    }
+                }
+            } else if (e.dataTransfer.files) {
+                for (const file of e.dataTransfer.files) {
+                    if (file.name.toLowerCase().endsWith('.sql')) files.push(file);
+                }
+            }
+
+            if (files.length === 0) {
+                alert('.sql ファイルが見つかりませんでした。');
+                return;
+            }
+
+            const parsedList = [];
+            for (const file of files) {
+                const text = await readFileAsText(file);
+                parsedList.push(parseSqlContent(file.name, text));
+            }
+
+            state.parsedFiles = parsedList;
+            buildGraph(parsedList);
+            fitToScreen();
+        });
+
+        function traverseFileTree(item, fileList) {
+            return new Promise((resolve) => {
+                if (item.isFile) {
+                    item.file((file) => {
+                        if (file.name.toLowerCase().endsWith('.sql')) fileList.push(file);
+                        resolve();
+                    });
+                } else if (item.isDirectory) {
+                    const dirReader = item.createReader();
+                    dirReader.readEntries(async (entries) => {
+                        for (const entry of entries) {
+                            await traverseFileTree(entry, fileList);
+                        }
+                        resolve();
+                    });
+                } else {
+                    resolve();
+                }
+            });
+        }
+
+        /**
+         * サンプルデータの読み込み実行
+         */
+        function loadSampleData() {
+            const parsedList = SAMPLE_SQL_FILES.map(f => parseSqlContent(f.name, f.content));
+            state.parsedFiles = parsedList;
+            buildGraph(parsedList);
+            fitToScreen();
+        }
+
+        document.getElementById('btn-load-sample').addEventListener('click', loadSampleData);
+        document.getElementById('empty-load-sample').addEventListener('click', loadSampleData);
+
+        /**
+         * 上段: 解析済みSQLファイル一覧の描画
+         */
+        function renderSidebar() {
+            sidebarFiles.innerHTML = '';
+            fileCountBadge.textContent = `${state.parsedFiles.length} 件`;
+
+            state.parsedFiles.forEach(file => {
+                const card = document.createElement('div');
+                card.className = 'file-card';
+
+                let badgeClass = 'badge-table';
+                if (file.objType === 'VIEW') badgeClass = 'badge-view';
+                else if (file.objType === 'PROCEDURE') badgeClass = 'badge-procedure';
+                else if (file.objType === 'FUNCTION') badgeClass = 'badge-function';
+
+                let insertHtml = '';
+                if (file.insertTargets && file.insertTargets.length > 0) {
+                    insertHtml = file.insertTargets.map(t => `<span class="insert-pill"><i class="fa-solid fa-arrow-right-to-bracket"></i> INSERT: ${escapeHtml(t.name)}</span>`).join('');
+                }
+
+                card.innerHTML = `
+                    <div class="file-card-title">
+                        <span><i class="fa-regular fa-file-lines"></i> ${escapeHtml(file.name)}</span>
+                        <span class="badge ${badgeClass}">${file.objType}</span>
+                    </div>
+                    <div class="file-card-deps">
+                        ${insertHtml}
+                        ${file.dependencies.length > 0 
+                            ? file.dependencies.map(d => `<span class="dep-pill"><i class="fa-solid fa-link"></i> ${escapeHtml(d.name)}</span>`).join('') 
+                            : (!insertHtml ? '<span style="color:#64748b;">(依存なし)</span>' : '')}
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    const node = state.nodes.get(file.name.toLowerCase());
+                    if (node) {
+                        centerOnNode(node);
+                        toggleNodeSelection(node.id);
+                    }
+                });
+
+                sidebarFiles.appendChild(card);
+            });
+        }
+
+        /**
+         * 下段: 重複テーブル一覧の描画
+         */
+        function renderDuplicatesSidebar() {
+            sidebarDuplicates.innerHTML = '';
+
+            if (state.duplicateTables.length === 0) {
+                sidebarDuplicates.innerHTML = `
+                    <div style="text-align:center; padding: 24px 10px; color: var(--text-sub); font-size: 12px;">
+                        <i class="fa-solid fa-circle-check" style="font-size: 20px; color: #34d399; margin-bottom: 8px; display:block;"></i>
+                        INSERT投入先とCREATE TABLEの重複はありません
+                    </div>
+                `;
+                return;
+            }
+
+            state.duplicateTables.forEach(dup => {
+                const card = document.createElement('div');
+                card.className = 'duplicate-card';
+                card.innerHTML = `
+                    <div class="dup-table-name">
+                        <i class="fa-solid fa-clone" style="color: #ea580c;"></i>
+                        <span>${escapeHtml(dup.schema ? dup.schema + '.' : '')}${escapeHtml(dup.tableName)}</span>
+                    </div>
+                    <div class="dup-detail">
+                        <div class="dup-row">
+                            <span class="badge badge-procedure" style="font-size:9px;">PROC</span>
+                            <span style="color:var(--text-main); font-weight:600;">${escapeHtml(dup.procedureName)}</span>
+                            <span style="font-size:10px; color:#94a3b8;">(投入元)</span>
+                        </div>
+                        <div class="dup-row">
+                            <span class="badge badge-table" style="font-size:9px;">TABLE</span>
+                            <span style="color:var(--text-main); font-weight:600;">${escapeHtml(dup.tableFileName)}</span>
+                            <span style="font-size:10px; color:#94a3b8;">(定義元)</span>
+                        </div>
+                    </div>
+                `;
+
+                // クリックで該当ノードへジャンプ
+                card.addEventListener('click', () => {
+                    const targetNode = state.nodes.get(dup.procedureId) || state.nodes.get(dup.tableId);
+                    if (targetNode) {
+                        centerOnNode(targetNode);
+                        toggleNodeSelection(targetNode.id);
+                    }
+                });
+
+                sidebarDuplicates.appendChild(card);
+            });
+        }
+
+        /**
+         * 重複CREATE TABLE非表示トグルの変更イベント
+         */
+        toggleHideDuplicates.addEventListener('change', (e) => {
+            state.hideDuplicateTables = e.target.checked;
+            buildGraph(state.parsedFiles);
+            fitToScreen();
+        });
+
+        /**
+         * 右サイドバーの開閉トグル
+         */
+        document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        /**
+         * 各一覧のハンバーガーメニュー風折りたたみトグル
+         */
+        const sectionFiles = document.getElementById('section-files');
+        const sectionDuplicates = document.getElementById('section-duplicates');
+
+        document.getElementById('btn-toggle-section-files').addEventListener('click', () => {
+            sectionFiles.classList.toggle('is-collapsed');
+        });
+
+        document.getElementById('btn-toggle-section-duplicates').addEventListener('click', () => {
+            sectionDuplicates.classList.toggle('is-collapsed');
+        });
+
+        /**
+         * スプリッターによる上下リサイズ機能
+         */
+        const resizer = document.getElementById('sidebar-resizer');
+        let isResizing = false;
+        let startY = 0;
+        let startHeight = 0;
+
+        resizer.addEventListener('mousedown', (e) => {
+            if (sectionFiles.classList.contains('is-collapsed') || sectionDuplicates.classList.contains('is-collapsed')) {
+                return;
+            }
+            isResizing = true;
+            startY = e.clientY;
+            startHeight = sectionFiles.getBoundingClientRect().height;
+            resizer.classList.add('resizing');
+            document.body.style.cursor = 'row-resize';
+            e.preventDefault();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const deltaY = e.clientY - startY;
+            const newHeight = Math.max(90, Math.min(sidebar.clientHeight - 130, startHeight + deltaY));
+            sectionFiles.style.height = `${newHeight}px`;
+            sectionFiles.style.flex = 'none';
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                resizer.classList.remove('resizing');
+                document.body.style.cursor = '';
+            }
+        });
+
+        function updateStats() {
+            statsPill.innerHTML = `<i class="fa-solid fa-database"></i> ${state.nodes.size} ノード / ${state.edges.length} 依存関係`;
+        }
+
+        /**
+         * SQLモーダル表示
+         */
+        const sqlModal = document.getElementById('sql-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalContent = document.getElementById('modal-content');
+
+        function showSqlModal(nodeId) {
+            const node = state.nodes.get(nodeId);
+            if (!node || !node.content) return;
+
+            modalTitle.textContent = `${node.name} (${node.fileName})`;
+            modalContent.textContent = node.content;
+            sqlModal.classList.remove('hidden');
+        }
+
+        document.getElementById('btn-close-modal').addEventListener('click', () => {
+            sqlModal.classList.add('hidden');
+        });
+
+        sqlModal.addEventListener('click', (e) => {
+            if (e.target === sqlModal) sqlModal.classList.add('hidden');
+        });
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // 初期ロード時にサンプルデータを自動描画
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSampleData();
+        });
+    </script>
+</body>
+</html>

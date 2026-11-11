@@ -10,30 +10,52 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy.orm import Session
+from capass_server.common.config import TOKEN_MAX_AGE_SEC
 from capass_server.common.db import get_db
 from capass_server.common.globals import HEADER_SIGNATURE, HEADER_SIGNED_AT
 from capass_server.controllers.dependencies import rate_limit_register
 from capass_server.schemas.agent import (
-    AgentAddToolRequest,
-    AgentAddToolResponse,
     AgentApproveResponse,
     AgentExecRequest,
+    AgentGrantApproveResponse,
+    AgentGrantRequest,
+    AgentGrantResponse,
     AgentRegisterRequest,
     AgentRegisterResponse,
+    AgentRevokeRequest,
+    AgentRevokeResponse,
     AgentToolItem,
     AgentToolListResponse,
 )
 from capass_server.schemas.approve import ApproveRequest
+from capass_server.schemas.tool import ToolAddRequest, ToolAddResponse, ToolChangeTokenRequest, ToolChangeTokenResponse
 from capass_server.schemas.tool_server import (
     ToolServerApproveResponse,
-    ToolServerChangeKeyRequest,
-    ToolServerChangeKeyResponse,
     ToolServerRegisterRequest,
     ToolServerRegisterResponse,
+    ToolServerReplaceActivateRequest,
+    ToolServerReplaceReserveRequest,
+    ToolServerReplaceReserveResponse,
+    ToolServerReplaceResponse,
+    ToolServerReplaceRollbackRequest,
 )
 from capass_server.services.agent import approve_agent, register_agent
-from capass_server.services.agent_tool import add_tool_to_agent, exec_agent_tool, list_executable_tools
-from capass_server.services.tool_server import approve_tool_server, change_tool_server_key, register_tool_server
+from capass_server.services.agent_tool import (
+    approve_agent_tool_grant,
+    exec_agent_tool,
+    list_executable_tools,
+    request_agent_tool_grant,
+    revoke_agent_tool_grant,
+)
+from capass_server.services.tool import add_tool, change_tool_token
+from capass_server.services.tool_server import (
+    ReplacementResult,
+    activate_tool_server_replacement,
+    approve_tool_server,
+    register_tool_server,
+    reserve_tool_server_replacement,
+    rollback_tool_server_replacement,
+)
 
 router = APIRouter()
 
@@ -70,17 +92,47 @@ def toolservers_approve(toolserver_id: int, req: ApproveRequest, db: Session = D
     )
 
 
-@router.post("/toolservers/{toolserver_id}/chkey", response_model=ToolServerChangeKeyResponse)
-def toolservers_chkey(toolserver_id: int, req: ToolServerChangeKeyRequest, db: Session = Depends(get_db)) -> ToolServerChangeKeyResponse:
-    """ツールサーバのリプレース(公開鍵の更新)。旧ツールサーバと新ツールサーバの、両方の署名が必要(CaPassクライアントの「chkey」から呼ばれる)。
-    承認済みのツールサーバの公開鍵を、新しい公開鍵に更新する。管理者の承認のやり直しは不要。実行URLは変わらない。"""
-    tool_server = change_tool_server_key(db, toolserver_id, req)
-    return ToolServerChangeKeyResponse(
-        toolserver_id=tool_server.id,
-        tool_server_name=tool_server.tool_server_name,
-        tool_server_public_key=tool_server.tool_server_public_key,
-        status=tool_server.status,
+def _replace_response(result: ReplacementResult) -> ToolServerReplaceResponse:
+    return ToolServerReplaceResponse(
+        active_toolserver_id=result.active.id,
+        active_tool_server_exec_url=result.active.exec_url,
+        standby_toolserver_id=result.standby.id,
+        standby_until=result.standby_until,
+        moved_tools=result.moved_tools,
     )
+
+
+# ---------- ツールサーバのリプレース(事前承認 → 切り替え → 切り戻し) ----------
+@router.post("/toolservers/{toolserver_id}/replace/reserve", status_code=201, response_model=ToolServerReplaceReserveResponse)
+def toolservers_replace_reserve(toolserver_id: int, req: ToolServerReplaceReserveRequest, db: Session = Depends(get_db)) -> ToolServerReplaceReserveResponse:
+    """ツールサーバのリプレース(1/3: 予約)。CaPassサーバ管理者が、新ツールサーバ(実行URLと公開鍵)を、旧ツールサーバ({toolserver_id})の後継として、事前に承認する。
+    管理者の署名が必要。予約には期限があり、期限内に、切り替え(activate)する。"""
+    successor = reserve_tool_server_replacement(db, toolserver_id, req)
+    return ToolServerReplaceReserveResponse(
+        toolserver_id=successor.id,
+        replaces_toolserver_id=toolserver_id,
+        tool_server_name=successor.tool_server_name,
+        tool_server_exec_url=successor.exec_url,
+        tool_server_public_key=successor.tool_server_public_key,
+        applicant_email=successor.applicant_email,
+        approver_email=successor.approver_email,
+        status=successor.status,
+        reserved_until=successor.status_expires_at,
+    )
+
+
+@router.post("/toolservers/{toolserver_id}/replace/activate", response_model=ToolServerReplaceResponse)
+def toolservers_replace_activate(toolserver_id: int, req: ToolServerReplaceActivateRequest, db: Session = Depends(get_db)) -> ToolServerReplaceResponse:
+    """ツールサーバのリプレース(2/3: 切り替え)。予約済みの新ツールサーバへ、ツールを切り替える。旧ツールサーバ({toolserver_id})と新ツールサーバの、両方の署名が必要。
+    旧ツールサーバは待機中(standby)になり、期限内なら、切り戻し(rollback)できる。管理者の操作は不要(事前に承認済みの送り先にだけ、切り替えられる)。"""
+    return _replace_response(activate_tool_server_replacement(db, toolserver_id, req))
+
+
+@router.post("/toolservers/{toolserver_id}/replace/rollback", response_model=ToolServerReplaceResponse)
+def toolservers_replace_rollback(toolserver_id: int, req: ToolServerReplaceRollbackRequest, db: Session = Depends(get_db)) -> ToolServerReplaceResponse:
+    """ツールサーバのリプレース(3/3: 切り戻し)。待機中(standby)の旧ツールサーバ({toolserver_id})へ、ツールを戻す。旧ツールサーバの署名だけでよい。
+    新ツールサーバは待機中になり、期限内なら、再度、切り替え(activate)できる。"""
+    return _replace_response(rollback_tool_server_replacement(db, toolserver_id, req))
 
 
 # ---------- AIエージェント(公開鍵)の初回登録と承認 ----------
@@ -112,15 +164,63 @@ def agents_approve(agent_id: str, req: ApproveRequest, db: Session = Depends(get
 
 
 # ---------- AIエージェントへのツール追加 ----------
-@router.post("/agents/{agent_id}/addtool", status_code=201, response_model=AgentAddToolResponse)
-def agents_addtool(agent_id: str, req: AgentAddToolRequest, db: Session = Depends(get_db)) -> AgentAddToolResponse:
-    """AIエージェントにツール(ツール代理トークン)を追加する(旧 register。CaPassクライアントの「regist」から呼ばれる)。承認済みツールサーバの署名を検証する。"""
-    agent_tool = add_tool_to_agent(db, agent_id, req)
-    return AgentAddToolResponse(
-        tool_endpoint=agent_tool.tool_endpoint,
-        agent_id=agent_tool.agent_id,
-        created_at=agent_tool.created_at,
+# ---------- ツール(ロール単位のツールエンドポイント)の登録とトークンの更新 ----------
+@router.post("/tools/addtool", status_code=201, response_model=ToolAddResponse)
+def tools_addtool(req: ToolAddRequest, db: Session = Depends(get_db)) -> ToolAddResponse:
+    """ツール(ロール単位のツールエンドポイント)の登録(CaPassクライアントの「regist」から呼ばれる)。承認済みツールサーバの署名が必要。
+    登録しただけでは、どのAIエージェントも使えない。AIエージェントへの割り当ては、grant(申請)と、その承認で行う。"""
+    tool = add_tool(db, req)
+    return ToolAddResponse(tool_endpoint=tool.tool_endpoint, created_at=tool.created_at, token_max_age_sec=TOKEN_MAX_AGE_SEC)
+
+
+@router.post("/tools/{tool_endpoint}/chtkn", response_model=ToolChangeTokenResponse)
+def tools_chtkn(tool_endpoint: str, req: ToolChangeTokenRequest, db: Session = Depends(get_db)) -> ToolChangeTokenResponse:
+    """ツール代理トークンの更新(CaPassクライアントの「chtkn」から呼ばれる。ツールサーバの定期更新ジョブ)。ツールを登録したツールサーバの署名が必要。
+    トークンはロール単位なので、1回の更新が、そのツールを割り当てられた全てのAIエージェントに反映される。
+    ツールサーバは、`token_max_age_sec` より短い間隔で、トークンを更新する。ロック中のツールは、更新しても、ロックされたまま。"""
+    tool = change_tool_token(db, tool_endpoint, req)
+    return ToolChangeTokenResponse(
+        tool_endpoint=tool.tool_endpoint,
+        tool_proxy_token_updated_at=tool.tool_proxy_token_updated_at,
+        locked=tool.locked,
+        token_max_age_sec=TOKEN_MAX_AGE_SEC,
     )
+
+
+# ---------- AIエージェントへのツールの割り当て(申請 → 承認 / 取り消し) ----------
+@router.post("/agents/{agent_id}/grant/{tool_endpoint}", status_code=201, response_model=AgentGrantResponse)
+def agents_grant(agent_id: str, tool_endpoint: str, req: AgentGrantRequest, db: Session = Depends(get_db)) -> AgentGrantResponse:
+    """AIエージェントへのツールの割り当ての申請(承認待ち:pendingになる)。AIエージェントの署名が必要。承認(approve)されると、使えるようになる。
+    取り消された(revoked)割り当ては、再申請できる。"""
+    grant = request_agent_tool_grant(db, agent_id, tool_endpoint, req)
+    return AgentGrantResponse(
+        agent_id=grant.agent_id,
+        tool_endpoint=tool_endpoint,
+        status=grant.status,
+        applicant_email=grant.applicant_email,
+        created_at=grant.created_at,
+    )
+
+
+@router.post("/agents/{agent_id}/grant/{tool_endpoint}/approve", response_model=AgentGrantApproveResponse)
+def agents_grant_approve(agent_id: str, tool_endpoint: str, req: ApproveRequest, db: Session = Depends(get_db)) -> AgentGrantApproveResponse:
+    """AIエージェントへのツールの割り当ての承認(いまは、CaPassサーバ管理者のみ。将来は、申請者の上司など)。管理者の署名が必要。"""
+    grant = approve_agent_tool_grant(db, agent_id, tool_endpoint, req)
+    return AgentGrantApproveResponse(
+        agent_id=grant.agent_id,
+        tool_endpoint=tool_endpoint,
+        status=grant.status,
+        applicant_email=grant.applicant_email,
+        approver_email=grant.approver_email,
+        approved_at=grant.approved_at,
+    )
+
+
+@router.post("/agents/{agent_id}/revoke/{tool_endpoint}", response_model=AgentRevokeResponse)
+def agents_revoke(agent_id: str, tool_endpoint: str, req: AgentRevokeRequest, db: Session = Depends(get_db)) -> AgentRevokeResponse:
+    """AIエージェントへのツールの割り当ての取り消し。CaPassサーバ管理者、または、そのツールを登録したツールサーバの署名が必要。"""
+    grant = revoke_agent_tool_grant(db, agent_id, tool_endpoint, req)
+    return AgentRevokeResponse(agent_id=grant.agent_id, tool_endpoint=tool_endpoint, status=grant.status)
 
 
 # ---------- AIエージェントによるツール実行 ----------

@@ -20,6 +20,7 @@ TOOL_PROXY_TOKEN_MAX_LEN = 1024  # 平文の上限。DBには暗号化して(Tex
 EXEC_URL_MAX_LEN = 2048
 NONCE_MAX_LEN = 128
 NONCE_MIN_LEN = 16
+NONCE_SCOPE_MAX_LEN = 160  # nonceを区切る単位("agent:<agent_id>" / "tool:<tool_endpoint>")
 PARAMS_SCHEMA_MAX_BYTES = 16 * 1024  # ツールのparamsのスキーマ(JSON Schema)の最大サイズ(JSON化したバイト数)
 STATUS_MAX_LEN = 16
 

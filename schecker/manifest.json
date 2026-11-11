@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Scheduled Clicker (指定日時自動クリック)",
+  "version": "1.0.0",
+  "description": "開いているWebページの要素を選択し、指定した日時に自動でクリックを試行します。",
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Scheduled Clicker",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  }
+}

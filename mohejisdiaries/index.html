@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>記事を読み込み中...</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        :root {
+            --cream: #faf8f3;
+            --ink: #1a1a1a;
+            --accent: #d4532f;
+            --muted: #6b6b6b;
+            --border: #e0ddd5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+            background-color: var(--cream);
+            color: var(--ink);
+            line-height: 1.8;
+            font-size: 18px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .site-header {
+            width: 100%;
+            height: 300px;
+            background-color: #ffffff;
+            background-image: url('https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/refs/heads/main/mohejisdiaries/media/header.svg');
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .site-header:hover {
+            opacity: 0.8;
+        }
+
+        /* ヘッダーのレスポンシブ対応 */
+        @media (max-width: 1000px) {
+            .site-header {
+                height: 30vw; /* 幅に応じて高さを調整 */
+            }
+        }
+
+        @media (min-width: 1001px) {
+            .site-header {
+                background-size: auto 300px; /* 高さを300pxに固定 */
+            }
+        }
+
+        /* Main */
+        .site-main {
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Footer */
+        .site-footer {
+            width: 100%;
+            height: 80px;
+            background-color: #000000;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 60px 24px;
+            opacity: 0;
+            animation: fadeIn 0.8s ease-out 0.2s forwards;
+            width: 100%;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Header Section */
+        .article-header {
+            margin-bottom: 60px;
+            padding-bottom: 40px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .article-title {
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+            font-size: 42px;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 24px;
+            color: var(--ink);
+            letter-spacing: -0.02em;
+            text-align: left;
+        }
+
+        .article-meta {
+            display: flex;
+            gap: 20px;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+            font-size: 14px;
+            color: var(--muted);
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .meta-label {
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Content Sections */
+        .content-section {
+            margin-bottom: 60px;
+            animation: slideUp 0.6s ease-out both;
+            position: relative;
+        }
+
+        /* 縦線の基本スタイル */
+        .content-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 4px;
+            background: var(--accent);
+            transition: height 0.4s ease;
+            z-index: 1;
+        }
+
+        /* PC版: レンガ状レイアウト */
+        @media (min-width: 769px) {
+            /* 奇数番目: 右寄せ + 右側の縦線 */
+            .content-section:nth-child(odd) {
+                width: 70%;
+                margin-left: auto;
+                margin-right: 15px;
+            }
+
+            .content-section:nth-child(odd)::before {
+                right: 0;
+                margin-right: -15px;
+                height: 50px;
+            }
+
+            /* 偶数番目: 左寄せ + 左側の縦線 */
+            .content-section:nth-child(even) {
+                width: 70%;
+                margin-left: 15px;
+                margin-right: auto;
+            }
+
+            .content-section:nth-child(even)::before {
+                left: 0;
+                margin-left: -15px;
+                height: 50px;
+            }
+
+            /* hover時に縦線を伸ばす */
+            .content-section:hover::before {
+                height: 100%;
+            }
+        }
+
+        /* スマホ版: 中央配置 + 左側に縦線を常に表示 */
+        @media (max-width: 768px) {
+            .content-section {
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .content-section::before {
+                left: 0;
+                margin-left: -5px;
+                height: 45px;
+            }
+        }
+
+        .content-section:nth-child(2) {
+            animation-delay: 0.3s;
+        }
+
+        .content-section:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        .content-section:nth-child(4) {
+            animation-delay: 0.5s;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .section-headline {
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--ink);
+            position: relative;
+            padding-left: 20px;
+            text-align: left;
+        }
+
+        .section-body {
+            /* monomdが.monomd-bodyとしてスタイルを提供するため、最小限のみ残す */
+        }
+
+        /* 画像スタイル - .article-imageの後に配置 */
+        .article-image {
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .article-image img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            display: block;
+            margin: 0 auto;
+            margin-bottom: 0;
+        }
+
+        .article-image figcaption {
+            margin-top: 12px;
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+            font-size: 14px;
+            color: var(--ink);
+        }
+
+        /* 画像モーダル */
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .image-modal.active {
+            display: flex;
+        }
+
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            cursor: default;
+        }
+
+        .article-image img {
+            cursor: pointer;
+        }
+
+        /* エラー表示 */
+        .error {
+            text-align: center;
+            padding: 100px 20px;
+            color: var(--accent);
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+        }
+
+        /* Tags Section */
+        .article-footer {
+            margin-top: 80px;
+            padding-top: 40px;
+            border-top: 2px solid var(--border);
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tag {
+            font-family: 'Meiryo', 'メイリオ', sans-serif;
+            font-size: 13px;
+            padding: 8px 16px;
+            background: var(--ink);
+            color: var(--cream);
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .tag:hover {
+            background: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .article-title {
+                font-size: 32px;
+            }
+
+            .section-headline {
+                font-size: 24px;
+            }
+
+            .container {
+                padding: 40px 20px;
+            }
+        }
+
+        /* ===================================================
+           トップページ (Top Page Layout & Slider)
+           =================================================== */
+
+        .top-page-layout {
+            display: grid;
+            /* タイル3列(285px * 3 = 855px) + gap(32px) + サイドバー(280px) */
+            grid-template-columns: 855px 280px;
+            gap: 32px;
+            width: 100%;
+            justify-content: center;
+            align-items: start;
+        }
+
+        /* タブレット版・スマホ版: サイドバーが記事一覧(.top-main-column)の下に回り込み、左右中央配置の一列で表示 */
+        @media (max-width: 1200px) {
+            .top-page-layout {
+                grid-template-columns: 1fr;
+                gap: 48px;
+                justify-items: center; /* 子要素を左右中央揃え */
+                justify-content: center;
+            }
+
+            .top-main-column {
+                width: 855px;
+                max-width: 100%;
+                margin: 0 auto;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .top-sidebar-column {
+                width: 100%;
+                max-width: 855px;
+                margin: 0 auto;
+                display: flex;
+                flex-direction: column;
+                align-items: center; /* サイドバーの各要素を左右中央配置の一列に */
+            }
+        }
+
+        /* メインカラム */
+        .top-main-column {
+            min-width: 0;
+            width: 855px;
+            max-width: 100%;
+        }
+
+        /* サイドバーカラム（今後のタグ一覧や検索用） */
+        .top-sidebar-column {
+            min-width: 0;
+            width: 280px;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .top-sidebar-column > * {
+            width: 100%;
+            max-width: 280px;
+        }
+
+        /* 記事一覧セクション */
+        .articles-section {
+            width: 100%;
+        }
+
+        /* 見出しバー: 「記事一覧 [All]」 */
+        .section-header-bar {
+            background-color: #2b2b2b;
+            color: #ffffff;
+            padding: 12px 20px;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+            width: 855px;
+            box-sizing: border-box;
+        }
+
+        .section-header-bar .filter-label {
+            font-size: 15px;
+            color: #b0b0b0;
+            font-weight: 400;
+            margin-left: 10px;
+        }
+
+        /* スライダーインジケーター（ドット） */
+        .slider-pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 0 16px;
+            width: 855px;
+            box-sizing: border-box;
+        }
+
+        .slider-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #d1cfc7;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .slider-dot.active {
+            background-color: #1a1a1a;
+            transform: scale(1.15);
+        }
+
+        .slider-dot:hover:not(.active) {
+            background-color: #8c8983;
+        }
+
+        /* スライダーコンテナ */
+        .slider-viewport {
+            width: 855px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .slider-track {
+            display: flex;
+            transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            width: 100%;
+        }
+
+        /* スライダーページ (3x3 グリッド: 各タイル幅285px・高さ500px固定、上・右線は不要) */
+        .slider-page-grid {
+            width: 855px;
+            flex-shrink: 0;
+            display: grid;
+            grid-template-columns: repeat(3, 285px);
+            grid-template-rows: repeat(3, 300px);
+            box-sizing: border-box;
+        }
+
+        /* 共通タイルスタイル (幅285px・高さ500px固定、左と下の線のみ) */
+        .slider-tile {
+            width: 285px;
+            height: 300px;
+            min-width: 285px;
+            max-width: 285px;
+            min-height: 300px;
+            max-height: 300px;
+            position: relative;
+            border-left: 2px solid #e0ddd5;
+            border-bottom: 2px solid #e0ddd5;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 32px 24px 28px;
+            background-color: rgba(255, 255, 255, 0.4);
+            transition: background-color 0.25s ease;
+            overflow: visible;
+        }
+
+        /* 各タイル左下を始点に線が赤色に染まるアニメーション */
+        /* 下線: 左下から右へ伸びる */
+        .slider-tile::before {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: -2px;
+            width: 0;
+            height: 4px;
+            background-color: var(--accent);
+            transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            z-index: 3;
+        }
+
+        /* 左線: 左下から上へ伸びる */
+        .slider-tile::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: -2px;
+            width: 4px;
+            height: 0;
+            background-color: var(--accent);
+            transition: height 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            z-index: 3;
+        }
+
+        /* ホバー時に左下から赤色線が伸長 */
+        .slider-tile:hover::before {
+            width: calc(100% + 2px);
+        }
+
+        .slider-tile:hover::after {
+            height: calc(100% + 2px);
+        }
+
+        /* ナビゲーションタイル（最　新の記　事、過　去の記　事へ、最　近の記事へ、最　古の記　事） */
+        .nav-tile {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            user-select: none;
+            line-height: 1.45;
+            letter-spacing: 0.12em;
+            padding: 24px;
+        }
+
+        /* 最　新の記　事 (黒太字、中央配置) */
+        .nav-tile-latest {
+            font-size: 40px;
+            font-weight: 700;
+            color: var(--ink);
+        }
+
+        /* 過　去の記事へ / 最　近の記事へ (薄いグレー太字、クリッカブル) */
+        .nav-tile-link {
+            font-size: 40px;
+            font-weight: 700;
+            color: #9c9a94;
+            cursor: pointer;
+            transition: color 0.25s ease;
+        }
+
+        .nav-tile-link:hover {
+            color: var(--ink);
+        }
+
+        /* 最　古の記　事 (薄いグレー太字、非クリッカブル) */
+        .nav-tile-oldest {
+            font-size: 40px;
+            font-weight: 700;
+            color: var(--ink);
+        }
+
+        /* 記事タイル */
+        .article-tile {
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .article-tile-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .article-tile-title {
+            font-size: 25px;
+            font-weight: 700;
+            line-height: 1.5;
+            color: var(--ink);
+            margin-bottom: 12px;
+            display: -webkit-box;
+            -webkit-line-clamp: 8;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: color 0.2s ease;
+        }
+
+        .article-tile:hover .article-tile-title {
+            color: var(--accent);
+        }
+
+        /* 「続きを読む」ボタン: 通常時は四角形「■」 */
+        .tile-readmore-btn {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            background-color: #ededed;
+            color: #555555;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            box-sizing: border-box;
+            transition: transform 0.22s ease, background-color 0.22s ease, color 0.22s ease;
+            z-index: 4;
+            overflow: visible;
+        }
+
+        /* 右側に出現する三角「▶」: 「■」が「■▶」になる */
+        .tile-readmore-btn::after {
+            content: '';
+            position: absolute;
+            top: 25%;
+            right: 0;
+            width: 0;
+            height: 50%;
+            background-color: #ededed;
+            clip-path: polygon(0 0, 100% 50%, 0 100%);
+            transition: right 0.22s ease, width 0.22s ease, background-color 0.22s ease;
+            pointer-events: none;
+        }
+
+        .tile-readmore-btn .btn-label {
+            display: inline-block;
+            transition: color 0.22s ease;
+            letter-spacing: 0.04em;
+        }
+
+        /* hover時: ボタンが左に少しズレて、右側に三角がピョコッと結合出現し「■▶」になる */
+        .slider-tile:hover .tile-readmore-btn {
+            background-color: #e2e2e2;
+            color: var(--accent);
+            transform: translateX(-9px);
+        }
+
+        .slider-tile:hover .tile-readmore-btn::after {
+            background-color: #e2e2e2;
+            right: -8px;
+            width: 9px;
+        }
+
+        .slider-tile:hover .tile-readmore-btn .btn-label {
+            color: var(--accent);
+        }
+
+        /* 空タイル: 中身が無いタイルは左と下の線およびアニメーションを表示しない */
+        .empty-tile {
+            border-left: none !important;
+            border-bottom: none !important;
+            pointer-events: none;
+            background-color: transparent;
+        }
+
+        .empty-tile::before,
+        .empty-tile::after {
+            display: none !important;
+        }
+
+        /* ===================================================
+           PC/タブレット版 vs スマホ版スライダー
+           =================================================== */
+
+        /* PC/タブレット版スライダーコンテナ */
+        .articles-slider-desktop {
+            display: block;
+            width: 855px;
+        }
+
+        /* スマホ版スライダーコンテナ（通常時は非表示） */
+        .articles-slider-mobile {
+            display: none;
+            width: 100%;
+        }
+
+        /* スマホ版レスポンシブスタイル (max-width: 855px) */
+        @media (max-width: 855px) {
+            .articles-slider-desktop {
+                display: none !important;
+            }
+
+            .articles-slider-mobile {
+                display: block !important;
+            }
+
+            .top-page-layout {
+                grid-template-columns: 1fr;
+                gap: 32px;
+                padding: 10px 0 60px;
+                width: 100%;
+                justify-items: center;
+            }
+
+            .top-main-column {
+                width: 100%;
+                max-width: 100%;
+                margin: 0 auto;
+            }
+
+            .top-sidebar-column {
+                width: 100%;
+                max-width: 100%;
+                margin: 0 auto;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .section-header-bar {
+                width: 100%;
+                font-size: 20px;
+                padding: 10px 16px;
+            }
+
+            /* スマホ版スライダービューポート & トラック */
+            .mobile-viewport {
+                width: 100%;
+                overflow: hidden;
+                position: relative;
+            }
+
+            .mobile-track {
+                display: flex;
+                transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+                width: 100%;
+            }
+
+            /* スマホ版: 1ページ縦一列 (10記事/ページ) */
+            .mobile-slider-page {
+                width: 100%;
+                flex-shrink: 0;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* スマホ版記事アイテム: ナビタイル・続きを読むボタン・赤線アニメーション無し */
+            .mobile-article-item {
+                width: 100%;
+                padding: 18px 14px;
+                border-bottom: 1px solid #e0ddd5;
+                box-sizing: border-box;
+                cursor: pointer;
+                background-color: transparent;
+                transition: background-color 0.15s ease;
+                position: relative;
+            }
+
+            .mobile-article-item:first-child {
+                border-top: 1px solid #e0ddd5;
+            }
+
+            .mobile-article-item:active {
+                background-color: rgba(0, 0, 0, 0.04);
+            }
+
+            .mobile-article-title {
+                font-size: 18px;
+                font-weight: 700;
+                line-height: 1.5;
+                color: var(--ink);
+                margin-bottom: 6px;
+            }
+
+            .mobile-article-meta {
+                font-size: 13px;
+                color: var(--muted);
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+
+            .mobile-pagination {
+                width: 100%;
+                padding: 12px 0 16px;
+            }
+        }
+
+        /* ===================================================
+           サイドバー: 検索 & タグ一覧 (Sidebar Widgets)
+           =================================================== */
+
+        .sidebar-widget {
+            width: 100%;
+            margin-bottom: 32px;
+        }
+
+        .sidebar-heading {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 16px;
+            letter-spacing: 0.05em;
+            line-height: 1.3;
+        }
+
+        /* 検索ブロック */
+        .sidebar-search-box {
+            padding-bottom: 24px;
+            border-bottom: 2px solid #e0ddd5;
+            margin-bottom: 32px;
+            width: 100%;
+        }
+
+        .search-text-main {
+            font-size: 14px;
+            color: var(--ink);
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .search-text-sub {
+            font-size: 14px;
+            color: #444444;
+            line-height: 1.6;
+        }
+
+        /* タグ一覧コンテナ */
+        .sidebar-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px 10px;
+            padding: 8px 4px 16px;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* 赤色の荷札風タグ */
+        .sidebar-tag-item {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            background-color: var(--accent);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 6px 14px 6px 20px;
+            border-radius: 12px 2px 2px 12px;
+            cursor: pointer;
+            user-select: none;
+            text-decoration: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+            transform-origin: center center;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        /* タグ左端の白い丸穴（パンチ穴） */
+        .sidebar-tag-item::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.25);
+        }
+
+        /* 添付図のような生き生きとした傾き (rotate) */
+        .sidebar-tag-item:nth-child(8n+1) { transform: rotate(-3.5deg); }
+        .sidebar-tag-item:nth-child(8n+2) { transform: rotate(4deg); }
+        .sidebar-tag-item:nth-child(8n+3) { transform: rotate(-2deg); }
+        .sidebar-tag-item:nth-child(8n+4) { transform: rotate(3.5deg); }
+        .sidebar-tag-item:nth-child(8n+5) { transform: rotate(-4.5deg); }
+        .sidebar-tag-item:nth-child(8n+6) { transform: rotate(2.5deg); }
+        .sidebar-tag-item:nth-child(8n+7) { transform: rotate(-1.5deg); }
+        .sidebar-tag-item:nth-child(8n+8) { transform: rotate(4.5deg); }
+
+        /* ホバー時: 少し拡大してまっすぐに戻り、影が強調される */
+        .sidebar-tag-item:hover {
+            transform: scale(1.08) rotate(0deg) !important;
+            background-color: #e23b16;
+            box-shadow: 0 4px 10px rgba(212, 83, 47, 0.35);
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+    </header>
+    
+    <main class="site-main">
+        <div class="container">
+            <div id="main-content"></div>
+        </div>
+    </main>
+    
+    <footer class="site-footer">
+    </footer>
+
+    <!-- 画像モーダル -->
+    <div id="image-modal" class="image-modal">
+        <img id="modal-image" src="" alt="">
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/monomd@1.0.1/index.js"></script>
+    <script>
+        // monomdのCSSを追加
+        const style = document.createElement('style');
+        style.textContent = MonoMD.getMonoMDCSS();
+        document.head.appendChild(style);
+        
+        // monomdをラップしたrenderMarkdown関数
+        async function renderMarkdown(markdown) {
+            const result = await MonoMD.renderMarkdown(markdown, { includeCSS: false });
+            // .monomd-bodyのdivに.section-bodyクラスを追加
+            return result.html.replace('<div class="monomd-body">', '<div class="monomd-body section-body">');
+        }
+        
+        // ルーティング処理
+        function getCurrentRoute() {
+            const params = new URLSearchParams(window.location.search);
+            const pathParam = params.get('path');
+            
+            // クエリストリングにpathパラメータがある場合
+            if (pathParam) {
+                // 記事ページの判定 /articles/{yyyy}/{採番}
+                const articleMatch = pathParam.match(/^\/articles\/(\d{4})\/(\d+)$/);
+                
+                if (articleMatch) {
+                    return {
+                        type: 'article',
+                        year: articleMatch[1],
+                        number: articleMatch[2]
+                    };
+                }
+                
+                // 404エラーページの判定
+                if (pathParam === '/errors/404') {
+                    return {
+                        type: '404'
+                    };
+                }
+            }
+            
+            // pathパラメータがない、または不正な場合はトップページ
+            return { type: 'top' };
+        }
+
+        // 記事IDを生成（採番を3桁0埋め）yyyyNNN形式
+        function generateArticleId(year, number) {
+            const paddedNumber = String(number).padStart(3, '0');
+            return `${year}${paddedNumber}`;
+        }
+
+        // ページ遷移（リロードなし）
+        function navigateTo(path) {
+            const currentPath = window.location.pathname;
+            const newUrl = `${currentPath}?path=${encodeURIComponent(path)}`;
+            window.history.pushState({}, '', newUrl);
+            init();
+        }
+
+        // 404エラーページをレンダリング
+        function render404Page() {
+            const mainContent = document.getElementById('main-content');
+            document.title = '404 Not Found';
+            
+            mainContent.innerHTML = `
+                <div style="padding: 100px 24px; text-align: center;">
+                    <h1 style="font-size: 48px; margin-bottom: 20px;">404</h1>
+                    <p style="font-size: 24px; color: var(--muted);">404やで(´・ω・｀)</p>
+                </div>
+            `;
+        }
+
+        // 記事テーブルデータ取得
+        async function fetchArticlesTable() {
+            const candidates = [
+                './github_actions/deliverable/tbl_articles/table.json',
+                'https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/main-github_actions/mohejisdiaries/github_actions/deliverable/tbl_articles/table.json',
+                'https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/github_actions/deliverable/tbl_articles/table.json?ref=main-github_actions'
+            ];
+
+            for (const url of candidates) {
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) continue;
+                    if (url.includes('api.github.com')) {
+                        const data = await response.json();
+                        const content = decodeURIComponent(escape(atob(data.content)));
+                        const parsed = JSON.parse(content);
+                        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                    } else {
+                        const parsed = await response.json();
+                        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                    }
+                } catch (e) {
+                    // 次のURLをフォールバック
+                }
+            }
+
+            // 万一フェッチ失敗時の初期フォールバックデータ
+            return [
+                {
+                    id: "2019001",
+                    fileName: "2019001_sample.yml",
+                    title: "matplotlibでガントチャートを実装する",
+                    createDate: "2019-07-13",
+                    updateDate: "2019-07-13",
+                    tags: ["Python", "個人開発"]
+                }
+            ];
+        }
+
+        // スライダー表示確認用のサンプル記事データ（実データが少ない場合に複数ページ動作を可能にする）
+        const PREVIEW_SAMPLE_ARTICLES = [
+            { id: "2019002", title: "クリック座標をフラグメント識別子にして検索できるChrome拡張を開発した", createDate: "2019-05-19", updateDate: "2019-05-19", tags: ["Chrome拡張", "JavaScript"] },
+            { id: "2019003", title: "Macで欲しいアレコレをAutomatorで", createDate: "2019-05-02", updateDate: "2019-05-02", tags: ["Mac", "作業効率化"] },
+            { id: "2019004", title: "【両OS対応】React Nativeで爆速プロトタイプアプリを作ろう", createDate: "2019-04-19", updateDate: "2019-04-19", tags: ["React", "モバイル"] },
+            { id: "2019005", title: "時系列データから秒単位のガントチャートを美しく生成する", createDate: "2019-04-05", updateDate: "2019-04-05", tags: ["Python", "可視化"] },
+            { id: "2019006", title: "CSS GridレイアウトとFlexboxの使い分け完全ガイド", createDate: "2019-03-22", updateDate: "2019-03-22", tags: ["CSS", "HTML"] },
+            { id: "2019007", title: "TypeScriptによる型安全なWebフロントエンド開発", createDate: "2019-03-10", updateDate: "2019-03-10", tags: ["TypeScript"] },
+            { id: "2019008", title: "GraphQL入門：REST APIからの移行手順とスキーマ設計", createDate: "2019-02-28", updateDate: "2019-02-28", tags: ["Web開発", "API"] },
+            { id: "2019009", title: "Dockerコンテナで構築する快適なローカル開発環境", createDate: "2019-02-15", updateDate: "2019-02-15", tags: ["Docker", "環境構築"] },
+            { id: "2019010", title: "GitHub Actionsで作るCI/CD自動化レシピ集", createDate: "2019-01-30", updateDate: "2019-01-30", tags: ["CI/CD", "GitHub"] },
+            { id: "2019011", title: "自然言語処理におけるBERTモデルのファインチューニング実践", createDate: "2019-01-18", updateDate: "2019-01-18", tags: ["機械学習", "自然言語処理"] },
+            { id: "2019012", title: "WebGLとThree.jsでインタラクティブな3D表現に挑戦する", createDate: "2019-01-05", updateDate: "2019-01-05", tags: ["JavaScript", "WebGL"] },
+            { id: "2018001", title: "個人ブログサイトの静的サイトジェネレーション戦略", createDate: "2018-12-20", updateDate: "2018-12-20", tags: ["静的サイト", "Web"] },
+            { id: "2018002", title: "Webパフォーマンス最適化：Core Web Vitalsの改善手法", createDate: "2018-12-01", updateDate: "2018-12-01", tags: ["パフォーマンス", "フロントエンド"] },
+            { id: "2018003", title: "Go言語で作るCLIツールのアーキテクチャ設計", createDate: "2018-11-15", updateDate: "2018-11-15", tags: ["Go", "CLI"] }
+        ];
+
+        // サイドバー表示用の初期ダミータグ一覧（添付図に基づく）
+        const DEFAULT_SIDEBAR_TAGS = [
+            "お知らせ", "フリートーク", "Java", "Python", "メモ",
+            "HTML", "CSS", "Javascript", "機械学習", "C",
+            "PHP", "jQuery", "企業", "就活・転職", "Crystal",
+            "環境構築", "自然言語処理", "SQL", "Mac", "React",
+            "TypeScript", "Chrome拡張", "個人開発"
+        ];
+
+        // トップページをレンダリング
+        async function renderTopPage() {
+            const mainContent = document.getElementById('main-content');
+            document.title = "Moheji's diaries = もへじの編綴";
+
+            // テーブルデータの取得
+            let loadedArticles = await fetchArticlesTable();
+            if (!Array.isArray(loadedArticles)) loadedArticles = [];
+
+            // 実データ（table.json）をベースにし、スライダー確認用に不足分をサンプル記事で補填
+            const knownIds = new Set(loadedArticles.map(a => a.id));
+            const mergedArticles = [...loadedArticles];
+            for (const sample of PREVIEW_SAMPLE_ARTICLES) {
+                if (!knownIds.has(sample.id)) {
+                    mergedArticles.push(sample);
+                }
+            }
+
+            // 1ページあたり記事は7件（3x3=9マスのうち、左上と右下の2マスがナビ用）
+            const ARTICLES_PER_PAGE = 7;
+            const totalPages = Math.max(1, Math.ceil(mergedArticles.length / ARTICLES_PER_PAGE));
+
+            // スライダーページのHTML生成
+            let pagesHtml = '';
+            for (let p = 0; p < totalPages; p++) {
+                const pageArticles = mergedArticles.slice(p * ARTICLES_PER_PAGE, (p + 1) * ARTICLES_PER_PAGE);
+                const isLastPage = (p === totalPages - 1);
+                // 最終ページの場合、「最古の記事」の直後のスロット番号 (1 + pageArticles.length)
+                const oldestSlotIndex = isLastPage ? (1 + pageArticles.length) : -1;
+
+                let tilesHtml = '';
+                for (let slot = 0; slot < 9; slot++) {
+                    if (slot === 0) {
+                        // 左上タイル (0, 0)
+                        if (p === 0) {
+                            tilesHtml += `
+                                <div class="slider-tile nav-tile nav-tile-latest">
+                                    最　新<br>の<br>記　事
+                                </div>
+                            `;
+                        } else {
+                            tilesHtml += `
+                                <div class="slider-tile nav-tile nav-tile-link nav-tile-prev" data-target-page="${p - 1}" role="button" tabindex="0">
+                                    最　近<br>の<br>記事へ
+                                </div>
+                            `;
+                        }
+                    } else if (isLastPage && slot === oldestSlotIndex && slot <= 8) {
+                        // 最終ページ: 最古の記事の直後の位置に配置
+                        tilesHtml += `
+                            <div class="slider-tile nav-tile nav-tile-oldest">
+                                最　古<br>の<br>記　事
+                            </div>
+                        `;
+                    } else if (!isLastPage && slot === 8) {
+                        // 途中ページの右下タイル (2, 2)
+                        tilesHtml += `
+                            <div class="slider-tile nav-tile nav-tile-link nav-tile-next" data-target-page="${p + 1}" role="button" tabindex="0">
+                                過　去<br>の<br>記事へ
+                            </div>
+                        `;
+                    } else {
+                        // 記事タイル (slot 1〜7) または空タイル
+                        const articleIdx = slot - 1;
+                        if (articleIdx >= 0 && articleIdx < pageArticles.length) {
+                            const article = pageArticles[articleIdx];
+                            // 記事パスの算出: id "2019001" -> /articles/2019/1
+                            let targetPath = '/articles/2019/1';
+                            if (article.id) {
+                                const yMatch = article.id.match(/^(\d{4})(\d+)$/);
+                                if (yMatch) {
+                                    targetPath = `/articles/${yMatch[1]}/${parseInt(yMatch[2], 10)}`;
+                                }
+                            }
+
+                            tilesHtml += `
+                                <div class="slider-tile article-tile" data-path="${targetPath}">
+                                    <div class="article-tile-content">
+                                        <div class="article-tile-title">${escapeHtml(article.title)}</div>
+                                    </div>
+                                    <div class="tile-readmore-btn" data-path="${targetPath}">
+                                        <span class="btn-label">続きを読む</span>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            // 空タイル
+                            tilesHtml += `<div class="slider-tile empty-tile"></div>`;
+                        }
+                    }
+                }
+
+                pagesHtml += `
+                    <div class="slider-page-grid" data-page-index="${p}">
+                        ${tilesHtml}
+                    </div>
+                `;
+            }
+
+            // ドットインジケーターのHTML生成 (PC/タブレット版)
+            let dotsHtml = '';
+            for (let p = 0; p < totalPages; p++) {
+                dotsHtml += `<div class="slider-dot desktop-dot ${p === 0 ? 'active' : ''}" data-dot-index="${p}"></div>`;
+            }
+
+            // ==========================================
+            // スマホ版スライダー生成 (縦一列、10記事/ページ、ナビタイル/ボタン/赤線アニメ無し)
+            // ==========================================
+            const MOBILE_ARTICLES_PER_PAGE = 10;
+            const mobileTotalPages = Math.max(1, Math.ceil(mergedArticles.length / MOBILE_ARTICLES_PER_PAGE));
+
+            let mobilePagesHtml = '';
+            for (let mp = 0; mp < mobileTotalPages; mp++) {
+                const pageArticles = mergedArticles.slice(mp * MOBILE_ARTICLES_PER_PAGE, (mp + 1) * MOBILE_ARTICLES_PER_PAGE);
+                let itemsHtml = '';
+                for (const article of pageArticles) {
+                    let targetPath = '/articles/2019/1';
+                    if (article.id) {
+                        const yMatch = article.id.match(/^(\d{4})(\d+)$/);
+                        if (yMatch) {
+                            targetPath = `/articles/${yMatch[1]}/${parseInt(yMatch[2], 10)}`;
+                        }
+                    }
+                    const formattedDate = article.createDate ? formatDate(article.createDate) : '';
+                    itemsHtml += `
+                        <div class="mobile-article-item" data-path="${targetPath}">
+                            <div class="mobile-article-title">${escapeHtml(article.title)}</div>
+                            ${formattedDate ? `<div class="mobile-article-meta"><span class="meta-date">${formattedDate}</span></div>` : ''}
+                        </div>
+                    `;
+                }
+                mobilePagesHtml += `
+                    <div class="mobile-slider-page" data-page-index="${mp}">
+                        ${itemsHtml}
+                    </div>
+                `;
+            }
+
+            let mobileDotsHtml = '';
+            for (let mp = 0; mp < mobileTotalPages; mp++) {
+                mobileDotsHtml += `<div class="slider-dot mobile-dot ${mp === 0 ? 'active' : ''}" data-dot-index="${mp}"></div>`;
+            }
+
+            // ==========================================
+            // サイドバーHTML生成（検索 & タグ一覧）
+            // ==========================================
+            let tagsHtml = '';
+            for (const tag of DEFAULT_SIDEBAR_TAGS) {
+                tagsHtml += `<span class="sidebar-tag-item" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`;
+            }
+
+            const sidebarHtml = `
+                <!-- 検索セクション -->
+                <section class="sidebar-widget sidebar-search-box">
+                    <h2 class="sidebar-heading">検索</h2>
+                    <p class="search-text-main">機械学習の勉強中です。</p>
+                    <p class="search-text-sub">タグ機能をご使用ください・・・( ´・ω・\` )</p>
+                </section>
+
+                <!-- タグ一覧セクション -->
+                <section class="sidebar-widget sidebar-tags-box">
+                    <h2 class="sidebar-heading">タグ一覧</h2>
+                    <div class="sidebar-tags-container">
+                        ${tagsHtml}
+                    </div>
+                </section>
+            `;
+
+            // トップページレイアウト全体のHTML構築
+            mainContent.innerHTML = `
+                <div class="top-page-layout">
+                    <!-- メインカラム: 記事一覧スライダー -->
+                    <div class="top-main-column">
+                        <section class="articles-section">
+                            <div class="section-header-bar">
+                                <span>記事一覧</span>
+                                <span class="filter-label">[All]</span>
+                            </div>
+
+                            <!-- PC/タブレット版スライダー (3x3 グリッド: 7記事/ページ) -->
+                            <div class="articles-slider-desktop">
+                                <div class="slider-pagination" id="slider-pagination-desktop">
+                                    ${dotsHtml}
+                                </div>
+                                <div class="slider-viewport">
+                                    <div class="slider-track" id="articles-slider-track">
+                                        ${pagesHtml}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- スマホ版スライダー (縦一列: 10記事/ページ) -->
+                            <div class="articles-slider-mobile">
+                                <div class="slider-pagination mobile-pagination" id="slider-pagination-mobile">
+                                    ${mobileDotsHtml}
+                                </div>
+                                <div class="mobile-viewport" id="mobile-slider-viewport">
+                                    <div class="mobile-track" id="articles-slider-track-mobile">
+                                        ${mobilePagesHtml}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- サイドバーカラム（検索・タグ一覧） -->
+                    <aside class="top-sidebar-column">
+                        ${sidebarHtml}
+                    </aside>
+                </div>
+            `;
+
+            // ==========================================
+            // PC/タブレット版スライダー制御ロジック
+            // ==========================================
+            let currentPage = 0;
+            const track = document.getElementById('articles-slider-track');
+            const desktopDots = mainContent.querySelectorAll('.desktop-dot');
+
+            function goToPage(pageIndex) {
+                if (pageIndex < 0 || pageIndex >= totalPages) return;
+                currentPage = pageIndex;
+                if (track) {
+                    track.style.transform = `translateX(-${currentPage * 100}%)`;
+                }
+                desktopDots.forEach((dot, idx) => {
+                    dot.classList.toggle('active', idx === currentPage);
+                });
+            }
+
+            // PCドットのクリックイベント
+            desktopDots.forEach(dot => {
+                dot.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const targetPage = parseInt(this.getAttribute('data-dot-index'), 10);
+                    goToPage(targetPage);
+                });
+            });
+
+            // ナビゲーションタイルのクリックイベント（過去の記事へ / 最近の記事へ）
+            const navLinks = mainContent.querySelectorAll('.nav-tile-link');
+            navLinks.forEach(navBtn => {
+                navBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const targetPage = parseInt(this.getAttribute('data-target-page'), 10);
+                    goToPage(targetPage);
+                });
+            });
+
+            // PC記事タイルのクリックイベント（タイル全体 & 続きを読むボタン）
+            const articleTiles = mainContent.querySelectorAll('.article-tile, .tile-readmore-btn');
+            articleTiles.forEach(elem => {
+                elem.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const path = this.getAttribute('data-path');
+                    if (path) {
+                        navigateTo(path);
+                    }
+                });
+            });
+
+            // ==========================================
+            // スマホ版スライダー制御ロジック
+            // ==========================================
+            let currentMobilePage = 0;
+            const mobileTrack = document.getElementById('articles-slider-track-mobile');
+            const mobileDots = mainContent.querySelectorAll('.mobile-dot');
+
+            function goToMobilePage(pageIndex) {
+                if (pageIndex < 0 || pageIndex >= mobileTotalPages) return;
+                currentMobilePage = pageIndex;
+                if (mobileTrack) {
+                    mobileTrack.style.transform = `translateX(-${currentMobilePage * 100}%)`;
+                }
+                mobileDots.forEach((dot, idx) => {
+                    dot.classList.toggle('active', idx === currentMobilePage);
+                });
+            }
+
+            // スマホドットクリックイベント
+            mobileDots.forEach(dot => {
+                dot.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const targetPage = parseInt(this.getAttribute('data-dot-index'), 10);
+                    goToMobilePage(targetPage);
+                });
+            });
+
+            // スマホ記事アイテムのクリックイベント
+            const mobileArticleItems = mainContent.querySelectorAll('.mobile-article-item');
+            mobileArticleItems.forEach(elem => {
+                elem.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const path = this.getAttribute('data-path');
+                    if (path) {
+                        navigateTo(path);
+                    }
+                });
+            });
+
+            // スマホ用タッチスワイプ制御
+            const mobileViewport = document.getElementById('mobile-slider-viewport');
+            if (mobileViewport) {
+                let touchStartX = 0;
+                let touchStartY = 0;
+                mobileViewport.addEventListener('touchstart', function(e) {
+                    touchStartX = e.changedTouches[0].screenX;
+                    touchStartY = e.changedTouches[0].screenY;
+                }, { passive: true });
+
+                mobileViewport.addEventListener('touchend', function(e) {
+                    const touchEndX = e.changedTouches[0].screenX;
+                    const touchEndY = e.changedTouches[0].screenY;
+                    const diffX = touchEndX - touchStartX;
+                    const diffY = touchEndY - touchStartY;
+                    // 水平方向のスワイプ判定 (縦スクロールを妨げない)
+                    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+                        if (diffX < 0) {
+                            goToMobilePage(currentMobilePage + 1);
+                        } else {
+                            goToMobilePage(currentMobilePage - 1);
+                        }
+                    }
+                }, { passive: true });
+            }
+
+            // サイドバーのタグクリックイベント（将来のフィルタ機能との連携準備）
+            const tagElements = mainContent.querySelectorAll('.sidebar-tag-item');
+            tagElements.forEach(tagBtn => {
+                tagBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const tagName = this.getAttribute('data-tag');
+                    console.log('Selected tag:', tagName);
+                });
+            });
+        }
+
+        // URLパラメータから記事IDを取得(旧実装・後方互換性のため残す)
+        function getArticleIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id') || '201907001_sample'; // デフォルト値
+        }
+
+        // GitHub APIから記事ファイル一覧を取得して記事IDにマッチするファイルを検索
+        async function findArticleFile(articleId) {
+            const listUrl = 'https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/articles';
+            
+            try {
+                const response = await fetch(listUrl);
+                if (!response.ok) {
+                    throw new Error(`ファイル一覧の取得に失敗しました (HTTP ${response.status})`);
+                }
+                
+                const files = await response.json();
+                
+                // 記事IDの先頭部分(yyyyNNN)を抽出
+                const idPrefix = articleId.match(/^(\d{4}\d{3})/);
+                if (!idPrefix) {
+                    throw new Error('記事IDの形式が正しくありません');
+                }
+                const prefix = idPrefix[1];
+                
+                // プレフィックスにマッチするファイルを検索
+                const matchedFile = files.find(file => 
+                    file.name.startsWith(prefix) && file.name.endsWith('.yml')
+                );
+                
+                if (!matchedFile) {
+                    // 404エラーとして扱う
+                    return null;
+                }
+                
+                return matchedFile.name;
+            } catch (error) {
+                throw new Error(`ファイル検索に失敗しました: ${error.message}`);
+            }
+        }
+
+        // GitHub APIから記事データを取得
+        async function fetchArticleData(articleId) {
+            try {
+                // まずファイル名を検索
+                const fileName = await findArticleFile(articleId);
+                
+                // ファイルが見つからなかった場合
+                if (!fileName) {
+                    return null;
+                }
+                
+                // ファイルの内容を取得
+                const url = `https://api.github.com/repos/KagenoMoheji/llm_challenge/contents/mohejisdiaries/articles/${fileName}`;
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`記事が見つかりません (HTTP ${response.status})`);
+                }
+                
+                const data = await response.json();
+                // Base64デコード(日本語対応)
+                const yamlContent = decodeURIComponent(escape(atob(data.content)));
+                return jsyaml.load(yamlContent);
+            } catch (error) {
+                throw new Error(`記事の読み込みに失敗しました: ${error.message}`);
+            }
+        }
+
+        // GitHub APIから画像を取得してBase64データURLに変換
+        async function fetchGitHubImage(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    return url; // 失敗した場合は元のURLを返す
+                }
+                
+                const data = await response.json();
+                const mimeType = getMimeTypeFromUrl(url);
+                return `data:${mimeType};base64,${data.content}`;
+            } catch (error) {
+                console.error('画像の読み込みエラー:', error);
+                return url;
+            }
+        }
+
+        // URLから拡張子を取得してMIMEタイプを判定
+        function getMimeTypeFromUrl(url) {
+            const ext = url.split('.').pop().toLowerCase();
+            const mimeTypes = {
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'gif': 'image/gif',
+                'webp': 'image/webp'
+            };
+            return mimeTypes[ext] || 'image/png';
+        }
+
+        // 日付をフォーマット
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}.${month}.${day}`;
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 記事をレンダリング
+        async function renderArticle(articleData) {
+            const mainContent = document.getElementById('main-content');
+            
+            // タイトルを更新
+            document.title = articleData.title;
+
+            // ヘッダー部分
+            let html = `
+                <article>
+                    <header class="article-header">
+                        <h1 class="article-title">${escapeHtml(articleData.title)}</h1>
+                        <div class="article-meta">
+                            <div class="meta-item">
+                                <span class="meta-label">作成</span>
+                                <span>${formatDate(articleData.createDate)}</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">更新</span>
+                                <span>${formatDate(articleData.updateDate)}</span>
+                            </div>
+                        </div>
+                    </header>
+            `;
+
+            // コンテンツセクション
+            for (const section of articleData.content) {
+                const bodyHtml = await renderMarkdown(section.body);
+                html += `
+                    <section class="content-section">
+                        <h2 class="section-headline">${escapeHtml(section.headline)}</h2>
+                        ${bodyHtml}
+                    </section>
+                `;
+            }
+
+            // フッター(タグ)
+            if (articleData.tags && articleData.tags.length > 0) {
+                html += `
+                    <footer class="article-footer">
+                        <div class="tags-container">
+                            ${articleData.tags.map(tag => 
+                                `<span class="tag">${escapeHtml(tag)}</span>`
+                            ).join('')}
+                        </div>
+                    </footer>
+                `;
+            }
+
+            html += '</article>';
+            mainContent.innerHTML = html;
+            
+            // 画像クリック時のモーダル表示イベントを追加
+            setupImageModal();
+            
+            // 内部リンクのクリックイベントを設定
+            setupInternalLinks();
+        }
+
+        // 内部リンクのイベント設定
+        function setupInternalLinks() {
+            const internalLinks = document.querySelectorAll('.internal-link');
+            internalLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    const path = this.getAttribute('data-path');
+                    navigateTo(path);
+                });
+                
+                // ホバー時の視覚効果を追加
+                link.addEventListener('mouseenter', function() {
+                    this.style.opacity = '0.7';
+                });
+                link.addEventListener('mouseleave', function() {
+                    this.style.opacity = '1';
+                });
+            });
+        }
+
+        // 画像モーダルの設定
+        function setupImageModal() {
+            const modal = document.getElementById('image-modal');
+            const modalImage = document.getElementById('modal-image');
+            const articleImages = document.querySelectorAll('.article-image img');
+
+            // 各画像にクリックイベントを追加
+            articleImages.forEach(img => {
+                img.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    modal.classList.add('active');
+                    modalImage.src = this.src;
+                    modalImage.alt = this.alt;
+                });
+            });
+
+            // モーダル背景クリックで閉じる
+            modal.addEventListener('click', function(e) {
+                // 画像自体のクリックは無視
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                    modalImage.src = '';
+                }
+            });
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // エラー表示
+        function showError(message) {
+            const mainContent = document.getElementById('main-content');
+            mainContent.innerHTML = `
+                <div class="error">
+                    <h2>エラー</h2>
+                    <p>${escapeHtml(message)}</p>
+                </div>
+            `;
+        }
+
+        // 初期化
+        async function init() {
+            const route = getCurrentRoute();
+            
+            if (route.type === 'top') {
+                // トップページを表示
+                await renderTopPage();
+            } else if (route.type === '404') {
+                // 404エラーページを表示
+                render404Page();
+            } else if (route.type === 'article') {
+                // 記事ページを表示
+                try {
+                    const articleId = generateArticleId(route.year, route.number);
+                    const articleData = await fetchArticleData(articleId);
+                    
+                    // 記事が見つからなかった場合は404ページへ遷移（履歴を置き換え）
+                    if (!articleData) {
+                        const currentPath = window.location.pathname;
+                        const newUrl = `${currentPath}?path=/errors/404`;
+                        window.history.replaceState({}, '', newUrl);
+                        render404Page();
+                        return;
+                    }
+                    
+                    await renderArticle(articleData);
+                } catch (error) {
+                    showError(error.message);
+                }
+            }
+            
+            // ヘッダークリックでトップページに遷移
+            setupHeaderClick();
+        }
+
+        // ヘッダーのクリックイベントを設定
+        function setupHeaderClick() {
+            const header = document.querySelector('.site-header');
+            if (header) {
+                header.addEventListener('click', function() {
+                    // トップページに遷移
+                    const currentPath = window.location.pathname;
+                    window.history.pushState({}, '', currentPath);
+                    init();
+                });
+            }
+        }
+
+        // ページ読み込み時に実行
+        window.addEventListener('DOMContentLoaded', init);
+
+        // ブラウザの戻る/進むボタンに対応
+        window.addEventListener('popstate', init);
+    </script>
+</body>
+</html>

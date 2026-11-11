@@ -72,7 +72,7 @@ examples/            暫定クライアントと、ツールサーバの見本�
 依存の向きは `controllers → services → models → common`(`schemas` は controllers と services から使う)。**下の層から上の層をimportしない**(例: `common` は `services` をimportしない)。
 
 - **controllers:** ルート関数は同期 `def`(DBが同期のSQLAlchemyのため)。`Depends(get_db)` でセッションを受け取り、serviceを呼んで、レスポンススキーマに詰めて返すだけ。業務エラーの `try/except` はルート関数に書かない(`error_handlers.py` に集約)。ボディ検証より前に実行したい共通処理(レート制限など)は、`dependencies.py` の関数を `dependencies=[Depends(...)]` で適用する。
-- **services:** 業務ルールを書く。`commit()` はここで呼ぶ。業務エラーは `common/errors.py` の例外を `raise` する。**1つのテーブル/リソースに関わる処理は、1つのモジュールにまとめる**(例: `tbl_agent_tool` の追加・一覧・実行は `services/agent_tool.py`)。
+- **services:** 業務ルールを書く。`commit()` はここで呼ぶ。業務エラーは `common/errors.py` の例外を `raise` する。**1つのテーブル/リソースに関わる処理は、1つのモジュールにまとめる**(例: AIエージェントへのツールの割り当て(申請・承認・取り消し)、一覧、実行は `services/agent_tool.py`。ツールの登録とトークンの更新は `services/tool.py`)。
 - **models:** `mappers.py` はクエリと `flush()` までで、`commit()` しない。
 - **common:** 他の層に依存しない。ツールサーバなど外部へのHTTP呼び出しは、`common/tool_client.py` だけで行う(リダイレクトを追わない、環境変数のプロキシを使わない、制限時間と応答サイズに上限を付ける、を守るため)。
 
@@ -127,10 +127,14 @@ examples/            暫定クライアントと、ツールサーバの見本�
 - メールアドレスは `EMAIL_PATTERN` で検証する。`EmailStr` は値を正規化して署名とずれるので使わない。
 - 署名の検証は `services/signed_request.py` の `verify_signed_request` / `verify_admin_request` を使い、**DB参照より先に**行う(未認証の相手に、登録の有無などを知らせない)。
 - プレフィックスは `common/signature.py` に定義する。新しい署名付きAPIを足したら、`QUICKSTART.md` の署名仕様の表と `examples/provisional_client.py` も更新する。
+- **ツールサーバのリプレース**は、ステータス(`approved` / `reserved` / `standby` / `revoked`)で遷移を管理する。`reserved` / `standby` は、期限(`status_expires_at`)を持ち、期限切れは使えない。ステータスの更新は、期待した値のままの場合だけ行う条件つきUPDATE(`update_tbl_tool_server_status`)で、並行リクエストとの競合を検出する。
+- **ツール(`tbl_tool`)と、AIエージェントへの割り当て(`tbl_agent_tool`)は、別のテーブル**。ツール代理トークンは、ツール(ロール)単位で、`tbl_tool` が持つ。割り当ては、申請(`pending`)→承認(`approved`)→取り消し(`revoked`)で、申請者メアド(`applicant_email`)と承認者メアド(`approver_email`)を記録する。
+- **nonce(`tbl_request_nonce`)は、`scope` で区切る**(AIエージェントのリクエストは `agent:<agent_id>`、ツールのトークン更新は `tool:<tool_endpoint>`)。
 - **署名を複数持つリクエスト**(ツールサーバのリプレースなど、複数の鍵が署名する場合)は、`SignedRequest.SIGNATURE_FIELDS` に署名のフィールドを全て列挙して、署名対象から除く。署名する役割ごとに、別の署名プレフィックスを定義する(署名の使い回しを防ぐ)。
 - **AIエージェントの署名付きAPI**(`tools` と `exec`)は、`services/signed_request.py` の `verify_agent_request` で認証する(`tbl_agent` に登録された公開鍵で検証する)。存在しない `agent_id` は、署名不正と同じ401にする(AIエージェントの有無を知らせない)。ボディが無いGETの署名は、ヘッダー(`HEADER_SIGNED_AT` / `HEADER_SIGNATURE`)で受ける。
 - **副作用のあるリクエスト(ツール実行など)には `nonce` を付け**、`consume_request_nonce` で使用済みにしてから処理する(再送対策)。認証に失敗したリクエストのnonceは記録しない。
 - ツールサーバへの中継中は、DBのトランザクション(接続)を保持しない(呼び出しの前に `commit()` する)。
+- **`params_schema` では、正規表現(`pattern` / `patternProperties`)を禁止する**(ReDoS対策。認可は、CaPassではなく、リソース側のスコープ・GRANTで行うのが前提)。`$ref` は、`#`、`#/$defs/<名前>`、`#/definitions/<名前>` のみ。スキーマを辿る処理は、キーワードの位置を見て辿る(パラメータ名や、`examples` などのデータの中身を、キーワードと取り違えない)。
 - **ツールのparamsは、JSON Schema(`params_schema`)で定義する。** 登録時の検証と、実行時のparamsの検証は `common/params_schema.py` に集約する。スキーマは、AIエージェントへの一覧にも含め、各パラメータに `description` を必須にする。
 - ツール代理トークンは、平文でDBに保存・ログ出力・レスポンスしない(`common/crypto.py` で暗号化して保存する)。ツールサーバへ渡すときだけ復号する。
 

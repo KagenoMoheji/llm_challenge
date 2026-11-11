@@ -1,0 +1,65 @@
+{
+  "export_date": "2026-11-06T15:00:00.000Z",
+  "version": "1.0",
+  "nodes": [
+    {
+      "unique_id": "demo-node-1",
+      "test_case_id": "TC-001",
+      "test_type": "正常系",
+      "status": "パス",
+      "markdown_content": "# ログイン機能テスト\n\n## 前提条件\n- ユーザーが登録済み\n- ログイン画面が表示されている\n\n## テスト手順\n1. ユーザーIDを入力\n2. パスワードを入力\n3. ログインボタンをクリック\n\n## 期待結果\nホーム画面が表示される",
+      "height": 260,
+      "width": 300,
+      "x_position": 150,
+      "y_position": 120,
+      "connected_node_ids": [
+        {
+          "direction": "to",
+          "node_id": "demo-node-2",
+          "connect_point": "right"
+        },
+        {
+          "direction": "to",
+          "node_id": "demo-node-3",
+          "connect_point": "right"
+        }
+      ]
+    },
+    {
+      "unique_id": "demo-node-2",
+      "test_case_id": "TC-002",
+      "test_type": "正常系",
+      "status": "実施中",
+      "markdown_content": "# 正常系テスト\n\n## 手順\n- 有効なID/PWを入力\n\n## 結果\n**成功**してログインできる",
+      "height": 180,
+      "width": 260,
+      "x_position": 540,
+      "y_position": 80,
+      "connected_node_ids": [
+        {
+          "direction": "from",
+          "node_id": "demo-node-1",
+          "connect_point": "left"
+        }
+      ]
+    },
+    {
+      "unique_id": "demo-node-3",
+      "test_case_id": "TC-003",
+      "test_type": "異常系",
+      "status": "起票",
+      "markdown_content": "# 異常系テスト\n\n## 手順\n- 無効なPWを入力\n\n## 結果\n`エラーメッセージ`が表示される",
+      "height": 180,
+      "width": 260,
+      "x_position": 540,
+      "y_position": 320,
+      "connected_node_ids": [
+        {
+          "direction": "from",
+          "node_id": "demo-node-1",
+          "connect_point": "left"
+        }
+      ]
+    }
+  ]
+}

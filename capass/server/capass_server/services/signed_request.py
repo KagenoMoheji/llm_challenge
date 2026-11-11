@@ -59,14 +59,14 @@ def verify_agent_request(db: Session, agent_id: str, sign_context: bytes, payloa
     return agent
 
 
-def consume_request_nonce(db: Session, agent_id: str, nonce: str, signed_at: int) -> None:
-    """nonceを使用済みとして記録する(リプレイ防止)。すでに使われていればReplayedRequestError。副作用のあるリクエスト(ツール実行など)に使う。
+def consume_request_nonce(db: Session, scope: str, nonce: str, signed_at: int) -> None:
+    """nonceを使用済みとして記録する(リプレイ防止)。scopeは、nonceを区切る単位("agent:<agent_id>" / "tool:<tool_endpoint>")。すでに使われていればReplayedRequestError。副作用のあるリクエスト(ツール実行など)に使う。
     nonceは、署名時刻が許容範囲を過ぎるまで(署名時刻でも拒否される時点まで)記録する。期限切れの記録は、ここで削除する。"""
     now = datetime.now(timezone.utc)
     expires_at = datetime.fromtimestamp(signed_at + SIGNATURE_MAX_SKEW_SEC, tz=timezone.utc)
     try:
         mappers.delete_expired_tbl_request_nonce(db, now)
-        mappers.insert_tbl_request_nonce(db, TblRequestNonce(agent_id=agent_id, nonce=nonce, expires_at=expires_at))
+        mappers.insert_tbl_request_nonce(db, TblRequestNonce(scope=scope, nonce=nonce, expires_at=expires_at))
         db.commit()
     except IntegrityError:
         db.rollback()
