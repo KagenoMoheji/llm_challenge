@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'articles/**'
-      - 'github_actions/tbl_articles/**'
+      - 'mohejisdiaries/articles/**'
+      # - 'mohejisdiaries/github_actions/tbl_articles/**'
   workflow_dispatch:
 
 permissions:
@@ -46,7 +46,7 @@ jobs:
           cd repo-main/mohejisdiaries/github_actions/tbl_articles
           python -m pytest test_generate_table.py -v
 
-      - name: Generate table.json
+      - name: Generate tbl_articles/table.json
         run: |
           python repo-main/mohejisdiaries/github_actions/tbl_articles/generate_table.py \
             --articles-dir repo-main/mohejisdiaries/articles \
@@ -57,10 +57,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add github_actions/deliverable/tbl_articles/table.json
+          git add mohejisdiaries/github_actions/deliverable/tbl_articles/table.json
           if git diff --staged --quiet; then
-            echo "No changes in table.json. Skipping commit."
+            echo "No changes in tbl_articles/table.json. Skipping commit."
           else
-            git commit -m "chore: auto-update table.json from main articles [skip ci]"
+            git commit -m "chore: auto-update tbl_articles/table.json from main articles [skip ci]"
             git push origin db_mohejisdiaries
           fi

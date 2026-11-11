@@ -1,6 +1,6 @@
 # Articles Table Generator (`tbl_articles`)
 
-`main` ブランチの `./articles/[0-9]{7}_.+.yml` から記事メタデータを抽出し、`main-github_actions` ブランチの `./github_actions/deliverable/tbl_articles/table.json` に反映する GitHub Actions ワークフローおよび Python スクリプトです。
+`main` ブランチの `./articles/[0-9]{7}_.+.yml` から記事メタデータを抽出し、`db_mohejisdiaries` ブランチの `./github_actions/deliverable/tbl_articles/table.json` に反映する GitHub Actions ワークフローおよび Python スクリプトです。
 
 ## ディレクトリ構成
 
@@ -8,13 +8,13 @@
 github_actions/
 ├── deliverable/
 │   └── tbl_articles/
-│       └── table.json         # 生成された記事一覧テーブル (JSON)
+│       └── table.json                               # 生成された記事一覧テーブル (JSON)
 └── tbl_articles/
-    ├── README.md              # 本ドキュメント
-    ├── generate_table.py      # テーブル生成 Python スクリプト
-    ├── requirements.txt       # 依存パッケージ定義 (PyYAML, pytest)
-    ├── test_generate_table.py # ユニット・結合テストコード
-    └── update_table.yml       # GitHub Actions ワークフロー定義
+    ├── README.md                                    # 本ドキュメント
+    ├── generate_table.py                            # テーブル生成 Python スクリプト
+    ├── requirements.txt                             # 依存パッケージ定義 (PyYAML, pytest)
+    ├── test_generate_table.py                       # ユニット・結合テストコード
+    └── mohejisdiaries_update_tbl_articles.yml       # GitHub Actions ワークフロー定義 ※`<repository>/.github/workflows/`に配置する
 ```
 
 ## `table.json` のレコード仕様
@@ -85,12 +85,12 @@ wsl docker run --rm \
 pytest github_actions/tbl_articles/test_generate_table.py -v
 ```
 
-## GitHub Actions ワークフロー (`update_table.yml`)
+## GitHub Actions ワークフロー (`mohejisdiaries_update_tbl_articles.yml`)
 
 - **トリガー**: `main` ブランチへの push（PRマージ含む）時、`articles/**` または `github_actions/tbl_articles/**` の変更を検知
 - **動作**:
   1. `main` ブランチ（記事ソース）をチェックアウト
-  2. `main-github_actions` ブランチ（成果物保存先）をチェックアウト
+  2. `db_mohejisdiaries` ブランチ（成果物保存先）をチェックアウト
   3. Python 環境をセットアップし、テストを実行
   4. `generate_table.py` で `table.json` を生成
-  5. 差分がある場合、`main-github_actions` ブランチに自動コミット＆プッシュ
+  5. 差分がある場合、`db_mohejisdiaries` ブランチに自動コミット＆プッシュ
