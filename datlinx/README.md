@@ -3,10 +3,10 @@
 `CREATE PROCEDURE` / `CREATE FUNCTION` / `CREATE VIEW` / `CREATE TABLE` のSQLファイルの `FROM/JOIN` および `INSERT INTO` を解析し、依存関係マップ（データリネージ・マインドマップ）の生成・検索を行うツールです。
 
 ## Quick try app
-https://kagenomoheji.github.io/llm_challenge/testindmap/index.html
+https://kagenomoheji.github.io/llm_challenge/datlinx/index.html
 
 ## Quick try VSCode extention
-Download [the vsix file](https://github.com/KagenoMoheji/llm_challenge/testindmap/dist/) and install it in VSCode.
+Download [the vsix file](https://github.com/KagenoMoheji/llm_challenge/tree/main/datlinx/vscode-ext/dist) and install it in VSCode.
 - **エクスプローラー右クリック**: 任意のSQLフォルダを右クリックして「`datlinx: SQLフォルダを解析してマインドマップを開く`」
 - **コマンドパレット (`Ctrl+Shift+P`)**:
   - `datlinx: ワークスペースの全SQLを解析して開く`
