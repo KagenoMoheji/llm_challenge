@@ -18,7 +18,7 @@ function Create-Icon($size, $path) {
     $bmp.Dispose()
 }
 
-$dir = "$HOME\.gemini\antigravity\scratch\scheduled-clicker-extension\icons"
+$dir = "C:\Users\${env:USERNAME}\.gemini\antigravity\scratch\scheduled-clicker-extension\icons"
 Create-Icon 16 "$dir\icon16.png"
 Create-Icon 48 "$dir\icon48.png"
 Create-Icon 128 "$dir\icon128.png"

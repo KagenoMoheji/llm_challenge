@@ -59,7 +59,7 @@ python generate_table.py \
 #### 1. テーブル生成
 ```bash
 wsl docker run --rm \
-  -v /mnt/$HOME/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace \
+  -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace \
   -w /workspace \
   python:3.11-slim \
   sh -c "pip install --no-cache-dir -r github_actions/tbl_articles/requirements.txt && python github_actions/tbl_articles/generate_table.py --articles-dir articles --output github_actions/deliverable/tbl_articles/table.json"
@@ -68,7 +68,7 @@ wsl docker run --rm \
 #### 2. ユニットテスト実行
 ```bash
 wsl docker run --rm \
-  -v /mnt/$HOME/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace \
+  -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace \
   -w /workspace \
   python:3.11-slim \
   sh -c "pip install --no-cache-dir -r github_actions/tbl_articles/requirements.txt && pytest github_actions/tbl_articles/test_generate_table.py -v"
