@@ -1128,8 +1128,16 @@
         // ページ遷移（リロードなし）
         function navigateTo(path) {
             const currentPath = window.location.pathname;
-            const newUrl = `${currentPath}?path=${encodeURIComponent(path)}`;
-            window.history.pushState({}, '', newUrl);
+            // トップページへの明示的なリンク遷移の場合は状態を初期化
+            if (!path || path === '/' || path === '') {
+                if (typeof topStore !== 'undefined') {
+                    topStore.dispatch(actions.resetState());
+                }
+                window.history.pushState({ topState: null }, '', currentPath);
+            } else {
+                const newUrl = `${currentPath}?path=${encodeURIComponent(path)}`;
+                window.history.pushState({}, '', newUrl);
+            }
             init();
         }
 
@@ -1189,14 +1197,157 @@
             return cachedArticles || [];
         }
 
-        // 現在のフィルタ状態
-        let currentFilter = { type: 'all', value: '' };
+        // ===================================================
+        // Redux風 状態管理 (State Management)
+        // ===================================================
+
+        // Action Types
+        const ActionTypes = {
+            SET_FILTER: 'top/SET_FILTER',
+            SET_PAGE: 'top/SET_PAGE',
+            SET_MOBILE_PAGE: 'top/SET_MOBILE_PAGE',
+            RESET_STATE: 'top/RESET_STATE',
+            RESTORE_STATE: 'top/RESTORE_STATE'
+        };
+
+        // Action Creators
+        const actions = {
+            setFilter: (type, value) => ({
+                type: ActionTypes.SET_FILTER,
+                payload: { type, value }
+            }),
+            setPage: (pageIndex) => ({
+                type: ActionTypes.SET_PAGE,
+                payload: pageIndex
+            }),
+            setMobilePage: (mobilePageIndex) => ({
+                type: ActionTypes.SET_MOBILE_PAGE,
+                payload: mobilePageIndex
+            }),
+            resetState: () => ({
+                type: ActionTypes.RESET_STATE
+            }),
+            restoreState: (savedState) => ({
+                type: ActionTypes.RESTORE_STATE,
+                payload: savedState
+            })
+        };
+
+        // Initial State
+        const initialTopState = {
+            filter: { type: 'all', value: '' }, // type: 'all' | 'tag' | 'search', value: string
+            pageIndex: 0,                       // PC/タブレット版スライダーのページ番号(0始まり)
+            mobilePageIndex: 0                  // スマホ版スライダーのページ番号(0始まり)
+        };
+
+        // Reducer (純粋関数によるステート更新)
+        function topReducer(state = initialTopState, action) {
+            switch (action.type) {
+                case ActionTypes.SET_FILTER:
+                    return {
+                        ...state,
+                        filter: {
+                            type: action.payload.type || 'all',
+                            value: action.payload.value || ''
+                        },
+                        // フィルタ条件変更時はページ番号を最初に戻す
+                        pageIndex: 0,
+                        mobilePageIndex: 0
+                    };
+                case ActionTypes.SET_PAGE:
+                    return {
+                        ...state,
+                        pageIndex: Math.max(0, action.payload)
+                    };
+                case ActionTypes.SET_MOBILE_PAGE:
+                    return {
+                        ...state,
+                        mobilePageIndex: Math.max(0, action.payload)
+                    };
+                case ActionTypes.RESTORE_STATE: {
+                    const saved = action.payload || {};
+                    return {
+                        ...state,
+                        filter: saved.filter || { type: 'all', value: '' },
+                        pageIndex: Math.max(0, saved.pageIndex || 0),
+                        mobilePageIndex: Math.max(0, saved.mobilePageIndex || 0)
+                    };
+                }
+                case ActionTypes.RESET_STATE:
+                    return {
+                        ...initialTopState
+                    };
+                default:
+                    return state;
+            }
+        }
+
+        // Store Creator (Redux Store API)
+        function createStore(reducer, initialState) {
+            let state = initialState;
+            const listeners = [];
+
+            return {
+                getState: () => state,
+                dispatch: (action) => {
+                    state = reducer(state, action);
+                    listeners.forEach(listener => {
+                        try {
+                            listener(state);
+                        } catch (e) {
+                            console.error('Store listener error:', e);
+                        }
+                    });
+                    return action;
+                },
+                subscribe: (listener) => {
+                    listeners.push(listener);
+                    return () => {
+                        const idx = listeners.indexOf(listener);
+                        if (idx > -1) listeners.splice(idx, 1);
+                    };
+                }
+            };
+        }
+
+        // トップページ状態ストアの生成
+        const topStore = createStore(topReducer, initialTopState);
+
+        // 記事一覧をフィルタする純粋関数
+        function filterArticles(articles, filter) {
+            if (!Array.isArray(articles)) return [];
+            if (!filter || filter.type === 'all' || !filter.value) {
+                return articles;
+            }
+            if (filter.type === 'tag') {
+                const targetTag = filter.value;
+                return articles.filter(art => Array.isArray(art.tags) && art.tags.includes(targetTag));
+            }
+            if (filter.type === 'search') {
+                const q = filter.value.toLowerCase();
+                return articles.filter(art => {
+                    const titleMatch = (art.title || '').toLowerCase().includes(q);
+                    const tagMatch = Array.isArray(art.tags) && art.tags.some(t => (t || '').toLowerCase().includes(q));
+                    return titleMatch || tagMatch;
+                });
+            }
+            return articles;
+        }
+
+        // フィルタに応じたラベル文字列を返す純粋関数
+        function getFilterLabel(filter) {
+            if (!filter || filter.type === 'all' || !filter.value) {
+                return '[All]';
+            }
+            return `[${filter.value}]`;
+        }
 
         // スライダー描画関数 (PC版 3x3 / スマホ版 縦1列)
-        function renderSliders(filteredArticles) {
+        function renderSliders(filteredArticles, initialPage = 0, initialMobilePage = 0) {
             // 1. PC版スライダーHTML生成 (1ページ7記事)
             const ARTICLES_PER_PAGE = 7;
             const totalPages = Math.max(1, Math.ceil(filteredArticles.length / ARTICLES_PER_PAGE));
+            const targetPage = Math.min(Math.max(0, initialPage), totalPages - 1);
 
             let pagesHtml = '';
             if (filteredArticles.length === 0) {
@@ -1277,12 +1428,13 @@
 
             let dotsHtml = '';
             for (let p = 0; p < totalPages; p++) {
-                dotsHtml += `<div class="slider-dot desktop-dot ${p === 0 ? 'active' : ''}" data-dot-index="${p}"></div>`;
+                dotsHtml += `<div class="slider-dot desktop-dot ${p === targetPage ? 'active' : ''}" data-dot-index="${p}"></div>`;
             }
 
             // 2. スマホ版スライダーHTML生成 (1ページ10記事)
             const MOBILE_ARTICLES_PER_PAGE = 10;
             const mobileTotalPages = Math.max(1, Math.ceil(filteredArticles.length / MOBILE_ARTICLES_PER_PAGE));
+            const targetMobilePage = Math.min(Math.max(0, initialMobilePage), mobileTotalPages - 1);
 
             let mobilePagesHtml = '';
             if (filteredArticles.length === 0) {
@@ -1321,7 +1473,7 @@
 
             let mobileDotsHtml = '';
             for (let mp = 0; mp < mobileTotalPages; mp++) {
-                mobileDotsHtml += `<div class="slider-dot mobile-dot ${mp === 0 ? 'active' : ''}" data-dot-index="${mp}"></div>`;
+                mobileDotsHtml += `<div class="slider-dot mobile-dot ${mp === targetMobilePage ? 'active' : ''}" data-dot-index="${mp}"></div>`;
             }
 
             // DOMへ反映
@@ -1333,31 +1485,32 @@
             if (desktopPagination) desktopPagination.innerHTML = dotsHtml;
             if (desktopTrack) {
                 desktopTrack.innerHTML = pagesHtml;
-                desktopTrack.style.transform = 'translateX(0%)';
+                desktopTrack.style.transform = `translateX(-${targetPage * 100}%)`;
             }
             if (mobilePagination) mobilePagination.innerHTML = mobileDotsHtml;
             if (mobileTrack) {
                 mobileTrack.innerHTML = mobilePagesHtml;
-                mobileTrack.style.transform = 'translateX(0%)';
+                mobileTrack.style.transform = `translateX(-${targetMobilePage * 100}%)`;
             }
 
             // スライダーイベントバインド
-            bindSliderEvents(totalPages, mobileTotalPages);
+            bindSliderEvents(totalPages, mobileTotalPages, targetPage, targetMobilePage);
         }
 
         // スライダーイベントバインド関数
-        function bindSliderEvents(totalPages, mobileTotalPages) {
+        function bindSliderEvents(totalPages, mobileTotalPages, initialPage = 0, initialMobilePage = 0) {
             const mainContent = document.getElementById('main-content');
             if (!mainContent) return;
 
             // PCスライダー
-            let currentPage = 0;
+            let currentPage = initialPage;
             const track = document.getElementById('articles-slider-track');
             const desktopDots = mainContent.querySelectorAll('.desktop-dot');
 
             function goToPage(pageIndex) {
                 if (pageIndex < 0 || pageIndex >= totalPages) return;
                 currentPage = pageIndex;
+                topStore.dispatch(actions.setPage(currentPage));
                 if (track) {
                     track.style.transform = `translateX(-${currentPage * 100}%)`;
                 }
@@ -1389,19 +1542,22 @@
                     e.stopPropagation();
                     const path = this.getAttribute('data-path');
                     if (path) {
+                        // 遷移前のトップページ状態を現在の履歴エントリに保存
+                        window.history.replaceState({ topState: topStore.getState() }, '', window.location.href);
                         navigateTo(path);
                     }
                 });
             });
 
             // スマホスライダー
-            let currentMobilePage = 0;
+            let currentMobilePage = initialMobilePage;
             const mobileTrack = document.getElementById('articles-slider-track-mobile');
             const mobileDots = mainContent.querySelectorAll('.mobile-dot');
 
             function goToMobilePage(pageIndex) {
                 if (pageIndex < 0 || pageIndex >= mobileTotalPages) return;
                 currentMobilePage = pageIndex;
+                topStore.dispatch(actions.setMobilePage(currentMobilePage));
                 if (mobileTrack) {
                     mobileTrack.style.transform = `translateX(-${currentMobilePage * 100}%)`;
                 }
@@ -1424,6 +1580,8 @@
                     e.stopPropagation();
                     const path = this.getAttribute('data-path');
                     if (path) {
+                        // 遷移前のトップページ状態を現在の履歴エントリに保存
+                        window.history.replaceState({ topState: topStore.getState() }, '', window.location.href);
                         navigateTo(path);
                     }
                 });
@@ -1483,36 +1641,23 @@
 
         // フィルタ適用関数 (タグフィルタ・インクリメンタル検索)
         async function applyFilter(type, value, forceRefresh = false) {
+            topStore.dispatch(actions.setFilter(type, value));
+
             const articles = await getArticlesTable(forceRefresh);
-            let filtered = articles;
-            let label = '[All]';
-
-            if (type === 'tag' && value) {
-                filtered = articles.filter(art => Array.isArray(art.tags) && art.tags.includes(value));
-                label = `[${value}]`;
-            } else if (type === 'search' && value) {
-                const q = value.toLowerCase();
-                filtered = articles.filter(art => {
-                    const titleMatch = (art.title || '').toLowerCase().includes(q);
-                    const tagMatch = Array.isArray(art.tags) && art.tags.some(t => (t || '').toLowerCase().includes(q));
-                    return titleMatch || tagMatch;
-                });
-                label = `[${value}]`;
-            }
-
-            currentFilter = { type, value };
+            const currentState = topStore.getState();
+            const filtered = filterArticles(articles, currentState.filter);
 
             // ヘッダーバーのラベル更新
             const filterLabelElem = document.getElementById('articles-filter-label');
             if (filterLabelElem) {
-                filterLabelElem.textContent = label;
+                filterLabelElem.textContent = getFilterLabel(currentState.filter);
             }
 
             // タグのハイライト更新
-            renderTagsSidebar(articles, type === 'tag' ? value : null);
+            renderTagsSidebar(articles, currentState.filter.type === 'tag' ? currentState.filter.value : null);
 
-            // スライダー再描画
-            renderSliders(filtered);
+            // スライダー再描画 (フィルタ変更時は先頭ページ0)
+            renderSliders(filtered, 0, 0);
         }
 
         // サイドバーイベントバインド (検索フォーム & タグクリック)
@@ -1554,6 +1699,8 @@
             const filterLabelElem = document.getElementById('articles-filter-label');
             if (filterLabelElem) {
                 filterLabelElem.addEventListener('click', async function() {
+                    const searchInput = document.getElementById('sidebar-search-input');
+                    const clearBtn = document.getElementById('sidebar-search-clear');
                     if (searchInput) searchInput.value = '';
                     if (clearBtn) clearBtn.style.display = 'none';
                     await applyFilter('all', '', false);
@@ -1570,21 +1717,18 @@
                 tagBtn.addEventListener('click', async function(e) {
                     e.stopPropagation();
                     const tagName = this.getAttribute('data-tag');
+                    const currentFilter = topStore.getState().filter;
+
+                    // 検索欄をリセット
+                    const searchInput = document.getElementById('sidebar-search-input');
+                    const clearBtn = document.getElementById('sidebar-search-clear');
+                    if (searchInput) searchInput.value = '';
+                    if (clearBtn) clearBtn.style.display = 'none';
 
                     // 同じタグをクリックした場合はフィルタ解除
                     if (currentFilter.type === 'tag' && currentFilter.value === tagName) {
-                        const searchInput = document.getElementById('sidebar-search-input');
-                        const clearBtn = document.getElementById('sidebar-search-clear');
-                        if (searchInput) searchInput.value = '';
-                        if (clearBtn) clearBtn.style.display = 'none';
-                        await applyFilter('all', '', true);
+                        await applyFilter('all', '', false);
                     } else {
-                        // 検索入力欄をクリア
-                        const searchInput = document.getElementById('sidebar-search-input');
-                        const clearBtn = document.getElementById('sidebar-search-clear');
-                        if (searchInput) searchInput.value = '';
-                        if (clearBtn) clearBtn.style.display = 'none';
-
                         // 最新化してタグ完全一致フィルタ (forceRefresh = true)
                         await applyFilter('tag', tagName, true);
                     }
@@ -1592,14 +1736,20 @@
             });
         }
 
-        // トップページをレンダリング
-        async function renderTopPage() {
+        // トップページをレンダリング (isRestore=true の場合は直前の状態を維持・復元)
+        async function renderTopPage(isRestore = false) {
             const mainContent = document.getElementById('main-content');
             document.title = appName;
 
-            // テーブルデータの取得 (最新化)
-            const articles = await getArticlesTable(true);
-            currentFilter = { type: 'all', value: '' };
+            // 復元モードでない場合（初回ロードやヘッダークリックなど）は状態を初期化
+            if (!isRestore) {
+                topStore.dispatch(actions.resetState());
+            }
+
+            const state = topStore.getState();
+            // 復元時はキャッシュを活用して高速復元、新規訪問時は最新テーブルデータを取得
+            const articles = await getArticlesTable(!isRestore);
+            const filtered = filterArticles(articles, state.filter);
 
             // トップページレイアウト全体のHTML構築
             mainContent.innerHTML = `
@@ -1609,7 +1759,7 @@
                         <section class="articles-section">
                             <div class="section-header-bar">
                                 <span>記事一覧</span>
-                                <span class="filter-label" id="articles-filter-label" title="クリックで全件表示に戻す">[All]</span>
+                                <span class="filter-label" id="articles-filter-label" title="クリックで全件表示に戻す">${escapeHtml(getFilterLabel(state.filter))}</span>
                             </div>
 
                             <!-- PC/タブレット版スライダー (3x3 グリッド: 7記事/ページ) -->
@@ -1650,11 +1800,19 @@
                 </div>
             `;
 
-            // スライダー描画
-            renderSliders(articles);
+            // 検索フォームの復元 (検索フィルタ適用中なら入力値とクリアボタンを表示)
+            const searchInput = document.getElementById('sidebar-search-input');
+            const clearBtn = document.getElementById('sidebar-search-clear');
+            if (searchInput && state.filter.type === 'search' && state.filter.value) {
+                searchInput.value = state.filter.value;
+                if (clearBtn) clearBtn.style.display = 'block';
+            }
 
-            // サイドバータグ描画
-            renderTagsSidebar(articles, null);
+            // スライダー描画 (保存されていたページ番号を指定して復元)
+            renderSliders(filtered, state.pageIndex, state.mobilePageIndex);
+
+            // サイドバータグ描画 (選択されていたタグをアクティブ状態で復元)
+            renderTagsSidebar(articles, state.filter.type === 'tag' ? state.filter.value : null);
 
             // サイドバーイベント登録
             bindSidebarEvents();
@@ -1885,13 +2043,18 @@
             `;
         }
 
+        let isFromPopState = false;
+
         // 初期化
         async function init() {
             const route = getCurrentRoute();
-            
+            const wasPopState = isFromPopState;
+            isFromPopState = false; // フラグを消費
+
             if (route.type === 'top') {
                 // トップページを表示
-                await renderTopPage();
+                // popstate(ページバック)経由なら状態を維持・復元、それ以外は初期化
+                await renderTopPage(wasPopState);
             } else if (route.type === '404') {
                 // 404エラーページを表示
                 render404Page();
@@ -1925,19 +2088,29 @@
             const header = document.querySelector('.site-header');
             if (header) {
                 header.addEventListener('click', function() {
-                    // トップページに遷移
+                    // トップページのヘッダリンクから来た場合はフィルタ条件とページ番号を初期化
+                    topStore.dispatch(actions.resetState());
                     const currentPath = window.location.pathname;
-                    window.history.pushState({}, '', currentPath);
+                    window.history.pushState({ topState: null }, '', currentPath);
                     init();
                 });
             }
         }
 
         // ページ読み込み時に実行
-        window.addEventListener('DOMContentLoaded', init);
+        window.addEventListener('DOMContentLoaded', () => {
+            init();
+        });
 
         // ブラウザの戻る/進むボタンに対応
-        window.addEventListener('popstate', init);
+        window.addEventListener('popstate', (e) => {
+            isFromPopState = true;
+            // 履歴に保存された状態があればストアに復元
+            if (e.state && e.state.topState) {
+                topStore.dispatch(actions.restoreState(e.state.topState));
+            }
+            init();
+        });
     </script>
 </body>
 </html>
