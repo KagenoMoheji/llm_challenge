@@ -326,7 +326,9 @@
         .tags-container {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 16px 12px;
+            align-items: center;
+            padding: 8px 0;
         }
 
         .tag {
@@ -1888,8 +1890,8 @@
             });
         }
 
-        // トップページをレンダリング (isRestore=true の場合は直前の状態を維持・復元)
-        async function renderTopPage(isRestore = false) {
+        // トップページをレンダリング (isRestore=true の場合は直前の状態を維持・復元、forceRefresh=true の場合は強制最新化)
+        async function renderTopPage(isRestore = false, forceRefresh = false) {
             const mainContent = document.getElementById('main-content');
             document.title = appName;
 
@@ -1899,8 +1901,8 @@
             }
 
             const state = topStore.getState();
-            // 復元時はキャッシュを活用して高速復元、新規訪問時は最新テーブルデータを取得
-            const articles = await getArticlesTable(!isRestore);
+            // 復元時はキャッシュを活用して高速復元、新規訪問時または強制最新化指定時は最新テーブルデータを取得
+            const articles = await getArticlesTable(forceRefresh || !isRestore);
             const filtered = filterArticles(articles, state.filter);
 
             // トップページレイアウト全体のHTML構築
@@ -2105,13 +2107,13 @@
                 }
             }
 
-            // フッター(タグ)
+            // フッター(タグ一覧)
             if (articleData.tags && articleData.tags.length > 0) {
                 html += `
                     <footer class="article-footer">
                         <div class="tags-container">
                             ${articleData.tags.map(tag => 
-                                `<span class="tag">${escapeHtml(tag)}</span>`
+                                `<span class="sidebar-tag-item article-tag-item" data-tag="${escapeHtml(tag)}" role="button" tabindex="0">${escapeHtml(tag)}</span>`
                             ).join('')}
                         </div>
                     </footer>
@@ -2120,6 +2122,44 @@
 
             html += '</article>';
             return html;
+        }
+
+        // 指定したタグでフィルタされたトップページへ遷移
+        async function navigateToTag(tagName) {
+            if (!tagName) return;
+            // 状態ストアのフィルタを対象タグに更新 (ページ番号は自動リセット)
+            topStore.dispatch(actions.setFilter('tag', tagName));
+            // URLをトップページ（?pathなし）に更新して履歴を追加
+            const currentPath = window.location.pathname;
+            window.history.pushState({ topState: topStore.getState() }, '', currentPath);
+            // 最新テーブルデータを取得し、指定タグでフィルタされたトップページを描画
+            await renderTopPage(true, true);
+            // ヘッダークリックの再登録と先頭へのスムーズスクロール
+            setupHeaderClick();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 記事下部のタグクリックイベントを設定
+        function setupArticleTagLinks() {
+            const tagElements = document.querySelectorAll('.article-tag-item');
+            tagElements.forEach(tagBtn => {
+                const handleClick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const tagName = this.getAttribute('data-tag');
+                    if (tagName) {
+                        navigateToTag(tagName);
+                    }
+                };
+
+                tagBtn.addEventListener('click', handleClick);
+                tagBtn.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleClick.call(this, e);
+                    }
+                });
+            });
         }
 
         // 記事をレンダリング
@@ -2136,6 +2176,9 @@
             
             // 内部リンクのクリックイベントを設定
             setupInternalLinks();
+
+            // 記事下部のタグリンククリックイベントを設定
+            setupArticleTagLinks();
         }
 
         // 管理者用記事プレビューテスト画面をレンダリング (/articles/test)
@@ -2209,6 +2252,7 @@
                     previewContainer.innerHTML = await buildArticleHtml(articleData);
                     setupImageModal();
                     setupInternalLinks();
+                    setupArticleTagLinks();
                 } catch (err) {
                     console.error('記事YAMLプレビューエラー:', err);
                     errorElem.style.display = 'block';
