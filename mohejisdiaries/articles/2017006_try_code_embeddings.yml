@@ -1,0 +1,70 @@
+creator: KagenoMoheji
+createDate: 2017-03-17
+updateDate: !!timestamp 2017-03-17
+title: ソースを埋め込むのでそのやり方を勉強してみた
+tags:
+  - メモ
+content:
+  - headline: 前置き
+    body: |
+      皆さんこんにちは、お久しぶりです。  
+      春休みの間は、PythonとJavaScriptの基礎学習に時間を割いてしまい、なかなかこのサイトの改良に至るまで行きません・・・お待たせしてしまうこと、申し訳ございませんが、お手柔らかにお願いします。(´･ω･｀)
+      
+      さて、今回は、このサイトで日記を書いていくうちに、きっと行うであろう「**ソースの埋め込み**」について、私自身のメモとして書いていきます。ですが、参考にしていただいても構いません。
+      
+      今回二つのWeb上実行環境と、それらを用いてのソース埋め込みに触れていきました。
+  - headline: ２つのWeb実行環境とソース埋め込み
+    body: |
+      以下に述べる２つは、どちらも便利なWeb上実行環境です。  
+      ほかにも、Wandboxやrepl.itなどありましたが、登録がめんどくさかったので！以下の２つに厳選しました"(-""-)"
+      
+      ### ①CodePen
+      CodePenは、HTMLやCSS、JavaScriptのWeb上実行環境となっており、また公開サイトにもなっています。
+      ![【画像１】CodePen](media/2017006_codepen.png)
+      【画像１】の画面の「Sign me up」から、「Free Plan」で登録をして、試しにちょっくら「Hello!」で遊んでみると・・・
+      <iframe height="300" style="width: 100%;" scrolling="no" title="hello" src="https://codepen.io/KagenoMoheji/embed/dvZdyK?default-tab=html%2Cresult" frameborder="no" loading="lazy" allowtransparency="true">
+        See the Pen <a href="https://codepen.io/KagenoMoheji/pen/dvZdyK">
+        hello</a> by へのへのもへじ (<a href="https://codepen.io/KagenoMoheji">@KagenoMoheji</a>)
+        on <a href="https://codepen.io">CodePen</a>.
+      </iframe>
+      <p data-height="265" data-theme-id="0" data-slug-hash="dvZdyK" data-default-tab="result" data-user="KagenoMoheji" data-embed-version="2" data-pen-title="hello" class="codepen">See the Pen <a href="https://codepen.io/KagenoMoheji/pen/dvZdyK/">hello</a> by KagenoMoheji (<a href="http://codepen.io/KagenoMoheji">@KagenoMoheji</a>) on <a href="http://codepen.io">CodePen</a>.</p>
+      <script async src="https://production-assets.codepen.io/assets/embed/ei.js"></script>
+
+      上のように、HTML/CSSのみで書いていますが（JavaScriptは勉強中！(; ･`д･´)）、こんな感じで書いてコンソールを出して、サイトに埋め込み・公開することができます！  
+      しかも見映えが良いですね！  
+      HTML/CSS・JavaScriptを組み合わせてグラフィックなコンソールを出せて、公開できるのがCodePenの強みかもしれません。
+      [CodePenサイト](https://codepen.io/)
+      
+      ### ②Paiza
+      こちらは、Java、C、C++、C#、Python2、Python3、R、Ruby、Go、Swift、・・・・・多いな、これほどのプログラム言語を、それぞれ書いて処理できるWeb上実行環境です。
+      ![【画像２】Paiza](media/2017006_paiza.PNG)
+      それでは、【画像２】の画面から登録をして、一部実行してみましょうか。「Hello、〇〇！」という感じで( *´艸｀)  
+      なお、Paizaでは、こちらに張り付けても、皆さんが編集して実行することができるようなので、一覧を作ってそのテーマに飛ぶようにしておきますね、ぜひご活用ください。  
+      - <a href="#paiza_java">Java</a>（クリックするとそれぞれの言語の入力画面に飛びます。）
+      - <a href="#paiza_c++">C++</a>
+      - <a href="#paiza_c#">C#</a>
+      - <a href="#paiza_python3">Python3</a>
+      - <a href="#paiza_ruby">Ruby</a>
+      <section id="paiza_java">
+        <iframe src="https://paiza.io/projects/e/M2pZmUrnVvnVHi3peCP6jw?theme=pastel_on_dark" width="100%" height="500" scrolling="no" seamless="seamless"></iframe>
+      </section>
+      <section id="paiza_c++">
+        <iframe src="https://paiza.io/projects/e/Jtn7JrA7Icpy-NNgHABL6w?theme=pastel_on_dark" width="100%" height="500" scrolling="no" seamless="seamless"></iframe>
+      </section>
+      <section id="paiza_c#">
+        <iframe src="https://paiza.io/projects/e/a4Qbuk_ZwucWg6kob1PA6w?theme=pastel_on_dark" width="100%" height="500" scrolling="no" seamless="seamless"></iframe>
+      </section>
+      <section id="paiza_python3">
+        <iframe src="https://paiza.io/projects/e/XqqxIQ0ki1Qirf4F1Cr2Hw?theme=pastel_on_dark" width="100%" height="500" scrolling="no" seamless="seamless"></iframe>
+      </section>
+      <section id="paiza_ruby">
+        <iframe src="https://paiza.io/projects/e/r27IVlr4aYFxcDnT13rgKQ?theme=pastel_on_dark" width="100%" height="500" scrolling="no" seamless="seamless"></iframe>
+      </section>
+
+      とりあえず一部挙げてみました。めっちゃ便利ですね！  
+      ただ、Paizaの場合、公開したその場で、他者がいじって実行できてしまうところが、公開者にとっては痛いところでしょうか。まぁ、オープンソースと言えばそこまで気にする必要はないと思いますが・・・|дﾟ)  
+      [Paizaサイト](https://paiza.io/)
+  - headline: 最後に
+    body: |
+      上に述べた二つを、プログラム言語に応じて、このサイトで公開する際に活用していこうかなと思います。よろしくお願いします。  
+      てゆか、CodePenとPaizaたくさん挙げたから、このページくそ重いな( ﾟДﾟ)
