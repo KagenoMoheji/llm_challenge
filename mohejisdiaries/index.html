@@ -870,6 +870,150 @@
         }
 
         /* ===================================================
+           管理者用記事テスト画面 (Article Test Preview)
+           =================================================== */
+        .article-test-panel {
+            background: #ffffff;
+            border: 2px dashed #d0ccc0;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+            transition: border-color 0.2s ease, background-color 0.2s ease;
+        }
+
+        .article-test-panel.dragover {
+            border-color: var(--accent);
+            background-color: rgba(212, 83, 47, 0.05);
+        }
+
+        .article-test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #e0ddd5;
+        }
+
+        .article-test-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .article-test-badge {
+            font-size: 11px;
+            background-color: var(--ink);
+            color: #ffffff;
+            padding: 3px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .article-test-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .article-test-upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background-color: var(--accent);
+            color: #ffffff;
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            user-select: none;
+        }
+
+        .article-test-upload-btn:hover {
+            background-color: #b33e1e;
+        }
+
+        .article-test-upload-btn:active {
+            transform: scale(0.98);
+        }
+
+        .article-test-clear-btn {
+            display: inline-flex;
+            align-items: center;
+            background-color: transparent;
+            color: var(--muted);
+            border: 1px solid #d0ccc0;
+            padding: 7px 14px;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .article-test-clear-btn:hover {
+            color: var(--ink);
+            border-color: var(--ink);
+        }
+
+        .article-test-dropzone {
+            padding: 24px 16px;
+            text-align: center;
+            border-radius: 6px;
+            background-color: rgba(0, 0, 0, 0.02);
+            color: var(--muted);
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .article-test-dropzone:hover {
+            background-color: rgba(0, 0, 0, 0.035);
+        }
+
+        .article-test-file-info {
+            font-size: 13px;
+            color: #666666;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        .article-test-error {
+            background-color: #fde8e8;
+            color: #9b1c1c;
+            border-left: 4px solid #f05252;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.6;
+            display: none;
+        }
+
+        .article-test-empty-notice {
+            padding: 80px 24px;
+            text-align: center;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid #e0ddd5;
+            border-radius: 8px;
+        }
+
+        .article-test-empty-notice h3 {
+            font-size: 20px;
+            margin-bottom: 8px;
+            color: var(--ink);
+        }
+
+        /* ===================================================
            レスポンシブメディアクエリ
            =================================================== */
 
@@ -1091,9 +1235,17 @@
         
         // ルーティング処理
         function getCurrentRoute() {
+            const pathname = window.location.pathname;
             const params = new URLSearchParams(window.location.search);
             const pathParam = params.get('path');
             
+            // 記事テスト画面の判定 (クエリストリング ?path=/articles/test または パス名末尾が /articles/test)
+            if (pathParam === '/articles/test' || pathname.endsWith('/articles/test')) {
+                return {
+                    type: 'article-test'
+                };
+            }
+
             // クエリストリングにpathパラメータがある場合
             if (pathParam) {
                 // 記事ページの判定 /articles/{yyyy}/{採番}
@@ -1921,40 +2073,36 @@
             return div.innerHTML;
         }
 
-        // 記事をレンダリング
-        async function renderArticle(articleData) {
-            const mainContent = document.getElementById('main-content');
-            
-            // タイトルを更新
-            document.title = `${articleData.title} | ${appName}`;
-
-            // ヘッダー部分
+        // 記事HTMLを生成する純粋関数
+        async function buildArticleHtml(articleData) {
             let html = `
                 <article>
                     <header class="article-header">
-                        <h1 class="article-title">${escapeHtml(articleData.title)}</h1>
+                        <h1 class="article-title">${escapeHtml(articleData.title || '')}</h1>
                         <div class="article-meta">
                             <div class="meta-item">
                                 <span class="meta-label">作成</span>
-                                <span>${formatDate(articleData.createDate)}</span>
+                                <span>${articleData.createDate ? formatDate(articleData.createDate) : '-'}</span>
                             </div>
                             <div class="meta-item">
                                 <span class="meta-label">更新</span>
-                                <span>${formatDate(articleData.updateDate)}</span>
+                                <span>${articleData.updateDate ? formatDate(articleData.updateDate) : (articleData.createDate ? formatDate(articleData.createDate) : '-')}</span>
                             </div>
                         </div>
                     </header>
             `;
 
             // コンテンツセクション
-            for (const section of articleData.content) {
-                const bodyHtml = await renderMarkdown(section.body);
-                html += `
-                    <section class="content-section">
-                        <h2 class="section-headline">${escapeHtml(section.headline)}</h2>
-                        ${bodyHtml}
-                    </section>
-                `;
+            if (Array.isArray(articleData.content)) {
+                for (const section of articleData.content) {
+                    const bodyHtml = await renderMarkdown(section.body || '');
+                    html += `
+                        <section class="content-section">
+                            <h2 class="section-headline">${escapeHtml(section.headline || '')}</h2>
+                            ${bodyHtml}
+                        </section>
+                    `;
+                }
             }
 
             // フッター(タグ)
@@ -1971,13 +2119,156 @@
             }
 
             html += '</article>';
-            mainContent.innerHTML = html;
+            return html;
+        }
+
+        // 記事をレンダリング
+        async function renderArticle(articleData) {
+            const mainContent = document.getElementById('main-content');
+            
+            // タイトルを更新
+            document.title = `${articleData.title} | ${appName}`;
+
+            mainContent.innerHTML = await buildArticleHtml(articleData);
             
             // 画像クリック時のモーダル表示イベントを追加
             setupImageModal();
             
             // 内部リンクのクリックイベントを設定
             setupInternalLinks();
+        }
+
+        // 管理者用記事プレビューテスト画面をレンダリング (/articles/test)
+        async function renderArticleTestPage() {
+            const mainContent = document.getElementById('main-content');
+            document.title = `記事テスト（管理者用） | ${appName}`;
+
+            mainContent.innerHTML = `
+                <div class="article-test-container">
+                    <section class="article-test-panel" id="article-test-dropzone">
+                        <div class="article-test-header">
+                            <div class="article-test-title">
+                                <span>記事プレビューテスト</span>
+                                <span class="article-test-badge">管理者用</span>
+                            </div>
+                            <div class="article-test-controls">
+                                <span id="article-test-file-info" class="article-test-file-info">未選択</span>
+                                <label class="article-test-upload-btn" for="article-yaml-input">
+                                    <span>YAMLを選択</span>
+                                </label>
+                                <input type="file" id="article-yaml-input" accept=".yml,.yaml,text/yaml" style="display: none;">
+                                <button type="button" id="article-test-clear-btn" class="article-test-clear-btn">クリア</button>
+                            </div>
+                        </div>
+                        <div class="article-test-dropzone">
+                            <span>記事のYAMLファイル（.yml / .yaml）をここにドラッグ＆ドロップするか、上のボタンからファイルを選択してください</span>
+                        </div>
+                    </section>
+
+                    <div id="article-test-error" class="article-test-error"></div>
+                    <div id="article-test-preview">
+                        <div class="article-test-empty-notice">
+                            <h3>プレビュー待機中</h3>
+                            <p>YAMLファイルをアップロードすると、ここに記事詳細画面と同じ見た目でプレビューが表示されます。</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const fileInput = document.getElementById('article-yaml-input');
+            const dropzone = document.getElementById('article-test-dropzone');
+            const clearBtn = document.getElementById('article-test-clear-btn');
+            const errorElem = document.getElementById('article-test-error');
+            const fileInfoElem = document.getElementById('article-test-file-info');
+            const previewContainer = document.getElementById('article-test-preview');
+
+            // YAML読み込み＆プレビュー処理
+            async function processYamlFile(file) {
+                if (!file) return;
+
+                errorElem.style.display = 'none';
+                errorElem.textContent = '';
+
+                try {
+                    const text = await file.text();
+                    const articleData = jsyaml.load(text);
+
+                    if (!articleData || typeof articleData !== 'object') {
+                        throw new Error('YAMLファイルの解析結果が空、またはオブジェクトではありません。');
+                    }
+                    if (!articleData.title) {
+                        throw new Error('記事データに "title"（タイトル）が指定されていません。');
+                    }
+                    if (!articleData.content || !Array.isArray(articleData.content)) {
+                        throw new Error('記事データに "content"（見出しと本文の配列）が指定されていません。');
+                    }
+
+                    fileInfoElem.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                    document.title = `[テスト] ${articleData.title} | ${appName}`;
+
+                    previewContainer.innerHTML = await buildArticleHtml(articleData);
+                    setupImageModal();
+                    setupInternalLinks();
+                } catch (err) {
+                    console.error('記事YAMLプレビューエラー:', err);
+                    errorElem.style.display = 'block';
+                    errorElem.innerHTML = `<strong>YAMLパース / 検証エラー:</strong> ${escapeHtml(err.message)}`;
+                }
+            }
+
+            // ファイル選択イベント
+            if (fileInput) {
+                fileInput.addEventListener('change', (e) => {
+                    const file = e.target.files && e.target.files[0];
+                    if (file) {
+                        processYamlFile(file);
+                    }
+                });
+            }
+
+            // ドラッグ＆ドロップイベント
+            if (dropzone) {
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropzone.classList.add('dragover');
+                    });
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropzone.classList.remove('dragover');
+                    });
+                });
+
+                dropzone.addEventListener('drop', (e) => {
+                    const dt = e.dataTransfer;
+                    const file = dt && dt.files && dt.files[0];
+                    if (file) {
+                        processYamlFile(file);
+                    }
+                });
+            }
+
+            // クリアボタン
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    if (fileInput) fileInput.value = '';
+                    fileInfoElem.textContent = '未選択';
+                    errorElem.style.display = 'none';
+                    errorElem.textContent = '';
+                    previewContainer.innerHTML = `
+                        <div class="article-test-empty-notice">
+                            <h3>プレビュー待機中</h3>
+                            <p>YAMLファイルをアップロードすると、ここに記事詳細画面と同じ見た目でプレビューが表示されます。</p>
+                        </div>
+                    `;
+                    document.title = `記事テスト（管理者用） | ${appName}`;
+                });
+            }
         }
 
         // 内部リンクのイベント設定
@@ -2055,6 +2346,9 @@
                 // トップページを表示
                 // popstate(ページバック)経由なら状態を維持・復元、それ以外は初期化
                 await renderTopPage(wasPopState);
+            } else if (route.type === 'article-test') {
+                // 記事テスト画面を表示 (管理者用)
+                await renderArticleTestPage();
             } else if (route.type === '404') {
                 // 404エラーページを表示
                 render404Page();
