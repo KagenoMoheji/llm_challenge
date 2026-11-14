@@ -11,7 +11,7 @@
 「Moheji's diaries = もへじの編綴」は、GitHub Pages として公開される静的Webブログアプリケーションです。
 
 - **フロントエンド構成**: HTML / CSS / JavaScript を `./index.html` のシングルファイルに統合した静的Webアプリ
-  - ルーティング: トップページ（`?path` なし）、記事詳細（`/articles/{yyyy}/{採番}`）、404エラー（`/errors/404`）、管理者用記事プレビューテスト（`/articles/test` ※直接URLアクセス専用）
+  - ルーティング: トップページ（`?path` なし）、記事詳細（`/articles/{yyyy}/{採番}`）、404エラー（`/errors/404`）、記事プレビュー（`/articles/preview` ※直接URLアクセス専用）
 - **データソース**:
   - 記事一覧テーブル: `https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/db_mohejisdiaries/mohejisdiaries/github_actions/deliverable/tbl_articles/table.json` (`db_mohejisdiaries` ブランチ)
   - 個別記事データ: `https://raw.githubusercontent.com/KagenoMoheji/llm_challenge/main/mohejisdiaries/articles/{fileName}` (`main` ブランチの YAML ファイル)

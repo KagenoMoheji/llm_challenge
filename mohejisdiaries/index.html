@@ -873,9 +873,9 @@
         }
 
         /* ===================================================
-           記事プレビュー画面 (Article Test Preview)
+           記事プレビュー画面 (Article Preview)
            =================================================== */
-        .article-test-panel {
+        .article-preview-panel {
             background: #ffffff;
             border: 2px dashed #d0ccc0;
             border-radius: 8px;
@@ -885,12 +885,12 @@
             transition: border-color 0.2s ease, background-color 0.2s ease;
         }
 
-        .article-test-panel.dragover {
+        .article-preview-panel.dragover {
             border-color: var(--accent);
             background-color: rgba(212, 83, 47, 0.05);
         }
 
-        .article-test-header {
+        .article-preview-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -901,7 +901,7 @@
             border-bottom: 1px solid #e0ddd5;
         }
 
-        .article-test-title {
+        .article-preview-title {
             font-size: 20px;
             font-weight: 700;
             color: var(--ink);
@@ -910,7 +910,7 @@
             gap: 10px;
         }
 
-        .article-test-badge {
+        .article-preview-badge {
             font-size: 11px;
             background-color: var(--ink);
             color: #ffffff;
@@ -919,14 +919,14 @@
             letter-spacing: 0.05em;
         }
 
-        .article-test-controls {
+        .article-preview-controls {
             display: flex;
             align-items: center;
             gap: 12px;
             flex-wrap: wrap;
         }
 
-        .article-test-upload-btn {
+        .article-preview-upload-btn {
             display: inline-flex;
             align-items: center;
             gap: 6px;
@@ -941,15 +941,15 @@
             user-select: none;
         }
 
-        .article-test-upload-btn:hover {
+        .article-preview-upload-btn:hover {
             background-color: #b33e1e;
         }
 
-        .article-test-upload-btn:active {
+        .article-preview-upload-btn:active {
             transform: scale(0.98);
         }
 
-        .article-test-clear-btn {
+        .article-preview-clear-btn {
             display: inline-flex;
             align-items: center;
             background-color: transparent;
@@ -962,12 +962,12 @@
             transition: color 0.2s ease, border-color 0.2s ease;
         }
 
-        .article-test-clear-btn:hover {
+        .article-preview-clear-btn:hover {
             color: var(--ink);
             border-color: var(--ink);
         }
 
-        .article-test-dropzone {
+        .article-preview-dropzone {
             padding: 24px 16px;
             text-align: center;
             border-radius: 6px;
@@ -978,18 +978,18 @@
             transition: background-color 0.2s ease;
         }
 
-        .article-test-dropzone:hover {
+        .article-preview-dropzone:hover {
             background-color: rgba(0, 0, 0, 0.035);
         }
 
-        .article-test-file-info {
+        .article-preview-file-info {
             font-size: 13px;
             color: #666666;
             font-family: monospace;
             word-break: break-all;
         }
 
-        .article-test-error {
+        .article-preview-error {
             background-color: #fde8e8;
             color: #9b1c1c;
             border-left: 4px solid #f05252;
@@ -1001,7 +1001,7 @@
             display: none;
         }
 
-        .article-test-empty-notice {
+        .article-preview-empty-notice {
             padding: 80px 24px;
             text-align: center;
             color: var(--muted);
@@ -1010,7 +1010,7 @@
             border-radius: 8px;
         }
 
-        .article-test-empty-notice h3 {
+        .article-preview-empty-notice h3 {
             font-size: 20px;
             margin-bottom: 8px;
             color: var(--ink);
@@ -1263,10 +1263,10 @@
             const params = new URLSearchParams(window.location.search);
             const pathParam = params.get('path');
             
-            // 記事プレビュー画面の判定 (クエリストリング ?path=/articles/test または パス名末尾が /articles/test)
-            if (pathParam === '/articles/test' || pathname.endsWith('/articles/test')) {
+            // 記事プレビュー画面の判定 (クエリストリング ?path=/articles/preview または パス名末尾が /articles/preview)
+            if (pathParam === '/articles/preview' || pathname.endsWith('/articles/preview')) {
                 return {
-                    type: 'article-test'
+                    type: 'article-preview'
                 };
             }
 
@@ -2203,35 +2203,35 @@
             setupArticleTagLinks();
         }
 
-        // 記事プレビュー画面をレンダリング (/articles/test)
-        async function renderArticleTestPage() {
+        // 記事プレビュー画面をレンダリング (/articles/preview)
+        async function renderArticlePreviewPage() {
             const mainContent = document.getElementById('main-content');
             document.title = `記事プレビュー | ${appName}`;
 
             mainContent.innerHTML = `
-                <div class="article-test-container">
-                    <section class="article-test-panel" id="article-test-dropzone">
-                        <div class="article-test-header">
-                            <div class="article-test-title">
+                <div class="article-preview-container">
+                    <section class="article-preview-panel" id="article-preview-dropzone">
+                        <div class="article-preview-header">
+                            <div class="article-preview-title">
                                 <span>記事プレビュー</span>
                             </div>
-                            <div class="article-test-controls">
-                                <span id="article-test-file-info" class="article-test-file-info">未選択</span>
-                                <label class="article-test-upload-btn" for="article-yaml-input">
+                            <div class="article-preview-controls">
+                                <span id="article-preview-file-info" class="article-preview-file-info">未選択</span>
+                                <label class="article-preview-upload-btn" for="article-yaml-input">
                                     <span>YAMLを選択</span>
                                 </label>
                                 <input type="file" id="article-yaml-input" accept=".yml,.yaml,text/yaml" style="display: none;">
-                                <button type="button" id="article-test-clear-btn" class="article-test-clear-btn">クリア</button>
+                                <button type="button" id="article-preview-clear-btn" class="article-preview-clear-btn">クリア</button>
                             </div>
                         </div>
-                        <div class="article-test-dropzone">
+                        <div class="article-preview-dropzone">
                             <span>記事のYAMLファイル（.yml / .yaml）をここにドラッグ＆ドロップするか、上のボタンからファイルを選択してください</span>
                         </div>
                     </section>
 
-                    <div id="article-test-error" class="article-test-error"></div>
-                    <div id="article-test-preview">
-                        <div class="article-test-empty-notice">
+                    <div id="article-preview-error" class="article-preview-error"></div>
+                    <div id="article-preview-output">
+                        <div class="article-preview-empty-notice">
                             <h3>プレビュー待機中</h3>
                             <p>YAMLファイルをアップロードすると、ここに記事詳細画面と同じ見た目でプレビューが表示されます。</p>
                         </div>
@@ -2240,11 +2240,11 @@
             `;
 
             const fileInput = document.getElementById('article-yaml-input');
-            const dropzone = document.getElementById('article-test-dropzone');
-            const clearBtn = document.getElementById('article-test-clear-btn');
-            const errorElem = document.getElementById('article-test-error');
-            const fileInfoElem = document.getElementById('article-test-file-info');
-            const previewContainer = document.getElementById('article-test-preview');
+            const dropzone = document.getElementById('article-preview-dropzone');
+            const clearBtn = document.getElementById('article-preview-clear-btn');
+            const errorElem = document.getElementById('article-preview-error');
+            const fileInfoElem = document.getElementById('article-preview-file-info');
+            const previewContainer = document.getElementById('article-preview-output');
 
             // YAML読み込み＆プレビュー処理
             async function processYamlFile(file) {
@@ -2326,7 +2326,7 @@
                     errorElem.style.display = 'none';
                     errorElem.textContent = '';
                     previewContainer.innerHTML = `
-                        <div class="article-test-empty-notice">
+                        <div class="article-preview-empty-notice">
                             <h3>プレビュー待機中</h3>
                             <p>YAMLファイルをアップロードすると、ここに記事詳細画面と同じ見た目でプレビューが表示されます。</p>
                         </div>
@@ -2411,9 +2411,9 @@
                 // トップページを表示
                 // popstate(ページバック)経由なら状態を維持・復元、それ以外は初期化
                 await renderTopPage(wasPopState);
-            } else if (route.type === 'article-test') {
+            } else if (route.type === 'article-preview') {
                 // 記事プレビュー画面を表示
-                await renderArticleTestPage();
+                await renderArticlePreviewPage();
             } else if (route.type === '404') {
                 // 404エラーページを表示
                 render404Page();
