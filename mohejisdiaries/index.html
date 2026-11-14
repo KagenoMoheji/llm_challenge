@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>サイトを読み込み中...</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js" integrity="sha384-+pxiN6T7yvpryuJmE1gM9PX7yQit15auDb+ZwwvJOd/4be2Cie5/IuVXgQb/S9du" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js" integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha384-DyZ88mC6Up2uqS4h/KRgHuoeGwBcD4Ng9SiP4dIRy0EXTlnuz47vAwmeGwVChigm" crossorigin="anonymous">
     <style>
         :root {
             --cream: #faf8f3;
@@ -1221,7 +1221,7 @@
         <img id="modal-image" src="" alt="">
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/monomd@1.0.1/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/monomd@1.0.1/index.js" integrity="sha384-+NhRYMp5AtjJUWW+lfAoKrF3fgpjA/X/5Q1jOvvqTfnBPpQG+3VKcHmSO1MLMJrq" crossorigin="anonymous"></script>
     <script>
         const appName = "もへじの編綴";
         // monomdのCSSを追加
@@ -1244,8 +1244,12 @@
         async function renderMarkdown(markdown) {
             const result = await MonoMD.renderMarkdown(markdown, { includeCSS: false });
             // .monomd-bodyのdivに.section-bodyクラスを追加
-            const rawHtml = result.html.replace('<div class="monomd-body">', '<div class="monomd-body section-body">');
+            let rawHtml = result.html.replace('<div class="monomd-body">', '<div class="monomd-body section-body">');
             
+            // iframe内のフォールバックHTML(<a>タグ等)やMonoMDによる<p>交差でDOMPurifyがiframeを丸ごと消去するのを防ぐため、
+            // iframe開きタグ〜閉じタグを自己完結したクリーンなiframeに正規化
+            rawHtml = rawHtml.replace(/<iframe\b([^>]*)>([\s\S]*?)<\/iframe>/gi, '<iframe$1></iframe>');
+
             // DOMPurifyによるサニタイズ（安全なHTML化）
             if (typeof DOMPurify !== 'undefined' && typeof DOMPurify.sanitize === 'function') {
                 return DOMPurify.sanitize(rawHtml, DOMPURIFY_CONFIG);
