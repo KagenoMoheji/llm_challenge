@@ -872,7 +872,7 @@
         }
 
         /* ===================================================
-           管理者用記事テスト画面 (Article Test Preview)
+           記事プレビュー画面 (Article Test Preview)
            =================================================== */
         .article-test-panel {
             background: #ffffff;
@@ -2181,18 +2181,17 @@
             setupArticleTagLinks();
         }
 
-        // 管理者用記事プレビューテスト画面をレンダリング (/articles/test)
+        // 記事プレビュー画面をレンダリング (/articles/test)
         async function renderArticleTestPage() {
             const mainContent = document.getElementById('main-content');
-            document.title = `記事テスト（管理者用） | ${appName}`;
+            document.title = `記事プレビュー | ${appName}`;
 
             mainContent.innerHTML = `
                 <div class="article-test-container">
                     <section class="article-test-panel" id="article-test-dropzone">
                         <div class="article-test-header">
                             <div class="article-test-title">
-                                <span>記事プレビューテスト</span>
-                                <span class="article-test-badge">管理者用</span>
+                                <span>記事プレビュー</span>
                             </div>
                             <div class="article-test-controls">
                                 <span id="article-test-file-info" class="article-test-file-info">未選択</span>
@@ -2310,7 +2309,7 @@
                             <p>YAMLファイルをアップロードすると、ここに記事詳細画面と同じ見た目でプレビューが表示されます。</p>
                         </div>
                     `;
-                    document.title = `記事テスト（管理者用） | ${appName}`;
+                    document.title = `記事プレビュー | ${appName}`;
                 });
             }
         }
@@ -2391,7 +2390,7 @@
                 // popstate(ページバック)経由なら状態を維持・復元、それ以外は初期化
                 await renderTopPage(wasPopState);
             } else if (route.type === 'article-test') {
-                // 記事テスト画面を表示 (管理者用)
+                // 記事テスト画面を表示
                 await renderArticleTestPage();
             } else if (route.type === '404') {
                 // 404エラーページを表示
