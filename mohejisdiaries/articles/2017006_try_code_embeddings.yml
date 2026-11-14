@@ -27,7 +27,7 @@ content:
         hello</a> by へのへのもへじ (<a href="https://codepen.io/KagenoMoheji">@KagenoMoheji</a>)
         on <a href="https://codepen.io">CodePen</a>.
       </iframe>
-      <p data-height="265" data-theme-id="0" data-slug-hash="dvZdyK" data-default-tab="result" data-user="KagenoMoheji" data-embed-version="2" data-pen-title="hello" class="codepen">See the Pen <a href="https://codepen.io/KagenoMoheji/pen/dvZdyK/">hello</a> by KagenoMoheji (<a href="http://codepen.io/KagenoMoheji">@KagenoMoheji</a>) on <a href="http://codepen.io">CodePen</a>.</p>
+      <p data-height="265" data-theme-id="0" data-slug-hash="dvZdyK" data-default-tab="result" data-user="KagenoMoheji" data-embed-version="2" data-pen-title="hello" class="codepen">See the Pen <a href="https://codepen.io/KagenoMoheji/pen/dvZdyK/">hello</a> by KagenoMoheji (<a href="https://codepen.io/KagenoMoheji">@KagenoMoheji</a>) on <a href="https://codepen.io">CodePen</a>.</p>
       <script async src="https://production-assets.codepen.io/assets/embed/ei.js"></script>
 
       上のように、HTML/CSSのみで書いていますが（JavaScriptは勉強中！(; ･`д･´)）、こんな感じで書いてコンソールを出して、サイトに埋め込み・公開することができます！  

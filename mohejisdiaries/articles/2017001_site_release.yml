@@ -20,7 +20,7 @@ content:
   - headline: これまでのやり方と現在への転換
     body: |
       実を言いますと、このサイトの以前もサイト制作をしていたのですが、これらは０からHTMLやCSSを使って構築していたわけではないのです。  
-      [Wix](http://ja.wix.com/)や[Jimdo](https://jp.jimdo.com/)というHP構築サイトを用いて、簡単に作っていました。  
+      [Wix](https://ja.wix.com/)や[Jimdo](https://jp.jimdo.com/)というHP構築サイトを用いて、簡単に作っていました。  
       しかしやはり情報系学生としては、言語に触れながらという作業をしたいもので、このサイトを制作するにあたって、HTMLやCSSなどで構築しようと思い学習を始めたのです。
   - headline: このサイトについて
     body: |

@@ -2246,6 +2246,71 @@
             const fileInfoElem = document.getElementById('article-preview-file-info');
             const previewContainer = document.getElementById('article-preview-output');
 
+            // URLが「https://始まり」「#始まり」「相対パス」のいずれかに適合するか検証
+            function isAllowedUrl(rawUrl) {
+                if (typeof rawUrl !== 'string') return false;
+                const url = rawUrl.trim();
+                if (!url) return false;
+
+                // 1. https:// で始まる
+                if (/^https:\/\//i.test(url)) return true;
+
+                // 2. # で始まる（ページ内アンカー）
+                if (url.startsWith('#')) return true;
+
+                // 3. プロトコル相対 (//example.com) は禁止
+                if (url.startsWith('//')) return false;
+
+                // 4. スキーム（コロン）を含むものは https:// 以外禁止 (http:, javascript:, data:, file: 等)
+                const beforeQueryOrHash = url.split(/[?#]/)[0];
+                if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(beforeQueryOrHash)) {
+                    return false;
+                }
+
+                // 5. それ以外は相対パスとして許可 (例: media/image.png, ./foo, /bar, ?path=...)
+                return true;
+            }
+
+            // 記事データ内のすべてのリンク・メディアURLを抽出して検証
+            function validateArticleLinks(articleData) {
+                const invalidUrls = [];
+
+                function checkUrl(url, contextInfo) {
+                    if (!url) return;
+                    const trimmed = url.trim();
+                    const actualUrl = trimmed.split(/\s+/)[0];
+                    if (!isAllowedUrl(actualUrl)) {
+                        invalidUrls.push({
+                            url: actualUrl,
+                            context: contextInfo
+                        });
+                    }
+                }
+
+                if (Array.isArray(articleData.content)) {
+                    articleData.content.forEach((section, sIdx) => {
+                        const body = section.body || '';
+                        const secTitle = section.headline || `セクション${sIdx + 1}`;
+
+                        // 1. マークダウンのリンク・画像・内部リンク: [text](url), ![alt](url), !!text!!(path)
+                        const mdMatches = [...body.matchAll(/!?\[[^\]]*\]\(([^)]+)\)|!![^!]+!!\(([^)]+)\)/g)];
+                        mdMatches.forEach(m => {
+                            const targetUrl = m[1] || m[2];
+                            checkUrl(targetUrl, `「${secTitle}」のマークダウンリンク`);
+                        });
+
+                        // 2. HTMLタグ内の href 属性、src 属性: <tag href="..." src="...">
+                        const htmlAttrMatches = [...body.matchAll(/\b(?:href|src)\s*=\s*(["'])(.*?)\1/gi)];
+                        htmlAttrMatches.forEach(m => {
+                            const targetUrl = m[2];
+                            checkUrl(targetUrl, `「${secTitle}」のHTMLタグ属性`);
+                        });
+                    });
+                }
+
+                return invalidUrls;
+            }
+
             // YAML読み込み＆プレビュー処理
             async function processYamlFile(file) {
                 if (!file) return;
@@ -2267,6 +2332,22 @@
                         throw new Error('記事データに "content"（見出しと本文の配列）が指定されていません。');
                     }
 
+                    // リンクおよびメディアURLのセキュリティバリデーション (https://、#、相対パスのみ許可)
+                    const invalidLinks = validateArticleLinks(articleData);
+                    if (invalidLinks.length > 0) {
+                        const errorItems = invalidLinks.map(inv => 
+                            `<li><code>${escapeHtml(inv.url)}</code> <span style="opacity: 0.85;">(${escapeHtml(inv.context)})</span></li>`
+                        ).join('');
+                        const secErr = new Error('セキュリティ制限違反のリンクが検出されました');
+                        secErr.isSecurityError = true;
+                        secErr.htmlMessage = `
+                            <strong>【セキュリティ警告】制限外のリンクまたはメディアURLが検出されました:</strong><br>
+                            許可されているURL形式は「<code>https://</code> 始まり」「<code>#</code> 始まり（ページ内アンカー）」「相対パス」のみです。（<code>http://</code> や <code>javascript:</code> 等は禁止されています）
+                            <ul style="margin: 8px 0 0 20px; font-size: 13px;">${errorItems}</ul>
+                        `;
+                        throw secErr;
+                    }
+
                     fileInfoElem.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
                     document.title = `[プレビュー] ${articleData.title} | ${appName}`;
 
@@ -2277,7 +2358,11 @@
                 } catch (err) {
                     console.error('記事YAMLプレビューエラー:', err);
                     errorElem.style.display = 'block';
-                    errorElem.innerHTML = `<strong>YAMLパース / 検証エラー:</strong> ${escapeHtml(err.message)}`;
+                    if (err.isSecurityError && err.htmlMessage) {
+                        errorElem.innerHTML = err.htmlMessage;
+                    } else {
+                        errorElem.innerHTML = `<strong>YAMLパース / 検証エラー:</strong> ${escapeHtml(err.message)}`;
+                    }
                 }
             }
 
