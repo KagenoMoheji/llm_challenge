@@ -1241,7 +1241,7 @@
             const params = new URLSearchParams(window.location.search);
             const pathParam = params.get('path');
             
-            // 記事テスト画面の判定 (クエリストリング ?path=/articles/test または パス名末尾が /articles/test)
+            // 記事プレビュー画面の判定 (クエリストリング ?path=/articles/test または パス名末尾が /articles/test)
             if (pathParam === '/articles/test' || pathname.endsWith('/articles/test')) {
                 return {
                     type: 'article-test'
@@ -2246,7 +2246,7 @@
                     }
 
                     fileInfoElem.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-                    document.title = `[テスト] ${articleData.title} | ${appName}`;
+                    document.title = `[プレビュー] ${articleData.title} | ${appName}`;
 
                     previewContainer.innerHTML = await buildArticleHtml(articleData);
                     setupImageModal();
@@ -2390,7 +2390,7 @@
                 // popstate(ページバック)経由なら状態を維持・復元、それ以外は初期化
                 await renderTopPage(wasPopState);
             } else if (route.type === 'article-test') {
-                // 記事テスト画面を表示
+                // 記事プレビュー画面を表示
                 await renderArticleTestPage();
             } else if (route.type === '404') {
                 // 404エラーページを表示
