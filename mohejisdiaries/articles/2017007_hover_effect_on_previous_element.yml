@@ -1,0 +1,80 @@
+creator: KagenoMoheji
+createDate: 2017-03-17
+updateDate: !!timestamp 2017-03-17
+title: ある要素をhoverした時に、直前の要素に変化を生じさせる強気のCSS
+tags:
+  - HTML
+  - CSS
+content:
+  - headline: 前置き
+    body: |
+      どうも、皆さんこんにちは。  
+      サイト制作をこのサイトとは別にもう一つ、デザインの方向性を切り替えたサイトを最近作っています。かなり詰みまくりですが(;´･ω･)
+      
+      さて、本題に入りましょうか、今回は、CSSによる装飾に関して、私自身のメモとして記録していきます。  
+      今回の装飾は、『**ある要素をhoverした時に、別の要素に変化をもたらす　かつ　hoverした要素よりも「HTMLタグ的に上の」要素に変化をもたらす**』というものです。ちょっと、イメージしづらいでしょうか。  
+      tableタグを使用した例を用いて、CodePenで色々書いていきますので、最終的な結果を見ていただければ、なんとなく今回の思い描く目標が分かると思います。  
+      では、始めましょう。
+  - headline: まずはHTML/CSSで表を作る
+    body: |
+      <iframe height="300" style="width: 100%;" scrolling="no" title="memo1-0" src="https://codepen.io/KagenoMoheji/embed/EWRjWx?default-tab=html%2Cresult" frameborder="no" loading="lazy" allowtransparency="true">
+        See the Pen <a href="https://codepen.io/KagenoMoheji/pen/EWRjWx">
+        memo1-0</a> by へのへのもへじ (<a href="https://codepen.io/KagenoMoheji">@KagenoMoheji</a>)
+        on <a href="https://codepen.io">CodePen</a>.
+      </iframe>
+      まず、上のように、table/tr/th・tdタグで簡単な表を作成しました。  
+      ここで、もう一度イメージのおさらいをしましょう。あなたがtdの内容を見ようとするするとき、マウスを動かしてカーソルをその対象に乗せることがあると思います。その時の変化として、thが変化するようにしたいのです。  
+      今回の場合は、『**tdにhoverしている際、thの背景色が赤くなる**』ようにしてみましょう。
+      
+      様々なやり方があることを示しながら段階的に進めていくので、すぐに完成とは言いません。
+  - headline: 調べてみると・・・
+    body: |
+      まず、基本的に、そういった変化を生じさせるには、JavaScriptで書くのが良いそうです。  
+      [CSS マウスホバーさせた時、親要素の背景を変えたい（Yahoo!知恵袋）](https://detail.chiebukuro.yahoo.co.jp/qa/question_detail/q14147094194)  
+      上の知恵袋のやりとりでは、ベストアンサーではCSSのみでの処理は難しく、JavaScriptを用いた方が良いとのことでしたが・・・私はまだJavaScriptを使いこなせていないので、どうにかしてCSSのみで処理させることができないだろうかと、模索してみました。
+      
+      まず、調べてみて出てきたのは、「>」や「+」を用いる、つまりタグ間の関係性を活用する方法です。  
+      「【CSS】:hover疑似クラスで指定要素とは別の要素にスタイルを適用する」(http://mementoo.info/archives/777 だったがリンク切れ)  
+      こちらの方法では、HTMLタグ間の関係が、兄弟関係であれば「>」、隣接関係であれば、「+」を用いるというものであります。さぁ、CodePenで実装してみましょう。
+      <iframe height="300" style="width: 100%;" scrolling="no" title="memo1-1" src="https://codepen.io/KagenoMoheji/embed/YZvyqa?default-tab=html%2Cresult" frameborder="no" loading="lazy" allowtransparency="true">
+        See the Pen <a href="https://codepen.io/KagenoMoheji/pen/YZvyqa">
+        memo1-1</a> by へのへのもへじ (<a href="https://codepen.io/KagenoMoheji">@KagenoMoheji</a>)
+        on <a href="https://codepen.io">CodePen</a>.
+      </iframe>
+      <iframe height="300" style="width: 100%;" scrolling="no" title="memo1-2" src="https://codepen.io/KagenoMoheji/embed/zZavoN?default-tab=html%2Cresult" frameborder="no" loading="lazy" allowtransparency="true">
+        See the Pen <a href="https://codepen.io/KagenoMoheji/pen/zZavoN">
+        memo1-2</a> by へのへのもへじ (<a href="https://codepen.io/KagenoMoheji">@KagenoMoheji</a>)
+        on <a href="https://codepen.io">CodePen</a>.
+      </iframe>
+      「tdがhoverなら・・・」と書いてみましたがどうしたことでしょう、全く変化が起きません。  
+      その理由は、タグの関係性というものは、上から下に『流れ処理』されていることが大きいです。  
+      つまり、兄弟関係というものは、例えば今回試用しているHTMLタグでいうと、「trと、thまたはtd」という、『外側と内側』の関係性を表します。  
+      そしてもう一つ、隣接関係については、thとtdは確かに隣接したタグではありますが、先ほど述べたように、「上から下に流れ処理」されているので、『「tdをhoverして」という条件のもと、HTMLを「逆戻りして」thに変化を生じさせる』ことはできないのです。
+
+      ならば・・・どうしたらいいのでしょうか。若干遠回りに考えてみる必要があります。
+  - headline: 最終的に導かれた２つの方法
+    body: |
+      ### ①『trを兄として』、thと兄弟関係にする。
+      一つ目は、先ほど兄弟関係について問題点を挙げましたが、これについてもう少し視野を広げて考えてみると答えにたどり着けました。そう、「**th・tdはtrで囲まれているじゃないか！**」ということです。  
+      こうすることで、兄弟関係が成立し、『tr（行）ごとにhoverされたら』thに変化を生じさせるということが可能になるのです。  
+      実行結果は以下になります。
+      <iframe height="300" style="width: 100%;" scrolling="no" title="memo1-3" src="https://codepen.io/KagenoMoheji/embed/evKJzV?default-tab=html%2Cresult" frameborder="no" loading="lazy" allowtransparency="true">
+        See the Pen <a href="https://codepen.io/KagenoMoheji/pen/evKJzV">
+        memo1-3</a> by へのへのもへじ (<a href="https://codepen.io/KagenoMoheji">@KagenoMoheji</a>)
+        on <a href="https://codepen.io">CodePen</a>.
+      </iframe>
+
+      ### ②『table』ごと全体を覆いこんで、その上でhoverされている行のthに変化を生じさせる。
+      こちらは、①よりは少々ややこしいですが、ベン図的な考えが好きな人はこちらで試しても良いと思います。  
+      手順としては、まず表のどの場所でもつまりtable全体がhoverされたら、thはhoverされる前の状態で装飾をかぶせます。  
+      次に、『table上でhoverされたまま（されている、かつ）、ある行trがhoverされている』という条件のもと、thの背景色に変化が生じるように書いています。  
+      実行結果は以下のようになります。
+      <iframe height="300" style="width: 100%;" scrolling="no" title="memo1-4" src="https://codepen.io/KagenoMoheji/embed/KWeVvX?default-tab=html%2Cresult" frameborder="no" loading="lazy" allowtransparency="true">
+        See the Pen <a href="https://codepen.io/KagenoMoheji/pen/KWeVvX">
+        memo1-4</a> by へのへのもへじ (<a href="https://codepen.io/KagenoMoheji">@KagenoMoheji</a>)
+        on <a href="https://codepen.io">CodePen</a>.
+      </iframe>
+  - headline: このやり方の問題点
+    body: |
+      今回の述べたやり方では、あくまで表という形で要素が「**全体的に埋まっている**」場合に適応。  
+      つまり、記事のリストなど、要素の個数が不特定で、flexboxなどを活用し、「埋まるとは限らない」場合においては、**空き空間となっている要素の部分をhoverした時も、いっぺんにhoverしていることによる変化が生じてしまう**欠点があります。
