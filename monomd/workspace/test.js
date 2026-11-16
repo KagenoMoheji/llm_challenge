@@ -342,6 +342,23 @@ async function runTests() {
         failed++;
     }
 
+    // Test 21: Inline Code HTML Escaping
+    console.log('Test 21: Inline Code HTML Escaping');
+    try {
+        const md = 'Here is an iframe: `<iframe>` and script: `<script>`';
+        const result = await renderMarkdown(md);
+        if (result.html.includes('<code>&lt;iframe&gt;</code>') && 
+            result.html.includes('<code>&lt;script&gt;</code>')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('HTML tags inside inline code not properly escaped');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
     // Summary
     console.log('='.repeat(50));
     console.log(`Tests Passed: ${passed}/${passed + failed}`);
