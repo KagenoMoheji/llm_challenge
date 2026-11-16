@@ -1302,7 +1302,7 @@
         }
 
         // ページ遷移（リロードなし）
-        function navigateTo(path) {
+        async function navigateTo(path) {
             const currentPath = window.location.pathname;
             // トップページへの明示的なリンク遷移の場合は状態を初期化
             if (!path || path === '/' || path === '') {
@@ -1314,7 +1314,10 @@
                 const newUrl = `${currentPath}?path=${encodeURIComponent(path)}`;
                 window.history.pushState({}, '', newUrl);
             }
-            init();
+            // 遷移先ページの先頭へスクロール
+            window.scrollTo(0, 0);
+            await init();
+            window.scrollTo(0, 0);
         }
 
         // 404エラーページをレンダリング
@@ -2425,9 +2428,13 @@
         function setupInternalLinks() {
             const internalLinks = document.querySelectorAll('.internal-link');
             internalLinks.forEach(link => {
-                link.addEventListener('click', function() {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     const path = this.getAttribute('data-path');
-                    navigateTo(path);
+                    if (path) {
+                        navigateTo(path);
+                    }
                 });
                 
                 // ホバー時の視覚効果を追加
@@ -2531,12 +2538,14 @@
         function setupHeaderClick() {
             const header = document.querySelector('.site-header');
             if (header) {
-                header.addEventListener('click', function() {
+                header.addEventListener('click', async function() {
                     // トップページのヘッダリンクから来た場合はフィルタ条件とページ番号を初期化
                     topStore.dispatch(actions.resetState());
                     const currentPath = window.location.pathname;
                     window.history.pushState({ topState: null }, '', currentPath);
-                    init();
+                    window.scrollTo(0, 0);
+                    await init();
+                    window.scrollTo(0, 0);
                 });
             }
         }
