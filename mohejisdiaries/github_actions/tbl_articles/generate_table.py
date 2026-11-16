@@ -30,6 +30,7 @@ logger = logging.getLogger("generate_table")
 
 # Regex to match article file names: e.g. 2019001_sample.yml
 ARTICLE_FILE_PATTERN = re.compile(r"^([0-9]{7})_(.+)\.ya?ml$", re.IGNORECASE)
+EXCLUDE_ARTICLE_FILE_PATTERN = re.compile(r"^9999_(.+)\.ya?ml$", re.IGNORECASE)
 
 
 def normalize_date(value: Any) -> str:
@@ -114,6 +115,8 @@ def generate_articles_table(
         if not file_path.is_file():
             continue
         if not ARTICLE_FILE_PATTERN.match(file_path.name):
+            continue
+        if EXCLUDE_ARTICLE_FILE_PATTERN.match(file_path.name):
             continue
 
         record = parse_article_file(file_path)
