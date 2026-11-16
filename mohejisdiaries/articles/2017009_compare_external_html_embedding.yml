@@ -1,0 +1,200 @@
+creator: KagenoMoheji
+createDate: 2017-06-28
+updateDate: !!timestamp 2017-06-28
+title: 外部HTMLをメインのHTMLに埋め込む処理のやり方を比較
+tags:
+  - JavaScript
+content:
+  - headline: 「外部HTMLを埋め込む」とは。
+    body: |
+      ホームページを作成する際、HTMLはページごとに別々に作成していると思います。  
+      しかし、ヘッダーやフッター、サイドメニューなど、「共通部分」においては、更新のたびにすべてのページでいちいち書き換えることが面倒になってきます。  
+      ならば、「共通部分」を別のHTMLファイルとして独立させ、各ページのHTMLソースに「埋め込めば」良いのではないか！！
+      
+      そういうことです、「外部ファイルを埋め込む」とは、一部のHTMLを別のファイルで作成し、別のHTMLファイルのソース中に呼び出すように、埋め込み処理を行うことです。
+      
+      そして、その方法も色々あったので、正確とも言えないし、全てのサイトに当てはまるとは言えないですが、それぞれ実行してみて、サイトの読み込み速度を比較してみました。
+  - headline: その方法のメリットデメリット
+    body: |
+      【メリット】
+      - 共通部分において、更新作業を行うのは、そのHTMLファイル一つのみで済ませることができる。
+      - HTMLソースが短くなってスッキリする。
+
+      【デメリット】
+      - 別のファイルにしているため、その読み込みを行うために時間がかかってしまう場合がある。
+      - javascriptを書く上で、ディレクトリ関係だったり、読み込みタイミングであったり、ややこしくなる。
+      - 一般にローカル環境でその動作を確認することができない。  
+        →ただし！  
+        **Brackets**を用いれば、これはNode.jsを用いているので、ローカルであっても通信をしているような動作がなされているので確認することはできます。
+  - headline: その様々な方法と、それぞれの速度測定結果
+    body: |
+      【測定方法】
+      - 測定日は2017/04/03
+      - 本サイト（・・・といっても、サーバーは以前のwebcrowですが。）のAboutページを使用。
+      - ブラウザ環境はChrome。
+      - サイト速度の測定は http://www.kaipara.net/cgi-bin/size_check.cgi (現在はリンク切れ)で行う。
+      - チェック結果の「予想表示時間」の数値で比較する。
+      
+      ### ①iframeを用いる。
+      HTMLタグの1つである`<iframe>`を用いる方法。
+      ```
+      <!-----------HTML--------->
+      <iframe src="（埋め込むHTMLファイル）.html" width="~" hight="~" scrolling="(スクロールするか：yes/no)" frameborder="0"></iframe>
+      ```
+      【メリット】
+      - HTMLだけでやりたい人にはこれは使える。
+      - 埋め込む場所にiframeタグを置くため見やすい。
+      【デメリット】
+      - CSSがうまく反映されない。
+      - 埋め込むHTMLのサイズを指定しないといけなくなる。
+      【測定結果】
+      ![【図1】](media/2017009_iframe.png)
+      図1で示されているように、予想表示時間は**16.93秒**ということになった。
+      
+      ### ②jQueryのload関数を用いる。
+      ```
+      // javascript
+      $(function(){
+        $("タグ").load("(タグ内に埋め込むHTMLファイル).html");
+      })
+      ```
+      【メリット】
+      - 1行の関数にタグ、埋め込みHTMLを書くだけで読み込まれる優れもの。
+      - 埋め込み先には、load関数が書かれたjavascriptの（headタグ内での）リンクのみで済ませれる。
+      【デメリット】
+      - FC2レンタルサーバーでなぜか使えない。  
+      →webcrow、sitemixでは使えることは確認しました。
+      【測定結果】
+      ![【図2】](media/2017009_load.png)
+      図2で示されているように、予想表示時間は**16.90秒**ということになった。
+      
+      ### ③XHRを用いる。(1)
+      非同期通信を実現するjavascriptのAPI「XHR」を用いる方法。
+      ```
+      // javascript
+      function include(_html,id){
+        var req = new XMLHttpRequest(); 
+        req.open("get",_html,true);
+        req.onreadystatechange  = function(){
+          if(req.readyState == 4 && req.status == 200){
+            var data = req.responseText;
+            var obj = document.getElementById(id);
+            obj.innerHTML = data;
+            return data;
+          }
+        }
+      }
+
+      <!-----------HTML--------->
+      ～
+      <body onload="include('(埋め込むHTMLファイル).html,'（埋め込む先のタグのid）')">
+      ～
+      </body>
+      ```
+      【メリット】
+      - 埋め込む場所のタグに設定したidと埋め込むHTMLファイルを指定すれば埋め込むことができる。
+      - bodyタグ内に埋め込む箇所を一括指定できる。
+      - 方法④と違って1つの関数で実行できる。
+      【デメリット】
+      - CSS装飾が微妙に合わない。
+      【測定結果】
+      ![【図3】](media/2017009_ajax.png)
+      図3で示されているように、予想表示時間は**16.95秒**ということになった。
+
+      ### ④XHRを用いる。(2)
+      ```
+      //javascript
+      function getParts(url){
+        req_parts = new XMLHttpRequest();
+        req_parts.onload = displayParts;
+        req_parts.open("get", url);
+        req_parts.send();
+      }
+      function displayParts(){
+        var ret = req_parts.responseText;
+        parts_obj = document.getElementById("(埋め込む先のタグのid)");
+        parts_obj.innerHTML = ret;
+      }
+
+      <!-----------HTML--------->
+      ～
+      <body onload="getParts('(埋め込むHTMLファイル).html')">
+      ～
+      </body>
+      ```
+      【メリット】
+      - 引数が1つだけで済む・・・・？
+      - bodyタグ内に埋め込む箇所を一括指定できる。
+      【デメリット】
+      - 上記の2つの関数で1つの共通部分のパーツに反映しているので、各パーツごとに、上記の2つの関数をいちいち書き加えていかないといけない。
+      【測定結果】  
+      なんか測定されてなかった・・・(´･ω･｀)
+      
+      ### ⑤Ajaxを用いる。
+      ```
+      //javascript
+      function include(_html,id){
+        $.ajax({
+          url:_html,
+          cache:false,
+          success:function(html){
+            var obj = document.getElementById(id);
+            obj.innerHTML = html;
+          }
+        });
+      }
+
+      <!--------HTML-------->
+      <div id="include_parts">
+        <script type="text/javascript">
+          include("(埋め込むHTMLファイル).html","include_parts");
+        </script>
+      </div>
+      ```
+      【メリット】
+      - 変数の代入と設定を1行で済ませれる。
+      - 埋め込み先のHTML内で埋め込む箇所のタグ内にscriptタグで各HTMLファイルとタグのidを指定するため、場所的に見やすくはなることもある。
+      - 1つのjavascript関数のみで複数の埋め込みHTMLの処理を行える。
+      【デメリット】
+      - CSSが崩れる。
+      - 埋め込み先HTMLにおいて、各パーツごとにそれぞれの埋め込み場所にいちいち設置しないといけない。
+      【測定結果】
+      ![【図4】](media/2017009_jsonly.png)
+      図4で示されているように、予想表示時間は**16.95秒**ということになった。  
+      もしかすると、Ajaxは方法③をエンジン（ライブラリ）化したものなのだろうか・・・？
+      
+      ### ⑥javascriptでひたすらHTMLを足して埋め込む。
+      ```
+      //javascript
+      function writeParts(){
+        var html='';
+        html+='(外部HTMLのソースを書き足していく。)';
+        html+=～;
+        html+=～;
+        ・
+        ・
+        ・
+        html+=～;
+        document.write(html);
+      }
+
+      <!--------HTMl-------->
+      <div id="include_parts">
+        <script type="text/javascript">
+          writeParts();
+        </script>
+      </div>
+      ```
+      【メリット】
+      - 至極シンプル！
+      【デメリット】
+      - ひたすらめんどくさい！！！
+      【測定結果】  
+      使用しないので測定しなかった。
+  - headline: まとめ
+    body: |
+      さて・・・どれが速かったのか・・・ごくわずかな差ですが、②のload関数を用いる方法が速かったですね。  
+      本サイトもこの方法を取ることにしています。そのため、FC2レンタルサーバーを使っていた前サイトを移転せざるを得なかった理由にもなっていますが・・・。
+      
+      これで、外部HTMLの埋め込みに関する話は終わりです～  
+      (∩´∀｀)∩ｵﾂｶﾚｻﾏ!
