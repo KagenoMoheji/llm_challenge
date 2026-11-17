@@ -1,0 +1,535 @@
+creator: KagenoMoheji
+createDate: 2018-02-22
+updateDate: !!timestamp 2018-02-22
+title: 組み込みCでPAC-MANを作っちゃった
+tags:
+  - C言語
+content:
+  - headline: はじめに
+    body: |
+      どうも、こちらでは約2か月ぶりということで。  
+      今回は今学期受講したプログラミングC言語（GameBoyAdvanceの組み込みプログラミングという内容）の期末レポートで自由題材で何か製作することになったので、何にしようかと悩んだ果てに...
+      
+      **半年前の（いきなりC言語を触って分からないまま実装していた）演習のリベンジ**として『PAC-MAN』を実装しようと決めました！  
+      期間は、期末試験が終わる2/2からレポート期限の2/5までの3日半。実際その期間で完成させました。
+      ![【図1】](media/2018001_pactitle.PNG)
+      タイトルは、【図1】にあるように「PAC-MAN Level is...Never be cleared!」ですね。  
+      絶対クリアできません。仕様上。はい( ;∀;)ｴｯ
+      ![【図2】](media/2018001_pacgame.PNG)
+      ゲーム画面は【図2】のようになっています。もうほぼ、まんまPAC-MANの難易度高いマップだと思います。  
+      後のチャプターで成果物として動画や体験用環境を掲載していますので、そちらもご覧になってください。
+  - headline: どのようなソースコードか
+    body: |
+      900行弱あるので、すべて説明はできません。そのため個人的に工夫した・重要だった部分を掲載します。
+      
+      ### ①8x8を1マスとして描写
+      今回のGBAの画面は240列×160行の点行列からなっているというものでした。  
+      なので、講義でもしつこく取り上げられていたが、ASCIIコードの描写の際は、8x8のドット群を1マスとして1文字を描写することになっていました。  
+      つまり、1ドットを0か1かのバイナリ情報にして、1だった場合に指定の色を描写して文字を表現させるというものです。  
+      さらに、バイナリ情報が8列並んだものが8行分あると考えることができるので、**8つの2桁の16進数が要素として持つ配列**を利用します。
+      
+      そうした考え方を利用し、PAC-MAN・モンスター・通路（壁）も8x8ドット群で1体（マス）分描写することにしました。  
+      例えばPAC-MANの描写は以下のようになります。  
+      ※ただし、コメントアウト部分で黄色になっているのは描写がどのようになるか分かりやすく示すためのものである。
+      ```C
+      hword dot_pacman[5][8]={ // パックマンのドット絵パターン
+          { // 口が開いていない状態
+              0x00, //0,0,0,0,0,0,0,0
+              0x3C, //0,0,<span class="yellow">1,1,1,1</span>,0,0
+              0x7E, //0,<span class="yellow">1,1,1,1,1,1</span>,0
+              0x7E, //0,<span class="yellow">1,1,1,1,1,1</span>,0
+              0x7E, //0,<span class="yellow">1,1,1,1,1,1</span>,0
+              0x7E, //0,<span class="yellow">1,1,1,1,1,1</span>,0
+              0x3C, //0,0,<span class="yellow">1,1,1,1</span>,0,0
+              0x00  //0,0,0,0,0,0,0,0
+          },
+          { // 口が右に開いている状態
+              0x00, //0,0,0,0,0,0,0,0
+              0x3C, //0,0,<span class="yellow">1,1,1,1</span>,0,0
+              0x7E, //0,<span class="yellow">1,1,1,1,1,1</span>,0
+              0x78, //0,<span class="yellow">1,1,1,1</span>,0,0,0
+              0x78, //0,<span class="yellow">1,1,1,1</span>,0,0,0
+              0x7E, //0,<span class="yellow">1,1,1,1,1,1</span>,0
+              0x3C, //0,0,<span class="yellow">1,1,1,1</span>,0,0
+              0x00  //0,0,0,0,0,0,0,0
+          },
+          { // 口が左に開いている状態
+              0x00, //0,0,0,0,0,0,0,0
+              0x3C, //0,0,<span class="yellow">1,1,1,1</span>,0,0
+              0x7E, //0,<span class="yellow">1,1,1,1,1,1</span>,0
+              0x1E, //0,0,0,<span class="yellow">1,1,1,1</span>,0
+              0x1E, //0,0,0,<span class="yellow">1,1,1,1</span>,0
+              0x7E, //0,<span class="yellow">1,1,1,1,1,1</span>,0
+              0x3C, //0,0,<span class="yellow">1,1,1,1</span>,0,0
+              0x00  //0,0,0,0,0,0,0,0
+          },
+          { // 口が上に...
+          ...
+      }
+      ```
+      ASCII文字・モンスターについては上と同様に描写し、通路については8x8のうち上下左右の1行または1列を「壁」とするようにバイナリデータを並べた1マス分としています。  
+      ゲーム画面のマップは、先述した多様な位置にある壁をもつ1マス分を繋いで30x20（240/8と160/8）で構築したものです。
+      
+      ### ②多様な機能を関数として独立させて自作
+      可読性の面ではかなり重要になってくると思い、関数の多様化に力をいれた。あまり多すぎてもいけないとは思うのですが、個人的に作っておいた方が独立的に変更、柔軟に呼び出しできるかな、と思うところは作成しました。  
+      例えば、
+      - (1)オブジェクト（PAC-MAN、モンスター）の生成  
+        →createPacman()とcreateEnemy()  
+        構造体の仕組み上PAC-MANとモンスター用のそれぞれ2つの関数を用意してあるが、構造体変数の初期値を代入する処理を実装しました（構造体では変数宣言のみで初期値代入はできないらしい）。
+      - (2)オブジェクトの座標更新・描写  
+        →movePacman()とmoveEnemy()  
+        移動する方向を決定（PAC-MANはキー操作に基づく）し、座標をその方向に応じて更新し、描写をする関数。  
+        モンスターの進路方向に関しては、GBAが持つクロックタイマに基づいたランダム関数で決めるようにしました。
+      - (3)壁やモンスターとの衝突判定  
+        →colorJudge()とcollidedWithEnemy()  
+        PAC-MANとモンスターの壁との衝突に関しては、壁の色である「白」を検出することで実現しました。  
+        PAC-MANとモンスターの衝突に関しては、それぞれの中心点の座標の距離を判定することで実現しました。
+      
+      また、関数を多く作成することで、main関数の行数を抑えて読みやすく（なってるかな？）できるということも。今回は210行（/900行弱）に収まりました。  
+      【プリプロセッサとmain関数↓】
+      ```
+      /* Cコード */
+      /* プリプロセッサ */
+      #define IOBASE 0x04000000
+      #define LCD_WIDTH 240
+      #define LCD_HEIGHT 160
+      #define LCD_CHAR_WIDTH 30
+      #define LCD_CHAR_HEIGHT 20
+      #define VRAM 0x06000000
+      #define RGB(r,g,b) (((b)&#60;&#60;10)+((g)&#60;&#60;5)+(r))
+      #define WHITE RGB(0x1F,0x1F,0x1F)
+      #define BLACK RGB(0x00,0x00,0x00)
+      #define YELLOW RGB(0x1F,0x1F,0x00)
+      #define MAGENTA RGB(0x1F,0x00,0x1F)
+      #define CYAN RGB(0x00,0x1F,0x1F)
+      #define RED RGB(0x1F,0x00,0x00)
+      #define BLUE RGB(0x00,0x00,0x1F)
+      #define GREEN RGB(0x00,0x1F,0x00)
+      #define FOODS RGB(0x1F,0x09,0x00)
+      #define KEY_STATUS	(IOBASE + 304)	               // Key status
+      #define KEY_L		0x0200	                       // L
+      #define KEY_R		0x0100	                       // R
+      #define KEY_DOWN	0x0080	                       // Down
+      #define KEY_UP		0x0040	                       // Up
+      #define KEY_LEFT	0x0020	                       // Left
+      #define KEY_RIGHT	0x0010	                       // Right
+      #define KEY_START	0x0008	                       // Start
+      #define KEY_SELECT	0x0004	                       // Select
+      #define KEY_B		0x0002	                       // B
+      #define KEY_A		0x0001	                       // A
+      #define KEY_ALL		0x03FF                         // All key bits
+      #define TIMER0 (hword*)0x04000100
+      #define TIMER1 (hword*)0x04000104
+      #define TIMER2 (hword*)0x04000108
+      #define TIMER3 (hword*)0x0400010C
+      #define SET_TIMER0 (hword*)0x04000102
+      #define SET_TIMER1 (hword*)0x04000106
+      #define SET_TIMER2 (hword*)0x0400010A
+      #define SET_TIMER3 (hword*)0x0400010E
+      #define TM_SET0 0x0000                              //制御設定（タイマOFF，割込みOFF，カスケードOFF，プリスケーラなし）
+      #define TM_SET1 0x0080                              //制御設定（タイマON，割込みOFF，カスケードOFF，プリスケーラなし）
+      #define TM_SET2 0x0084                              //制御設定（タイマON，割込みOFF，カスケードON，プリスケーラなし）
+      #define TIMER_ON(l) timer(l)
+      #define TIMER_OFF (*((hword *)0x04000102) = 0x0000)
+      #define LENGTHOF(array) (sizeof(array)/sizeof(*array))
+      typedef unsigned short hword;
+      typedef unsigned char byte;
+      typedef struct{
+          hword x,y;
+      }POINT;
+      typedef struct{
+          hword x,y;
+          hword dm;                                        //0:口閉じ、1:右方向、2:左方向、3:上方向、4:下方向
+          hword score;
+      }PACMAN;
+      typedef struct{
+          hword x,y;
+          hword dm;                                        //0:右方向、1:左方向、2:上方向、3:下方向
+          hword dn,color;
+      }ENEMY;
+                                                  
+      /* 関数 */
+      void locate(hword,hword,hword);                      //8x8を1マスとしたときの、描写開始点（8x8の左上）の座標を返す
+      void draw_point(hword,hword,hword);                  //ドット描写
+      void createPacman(PACMAN*);                          //PAC-MANの初期値設定
+      void createEnemy(ENEMY*,hword,hword,hword,hword);    //モンスターの初期値設定ー
+      void movePacman(PACMAN*);                            //PAC-MANの座標更新、描写
+      void moveEnemy(ENEMY*);                              //モンスターの座標更新、描写
+      void keyopr(PACMAN*);                                //キー操作
+      hword collideWithEnemy(PACMAN*,ENEMY*);              //モンスターとの衝突判定
+      hword colorJudge(PACMAN*,hword);                     //接触した色の判定（要は壁との衝突判定）
+      void prints(byte*,hword);                            //ASCII文字列の描写
+      void printn(hword,hword);                            //ASCII数字列の描写
+      void drawDots(hword,hword,hword);                    //8x8ドット絵（PAC-MAN、モンスター、壁）の描写
+      hword rand(hword,hword);                             //ランダム関数
+      void timer(hword);                                   //タイマー関数
+      hword issue_mask(hword);                             //まぁこれはようはあれだ。
+      hword power(int,hword);                              //累乗演算関数
+      hword div(hword,hword);                              //除算関数
+      hword remainder(hword,hword);                        //剰余演算関数
+      void sleep(int);                                     //停止関数
+      void deleteAll(void);                                //画面初期化関数
+                                                  
+      /* グローバル変数 */
+      hword *ptr,*ptr2;                                    //描写のポインタ、キー操作のポインタ
+      POINT p;                                             //構造体POINTのインスタンス（？）
+      hword cx,cy;                                         //240x160での座標
+      hword scene=0;                                       //0:タイトル画面、1:プレイ中画面、2:クリア画面、3:ゲームオーバー画面
+      hword dotWidth=LENGTHOF(*char8x8);                   //dot_aisle、dot_pacman、dot_enemyも同じ幅。
+      hword flushFlag=0;                                   //点滅・モーション描写の際の切り替えフラグ
+      hword time,retime=0,limit=240;                       //ゲーム制限時間(4分)
+      hword bestscore=0;                                   //ハイスコア
+
+      /* main関数 */
+      int main(void){
+          /*GBA画面初期化*/
+          ptr=(hword*)IOBASE;
+          *ptr=0xF03;
+
+          ptr2=(hword*)KEY_STATUS;
+
+          hword x,y;
+          PACMAN pc;//パックマンの構造体を定義
+          ENEMY e1,e2,e3,e4,e5,e6,e7;//敵（7匹）の構造体を定義
+
+          while(1){
+              switch(scene){
+                  case 0:/*タイトル画面*/
+                      if(((~*ptr2)&KEY_ALL)==KEY_START){ // STARTボタンが押されたら
+                          hword i;
+                          for(i=0;i&#60;3;i++){ // スリーカウント
+                              cx=13,cy=8;
+                              locate(cx,cy,0);
+                              printn(3-i,WHITE);
+                              sleep(2000000);
+                          }
+                          flushFlag=0;
+
+                          //コースの描写
+                          for(y=0;y&#60;LCD_CHAR_HEIGHT;y++){
+                              for(x=0;x&#60;LCD_CHAR_WIDTH;x++){
+                                  locate(x,y,0);
+                                  drawDots(course[y][x],0,3);//colorは決まってるので無視
+                              }
+                          }
+                          //ハイスコアの描写
+                          cx=1,cy=0;
+                          locate(cx,cy,0);
+                          prints("HS:",WHITE);
+                          cx=4,cy=0;
+                          locate(cx,cy,0);
+                          printn(bestscore,WHITE);
+                          //パックマンの生成
+                          createPacman(&pc);
+                          //敵（7匹）の生成
+                          createEnemy(&e1,116,36,0,MAGENTA);
+                          createEnemy(&e2,120,65,1,CYAN);
+                          createEnemy(&e3,58,102,2,GREEN);
+                          createEnemy(&e4,13,11,0,BLUE);
+                          createEnemy(&e5,194,36,1,RED);
+                          createEnemy(&e6,202,94,2,BLUE);
+                          createEnemy(&e7,116,133,2,MAGENTA);
+                          
+                          //シーン切り替え
+                          scene=1;
+                          break;
+                      }
+
+                      //タイトル描写
+                      cx=11,cy=2;
+                      locate(cx,cy,0);
+                      prints("PAC-MAN",YELLOW);
+                      cx=9,cy=3;
+                      locate(cx,cy,0);
+                      prints("Level is...",WHITE);
+                      cx=6,cy=4;
+                      locate(cx,cy,0);
+                      prints("Never be cleared!",WHITE);
+                      cx=1,cy=10;
+                      locate(cx,cy,0);
+                      prints("Full Score is 569.",WHITE);
+                      //イントロ描写
+                      cx=1,cy=11;
+                      locate(cx,cy,0);
+                      prints("HS is High Score.",WHITE);
+                      cx=1,cy=13;
+                      locate(cx,cy,0);
+                      prints("Push UP or DOWN or RIGHT or",WHITE);
+                      cx=1,cy=14;
+                      locate(cx,cy,0);
+                      prints("LEFT to move PAC-MAN.",WHITE);
+
+                      //（点滅仕様の）アナウンス描写
+                      cx=3,cy=16;
+                      locate(cx,cy,0);
+                      if(flushFlag==0){
+                          prints("Push START to start game.",WHITE);
+                          flushFlag=1;
+                      }else{
+                          prints("                         ",WHITE);
+                          flushFlag=0;
+                      }
+
+                      sleep(1000000);
+                      break;
+                  case 1:
+                      //タイマーON
+                      TIMER_ON(10);
+
+                      while(1){
+                          if(((~*ptr2)&KEY_ALL)!=0){ // キーのいずれかが押されたら
+                              keyopr(&pc);
+                          }
+                          
+                          //パックマンの座標更新
+                          movePacman(&pc);
+                          //敵（7匹）それぞれの座標更新
+                          moveEnemy(&e1);
+                          moveEnemy(&e2);
+                          moveEnemy(&e3);
+                          moveEnemy(&e4);
+                          moveEnemy(&e5);
+                          moveEnemy(&e6);
+                          moveEnemy(&e7);
+
+                          //タイムリミット描写
+                          time=limit-((*(TIMER3)-retime)/10);
+                          cx=13,cy=0;
+                          locate(cx,cy,0);
+                          printn(time,WHITE);
+              
+                          //色センサがエサを認識したらスコア更新
+                          if(colorJudge(&pc,FOODS)==1){
+                              pc.score++;
+                          }
+                          //スコア描写
+                          cx=26,cy=0;
+                          locate(cx,cy,0);
+                          printn(pc.score,WHITE);
+
+                          //スコアが満点になったら
+                          if(pc.score==569){
+                              TIMER_OFF;//タイマOFF
+                              retime=(*(TIMER3));
+                              scene=2;//クリア画面に遷移
+                              break;
+                          }
+
+                          //いずれかの敵に衝突した、もしくはタイムリミットを迎えたら
+                          if(collideWithEnemy(&pc,&e1)==1||collideWithEnemy(&pc,&e2)==1||
+                          collideWithEnemy(&pc,&e3)==1||collideWithEnemy(&pc,&e4)==1||
+                          collideWithEnemy(&pc,&e5)==1||collideWithEnemy(&pc,&e6)==1||
+                          collideWithEnemy(&pc,&e7)==1||time==0){
+                              TIMER_OFF;
+                              retime=(*(TIMER3));
+                              scene=3;//ゲームオーバー画面に遷移
+                              break;
+                          }
+
+                          sleep(30000);
+                      }
+                      break;
+                  case 2:
+                      //ハイスコアの更新
+                      bestscore=(pc.score>bestscore) ? pc.score:bestscore;
+
+                      if(((~*ptr2)&KEY_ALL)==KEY_A){ // Aボタンが押されたら
+                          deleteAll();
+                          *(TIMER0)=0xFF00;
+                          scene=0;
+                          break;
+                      }
+
+                      //クリアコメント（点滅）描写
+                      cx=13,cy=12;
+                      locate(cx,cy,0);
+                      if(flushFlag==0){
+                          prints("CLEAR!!!",YELLOW);
+                          flushFlag=1;
+                      }else{
+                          prints("        ",WHITE);
+                          flushFlag=0;
+                      }
+
+                      //リセットのアナウンス描写
+                      cx=5,cy=13;
+                      locate(cx,cy,0);
+                      prints("Push key_A to reset.",WHITE);
+                      sleep(500000);
+                      break;
+                  case 3:
+                      //ハイスコアの更新
+                      bestscore=(pc.score>bestscore) ? pc.score:bestscore;
+
+                      if(((~*ptr2)&KEY_ALL)==KEY_A){ // Aボタンが押されたら
+                          deleteAll();
+                          *(TIMER0)=0xFF00;
+                          scene=0;
+                          break;
+                      }
+
+                      //ゲームオーバーコメント（点滅）描写
+                      cx=9,cy=12;
+                      locate(cx,cy,0);
+                      if(flushFlag==0){
+                          prints("GAME OVER...",BLUE);
+                          flushFlag=1;
+                      }else{
+                          prints("            ",WHITE);
+                          flushFlag=0;
+                      }
+
+                      //リセットのアナウンス描写
+                      cx=5,cy=13;
+                      locate(cx,cy,0);
+                      prints("Push key_A to reset.",WHITE);
+                      sleep(500000);
+                      break;
+              }
+          }
+
+          /*停止処理*/
+          while(1);
+          return 0;
+      }
+      ```
+      ### ③構造体の活用
+      これ重要、構造体です。  
+      講義でもｻﾗｯｯという感じに薄～く習った感じでしたが、個人的にこれが鍵になると考えてかなり勉強しました。
+      また、ここで講義でも習っていない、**構造体の値をポインタとして関数の引数に設定して渡す**書き方や**アロー演算子**も導入しました。
+      
+      今回習った組み込みCでは、クラスという概念が無い感じで、Javaを先に習った者としては構造体がオブジェクト指向に類似したものとして扱うに値すると感じました。  
+      したがって、構造体をJavaでいうコンストラクタと同様に用意し、インスタンス生成、という流れを作ってオブジェクトの更新のたびに呼び出すようにソースを書きました。  
+      その時、構造体を関数に渡す際は構造体としてorポインタとして渡すか、また構造体変数に変更を加える際にドット演算子orアロー演算子を用いるか、という使い分けが必要になってくることも勉強になったんです。
+      
+      なので、ここで自分メモとしてまとめておきます。
+      
+      まず構造体は下のソースのようにstruct構文で、関連した複数の変数群を１まとまりにして定義するものです。  
+      ただし変数に初期値を与えてはダメなようです。
+      ```
+      struct (構造体名){
+          //ここで変数群を定義。
+      };
+                                                  
+      /* 例 */
+      struct Point{
+          int x;
+          short y;
+      }
+      ```
+      構造体やその変数の呼び出し下のようになります。Javaでいうインスタンスの生成に似ています。  
+      変数の呼び出しに関しては基本的にドット演算子を用います。
+      ```
+      //構造体の呼び出し
+      (構造体名) (変数名);
+                                                  
+      //変数の呼び出し
+      (構造体を呼び出した際に定義した変数名).(構造体内の変数名)
+                                                  
+      /* 例 */
+      Point point;
+      point.x
+      ```
+      ここからが構造体の本題、関数に引数として構造体を渡し、構造体変数の値を変更することについてです。  
+      まず構造体を関数に渡す方法は、構造体名で渡すやり方とポインタとして渡すやり方があります。
+      #### (1)構造体名で渡す
+      書き方は下のようになります。
+      ```
+      /* 例 */
+      void func1(Point point){
+          //処理
+          
+          point.x=5;
+      }
+      func1(point);
+      ```
+      このやり方の場合、関数内で構造体の変数の値を参照・変更する際はドット演算子を使わなくてはなりません。  
+      アロー演算子を用いるとエラーになってしまします。  
+      さらに、構造体名で関数に値を渡すやり方では変数群を**別のアドレスにコピーして**渡す、つまり渡された構造体変数はスタックメモリに格納されているので、関数内で構造体変数の値を変更しても、その関数の一連の処理が終わったらメモリから削除され、元の（main関数で設定した）値に戻されてしまいます。  
+      そのため、そうしたことを踏まえたうえでの処理にのみ、このやり方を利用した方がいいでしょう。
+      
+      では、関数内で構造体の変数の値をグローバル的に変更するにはどうすればよいでしょうか。  
+      先述した2つの方法のうち後者を使います。
+
+      #### (2)ポインタとして渡す
+      書き方は下のようになります。
+      ```
+      /* 例 */
+      void func2(Point* point){
+          //処理
+
+          point->x=5;
+      }
+      func2(&point);
+      ```
+      先述した構造体名で渡すやり方と違い、こちらでは関数内での構造体の変数の値参照・変更は**アロー演算子**を使わないといけません。ドットでやっていたところを矢印の形を作る記号2つに置き換えます。  
+      また、こちらの方法では、**構造体の変数を定義したアドレスそのものを関数に渡している**ため、直接そのアドレスに格納されている値を参照・変更していることになり、これはグローバル的に値が維持されることになります。  
+      ポインタの扱い方はかなり重要ですね！(´ω｀*)
+      
+      こうした構造体というシステムを利用して、組み込みCをオブジェクト指向っぽくし、PAC-MANを製作することができました。
+  - headline: もっとできたかな～って思うこと
+    body: |
+      モンスターを生成（createEnemy）・更新する（moveEnemy）にあたり、7つのインスタンスをそれぞれ別々に呼び出して7行も書いちゃうのはどうだったかな～というのがあった。  
+      これについては構造体変数を配列として定義すれば、インデックスで繰り返し処理できるのではないかなと考えました。  
+      それについては、配列のポインタの引数受け渡しという勉強もできたと思うのですが、期限的にちょっと先送りしました。また余裕ができたときにやってみます。
+  - headline: 成果物
+    body: |
+      下の動画は私がツイートしたもので、半年前の大学の演習（C言語習っておらずいきなり作らされていた）で作成したものと今回の成果物を比較したものです。  
+      （半年前の私、PAC-MANのルールを勘違いして、「モンスターを食べたらクリア」だなんてもはやPAC-MANでなくなってる...(´･ω･｀)  
+      正しくは、モンスターを回避しながら制限時間内にマップ中にあるエサを全て食べてクリアなんですね。）
+      <blockquote class="twitter-tweet"><p lang="ja" dir="ltr">1回生の時に作成したパックマンと，今完成したパックマンを比較した動画作りましたｗ
+      半年の学習の進捗です！ https://t.co/tAKWADK9IG</p>&mdash; へのへのもへじ (@KagenoMoheji) <a href="https://x.com/KagenoMoheji/status/960280375346868224?ref_src=twsrc%5Etfw">February 4, 2018</a></blockquote>
+      <script async src="https://platform.x.com/widgets.js" charset="utf-8"></script>
+      いかがでしょう？  
+      個人的に動画にあるような興奮を覚えています(∩´∀｀)∩
+      
+      下にCコードをコンパイル・リンカして作成した実行（mb）ファイルと、GBAのエミュレータであるVBA（Excelのアレではないよ！）がダウンロードできるように置いておき、操作方法も説明しますので、ぜひ体験してみてください。
+  - headline: ダウンロード&体験はこちらから
+    body: |
+      ### ①GBAエミュレータであるVBAのダウンロード
+      ![【図3】](media/2018001_vbadownload.PNG)
+      [https://logu.jp/gba-for-pc/](https://logu.jp/gba-for-pc/)  
+      上のリンクをクリックして【図3】にあるようなページに飛び、【図3】の赤枠で囲んでいるところからVBAのzipファイルをダウンロードし、「全て展開」とかで解凍してください。  
+      操作方法については③で説明します。
+      
+      ### ②実行可能（mb）ファイルのダウンロード
+      [PACMAN.zip](media/PACMAN.zip)  
+      上のリンクからダウンロードできます。解凍してmbファイルを取り出してください。  
+      セキュリティ云々とか警告出そうですけど、誓って攻撃の意図はないです、ハイ('ω')
+      
+      ### ③VBAの操作方法
+      まず「VisualBoyAdvance.exe」をクリックして起動し、File→Openから②でダウンロードしたmbファイルを導入すると、ゲームが開始されます。  
+      【キー操作】
+      Option→Joypad→Configure→1…を選択すると、どのGBAのボタンがキーボードのどのキーに対応しているかが分かります。  
+      ただ、なーんか「Xfer」ってでてきて動作しなかったりするんですけど、下に記載する設定例または好みで設定すれば動作したりします。  
+      一応下に設定例を記載しますね。  
+      ※GBAにあるB・L・R・Selectは今回使わないので記載していません。好みで設定してください。
+      | GBAのキー | 対応するキー |
+      |:---:|:---:|
+      | A | Z |
+      | Up | 上矢印 |
+      | Down | 下矢印 |
+      | Left | 左矢印 |
+      | Right | 右矢印 |
+      | Start | Enter |
+      また、ワンタッチで反応しなくても、長押ししてれば反応する...かも？
+      
+      【描画速度】
+      GBAマシンの処理速度を変更することができます。  
+      私が作成したPAC-MANには除算処理を多く使用していますので、これがなかなか、動作を重くしているんですね。  
+      それにイラついた方は、スロットルを上げてスムーズに動くようにしちゃってください。  
+      Option→Frame Skip→Throttleから、100％以上で設定すれば速くなります。カスタマイズで1000％まで設定できます。
+      
+      た・だ・し！  
+      処理速度が上がるということは、クロックタイマーも速くなるので、制限時間が減る速度も速くなります。要は4分という制限時間もあっという間に4分経たないうちに過ぎます。  
+      これについてのお問い合わせは受け付けません、ハイ('ω')
+      
+      【画面サイズ】
+      初めて起動したサイズでは小さくて見づらいと思います。  
+      Option→Videoから、「x1」～「x4」があるので、例えば「x3」を選択して3倍の画面サイズにすることも可能です。
+  - headline: 最後に
+    body: |
+      なんとも読みにくそうな記事に仕上がってしまいましたが、まぁまぁな成果物を作れたので勝手ながら記事にさせていただきました。  
+      なお、main関数以外のソースについては、大学の後輩などが見てコピーしてしまうなどしては宜しくないかなと考え、省略させていただきました。
+      
+      今後もプログラミングで形あるモノを、サービスを開発していけるように精進していきたいです。
