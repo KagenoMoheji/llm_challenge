@@ -27,14 +27,14 @@ from capass_server.common.config import DB_HOST
 
 - **使っていなくても、ヘッダの `import` は削除しない。**(`sys` / `time` / `traceback` / `PYPATH` / `MODNAME` が未使用でも残す)
 - モジュールdocstringを付ける場合は、ヘッダより前(ファイルの先頭)に置く。
-- 実際のimportは、ヘッダの後の `# その他のモジュールや...` コメントの下に書く。他のCaPassモジュールは、`capass_server.` から始まる、**ROOTPATH(`server/`)起点の絶対パス**でimportする(相対importは使わない)。
+- 実際のimportは、ヘッダの後の `# その他のモジュールや...` コメントの下に書く。同じプロジェクトのモジュールは、パッケージ名(`capass_server.` `capass_core.` `capass_toolserver.` `capass_agent.`)から始まる、**ROOTPATH(そのプロジェクトのディレクトリ)起点の絶対パス**でimportする(相対importは使わない)。他のプロジェクト(例: `toolserver` から `capass_core`)は、**インストールされたパッケージ**としてimportする。
 - `common/config.py` は、他モジュールをimportしないので、末尾の `# その他のモジュール...` コメントは不要(ヘッダのみ)。
 
 ### ROOTPATH の指定(エントリポイントのモジュールだけ)
 
 `ROOTPATH` の定義と `sys.path.append(ROOTPATH)` は、**実行の起点になるモジュールにだけ**書く。ライブラリとして他から呼ばれるモジュール(`controllers/` `services/` `models/` `schemas/` `common/` など)には書かない。
 
-- サーバ: `capass_server/main.py`
+- サーバ: `capass_server/main.py`(`server/daemon/`)、`capassコマンド`: `capass_core/cli/main.py`
 - テスト: `tests/` 配下の全モジュール(`conftest.py` `testlib.py` `ut_*.py` `it_*.py`。pytestが直接読み込む起点になるため)
 
 `ROOTPATH` は `PYPATH` の次の行で定義し、コメントと `sys.path.append` は `MODNAME` の後に書く。
@@ -49,26 +49,41 @@ sys.path.append(ROOTPATH)
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 ```
 
-- `ROOTPATH` は、そのファイルの1つ上のディレクトリ(`capass_server/main.py` も `tests/*.py` も `server/`)。
+- `ROOTPATH` は、プロジェクトのディレクトリ(`pyproject.toml` があるディレクトリ)。`capass_server/main.py` と `tests/*.py` は、1つ上(`{PYPATH}/..`。`server/daemon/`、`core/` など)、`capass_core/cli/main.py` は、2つ上(`{PYPATH}/../..`。`core/`)。
 - `tests/testlib.py` をimportするテスト(と `conftest.py`)は、`sys.path.append(ROOTPATH)` の次の行に `sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimportするため` を追加する。
 - CaPassのコードをimportしない単体スクリプト(`examples/provisional_client.py`)は、ヘッダのみで `ROOTPATH` は使わない。
 
 ## 2. ディレクトリ構成と層の責務
 
+**プロジェクト(`pyproject.toml` を持つディレクトリ)は、モードごとに、別々に配布する。** 各プロジェクトは、`<プロジェクト>/<パッケージ>/` の2層(プロジェクトのディレクトリ + importできるパッケージ)にする。パッケージ名は、`capass_` から始める(他のパッケージと、名前が衝突しないように。モードの検出に、パッケージ名を使う)。
+
 ```
-server/capass_server/
-  main.py            アプリ生成、lifespan、起動
-  routes.py          ルータの登録
-  controllers/       HTTPの入出力だけ(api_v1.py, root.py, dependencies.py, error_handlers.py)
-  services/          業務ロジック。トランザクション(commit/rollback)の境界
-  models/            entities.py(テーブル定義)と mappers.py(DBアクセス)
-  schemas/           Pydanticのリクエスト/レスポンス
-  common/            横断的な部品(config, globals, db, errors, crypto, signature, rate_limit, tool_client)
-server/tests/        ut_*.py(単体)、it_*.py(結合)、conftest.py、testlib.py
-cli/capass_cli/      CaPassクライアント(CLI)。main.py、commands/(サブコマンド)、common/(部品)。詳しくは 11.
-cli/tests/           ut_*.py(単体)、it_*.py(結合)
-examples/            暫定クライアントと、ツールサーバの見本。skills/ AI向けスキル
+core/                       配布名 capass。共通部品と、capass コマンド
+  capass_core/                errors, paths, system(OSの操作), fileio, keys, conf, modes, roles, systemd, init_steps, testing(各プロジェクトのテストで使う補助)
+    cli/                      main.py(capass コマンドの入口: インストール済みのモードを探して、そのCLIを登録する)、init.py(常駐プロセスを持つモードの、共通の init)
+  tests/
+toolserver/                 配布名 capass-toolserver(モード: ツールサーバ)
+  capass_toolserver/
+    cli/                      ツールサーバのコマンド(register(subparsers, context) を持つ)
+    daemon/                   常駐プロセス(受け口)。未実装
+  tests/
+agent/                      配布名 capass-agent(モード: AIエージェント)。待ち受けの機能は持たない
+  capass_agent/cli/           未実装
+  tests/
+server/daemon/              配布名 capass-server(モード: CaPassサーバ)。v0.1.5までのサーバを、中身を変えずに移したもの
+  capass_server/
+    main.py            アプリ生成、lifespan、起動
+    routes.py          ルータの登録
+    controllers/       HTTPの入出力だけ(api_v1.py, root.py, dependencies.py, error_handlers.py)
+    services/          業務ロジック。トランザクション(commit/rollback)の境界
+    models/            entities.py(テーブル定義)と mappers.py(DBアクセス)
+    schemas/           Pydanticのリクエスト/レスポンス
+    common/            横断的な部品(config, globals, db, errors, crypto, signature, rate_limit, tool_client)
+  tests/               ut_*.py(単体)、it_*.py(結合)、conftest.py、testlib.py
+examples/              暫定クライアントと、ツールサーバの見本。skills/ AI向けスキル
 ```
+
+- **層の責務(`capass_server`):** controllers → services → models → common。下の層から、上の層をimportしない。
 
 依存の向きは `controllers → services → models → common`(`schemas` は controllers と services から使う)。**下の層から上の層をimportしない**(例: `common` は `services` をimportしない)。
 
@@ -147,6 +162,7 @@ examples/            暫定クライアントと、ツールサーバの見本�
 
 ## 8. テスト
 
+- プロジェクト(`core` `toolserver` `agent` `server/daemon`)ごとに、そのディレクトリで `pytest` を実行する。`toolserver` と `agent` のテストは、`capass_core` を、インストールして使う(`pip install -e ./core -e "./toolserver[dev]"`)。システムを変更する処理(ユーザ作成、chownなど)は、`capass_core.testing` の `FakeSystemOps` と `make_context` で、差し替えて、実際の `/opt/capass` には触れない。
 - 命名: `ut_*.py` は単体テスト(外部依存なし)、`it_*.py` は結合テスト(`TestClient` + インメモリSQLite)。pytestの設定は `pyproject.toml` の `python_files`。
 - 共通のfixtureは `conftest.py`(`session_factory` `client` `admin_priv` `fake_tool_server`)、署名付きボディの作成やDBへの前提データ登録は `testlib.py` に置く。PostgreSQLやネットワークは使わない。
 - 新しいAPIには、正常系に加えて、401 / 403 / 404 / 409 / 422 の異常系のテストを書く。署名付きAPIは、改ざん・期限切れ・別リソースへの使い回しも確認する。
@@ -156,7 +172,7 @@ examples/            暫定クライアントと、ツールサーバの見本�
 
 ## 9. バージョンと成果物
 
-- バージョンは `capass_server/__init__.py` と `capass_cli/__init__.py` の `__version__` に書く(同じ値にそろえる。`pyproject.toml` は動的に読む)。**利用者から指示がない限り変えない。**
+- バージョンは、各パッケージ(`capass_core` `capass_toolserver` `capass_agent` `capass_server`)の `__init__.py` の `__version__` に書く(同じ値にそろえる。`pyproject.toml` は動的に読む)。**パッケージ間の依存(`capass==0.1.6`、`capass-toolserver==0.1.6` など)も、同じ値に固定しているので、バージョンを上げるときは、そろえる。** **利用者から指示がない限り変えない。**
 - 成果物は、同名のトップディレクトリを持つzip(`capass-v0.1.3-1.zip` など)で渡し、**変更したファイルの一覧**も示す。
 - 利用者が依頼していない変更をした場合は、その旨と理由を伝える。
 
@@ -168,13 +184,17 @@ examples/            暫定クライアントと、ツールサーバの見本�
 4. 新しい業務エラーは `errors.py` と `_STATUS_BY_ERROR` に追加した。
 5. テストを足し、`QUICKSTART.md` など関連するドキュメントを更新した。
 
-## 11. CLI(`cli/`)
+## 11. CLI(`capass` コマンドと、モード)
 
-- **構成:** `capass_cli/main.py`(エントリポイント。引数の解析と、エラーの表示だけ)→ `commands/`(サブコマンドごとに1モジュール。引数の定義と、表示)→ `common/`(部品: `paths.py` `roles.py` `keys.py` `fileio.py` `errors.py`)。**下の層から上の層をimportしない**。業務ルール(鍵の作成、役割の確認)は、`common/` に書き、`commands/` には書かない。
-- **サブコマンドの追加:** `commands/<グループ>.py` に `register(subparsers)` を作り、`main.py` の `build_parser` で呼ぶ。コマンドの関数は、終了コード(int)を返す。
-- **エラー:** 業務エラーは `common/errors.py` の `CapassCliError`(サブクラスが `exit_code` を持つ)を `raise` する。`main.py` が、`エラー: ...` を標準エラーに出して、`exit_code` で終了する。終了コード: 0=成功、1=エラー、2=使い方の誤り(argparse)、3=役割の同居、4=鍵が存在する、5=ホームディレクトリを使えない。
+- **モードごとに、別のパッケージ(別の配布)にする。** サーバの役割は、`toolserver`(ツールサーバ)/ `agent`(AIエージェントの作業環境)/ `server`(CaPassサーバ)。1つのサーバに、1つだけ。`pip install "capass[toolserver]"` は、`capass`(`core/`。共通部品と `capass` コマンド)と、`capass-toolserver` をインストールする(`[toolserver]` は、追加でインストールする、別のパッケージの名前。コードを書き換えるものではない)。使わないモードのコードは、そのサーバに入らない。
+- **`capass` コマンドの入口は `capass_core/cli/main.py`。** インストール済みのモードを、`importlib.util.find_spec("capass_<モード>")` で、**importせずに**検出し(`modes.detect_installed_modes`)、ちょうど1つであることを確認して(`modes.ensure_single_mode`。0個はエラー10、2個以上はエラー11)、そのモードの CLI(`capass_<モード>.cli`)だけを、**遅延import**で読み込んで、`register(subparsers, context)` を呼ぶ。他のモードのコードは、読み込まない。`capass_<モード>.cli` が無い、または `register` が無いモードは、「未実装」(エラー9)。`--help` と `--version` は、どの状態でも動く。
+- **モードのパッケージの規約:** パッケージ名は `capass_<モード>`。CLIは `capass_<モード>/cli/__init__.py` に `register(subparsers, context)` を書く。常駐プロセスは `capass_<モード>/daemon/`。依存は、`capass==<同じバージョン>`。パッケージ(`capass_<モード>`)の中の、importエラーは、隠さずに、そのまま表示する(CLIが無いこととは、区別する)。
+- **常駐プロセスを持つモード(toolserver、server)の `init`:** モードのパッケージは、`InitSpec`(モード名、サービスの説明、サービスが実行するコマンド)だけを定義して、`capass_core.cli.init.register_init` を呼ぶ。手順は `capass_core.init_steps.run_init` に、共通で持つ。
+- **層:** `capass_core/cli/main.py`(入口。引数の解析と、エラーの表示だけ)→ `capass_<モード>/cli/`(コマンドの定義と表示)→ `capass_core/`(部品)。**下の層から上の層をimportしない**。業務ルール(初期導入の手順、モードの確認、鍵の作成)は、`capass_core` に書き、`cli/` には書かない。
+- **アプリディレクトリは `/opt/capass` で固定**(オプションで変えられない)。異なるモードの同居を、サーバ全体で防ぐため(Python環境やユーザが違っても検出できる)。モードは、`confs/capass.conf` の `mode` と、鍵のファイル名(`keys/<モード>.key` / `.pub`)で判定する(`roles.ensure_role_available`)。確認に失敗したら、何も作らない。Python環境の中の確認(`modes.ensure_single_mode`)と、サーバ全体の確認(`roles`)の、2段階で防ぐ。
+- **システムを変更する処理は、`SystemOps`(root権限が必要な操作: ユーザ作成、chown など)を通す。** テストでは、`SystemContext`(場所と `SystemOps`)を差し替える(`capass_core.testing`)。`main(argv, context, find_spec, load_cli)` に渡す(本番は、全て省略)。OSごとの差(ユーザ作成のコマンド、シェルのパス、サービスファイルの場所)は、`system.py` と `paths.py` に集める。
+- **初期導入(`init`)の順序:** 確認(root権限、環境、オプション、初期化済みか、別のモードか)を、全て先に行い、失敗したら何も変更しない → ユーザ/グループ → ディレクトリ → 実行ファイル → 鍵 → サービスファイル → **設定ファイル(最後。初期化済みの目印)**。途中で失敗しても、設定ファイルが無いので、再実行できる(既存の鍵は、上書きしない)。
+- **権限:** 実行ファイルと設定は、rootの持ち物(実行ユーザが書き換えられない)。`keys/` は 0700、秘密鍵は 0600、ともに実行ユーザの持ち物。ファイルは、一時ファイルに書いてから置き換える(`write_atomic`。秘密鍵が、一時的にも、緩い権限にならない)。
+- **エラー:** 業務エラーは `capass_core/errors.py` の `CapassCliError`(サブクラスが `exit_code` を持つ)を `raise` する。`main` が、`エラー: ...` を標準エラーに出して、`exit_code` で終了する。終了コード: 0=成功、1=エラー、2=使い方の誤り・オプションの不正、3=モードの同居(サーバ)、4=初期化済み、5=ディレクトリ・ファイルを使えない、6=root権限が必要、7=サポート外の環境、8=OSのコマンドの失敗、9=コマンドが未実装のモード、10=モードがインストールされていない、11=2つ以上のモードがインストールされている。
+- **鍵の形式:** Ed25519。秘密鍵・公開鍵とも、生の32バイトをBase64にした1行(CaPassサーバの署名の形式と同じ)。
 - **表示は日本語。** ただし、秘密鍵などの機密は、表示しない(保存先だけ表示する)。
-- **ホームディレクトリ(`CAPASS_HOME`):** 優先順位は、`--home` > 環境変数 `CAPASS_HOME` > `~/.capass`。役割ごとのファイルは、`<home>/<役割>/` の下に置く(役割: `agent` / `toolserver` / `server`)。ファイル名にも、役割を入れる(例: `toolserver.key`)。ディレクトリは 0700、秘密鍵は 0600。
-- **役割の同居の防止:** 鍵などを作る前に、`ensure_role_available` で、別の役割が設定済みでないかを確認する(役割のディレクトリと、`<home>/role` を見る)。確認に失敗したら、何も作らない。鍵の作成は、`setup_role_keys`(確認 → 作成 → 役割ファイルの記録)を使う。
-- **鍵の形式:** Ed25519。秘密鍵・公開鍵とも、生の32バイトをBase64にした1行(CaPassサーバの署名の形式と同じ)。ファイルは、一時ファイルに書いてから置き換える(`write_atomic`)。
-- **テスト:** `cd cli && pip install -e ".[dev]" && pytest`。ファイルは、`tmp_path` の下だけに作り、環境変数は `monkeypatch` で変える。
