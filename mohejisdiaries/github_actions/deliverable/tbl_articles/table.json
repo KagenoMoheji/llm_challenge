@@ -1,109 +1,104 @@
 [
   {
-    "id": "2020007",
-    "fileName": "2020007_sample.yml",
-    "title": "Go言語で作るCLIツールのアーキテクチャ設計",
-    "createDate": "2020-09-20",
-    "updateDate": "2020-09-20",
-    "tags": [
-      "Go",
-      "CLI"
-    ]
-  },
-  {
-    "id": "2020006",
-    "fileName": "2020006_sample.yml",
-    "title": "自然言語処理におけるBERTモデルのファインチューニング実践",
-    "createDate": "2020-07-10",
-    "updateDate": "2020-07-10",
+    "id": "2017010",
+    "fileName": "2017010_init_python_ml_on_win10.yml",
+    "title": "Windows10でPython機械学習の初期構築（PyCharm+Anaconda+Tensorflow-CPU/GPU）",
+    "createDate": "2017-08-18",
+    "updateDate": "2017-08-18",
     "tags": [
       "Python",
       "機械学習"
     ]
   },
   {
-    "id": "2020005",
-    "fileName": "2020005_sample.yml",
-    "title": "Dockerコンテナで構築する快適なローカル開発環境",
-    "createDate": "2020-03-13",
-    "updateDate": "2020-03-13",
+    "id": "2017009",
+    "fileName": "2017009_compare_external_html_embedding.yml",
+    "title": "外部HTMLをメインのHTMLに埋め込む処理のやり方を比較",
+    "createDate": "2017-06-28",
+    "updateDate": "2017-06-28",
     "tags": [
-      "Docker"
+      "JavaScript"
     ]
   },
   {
-    "id": "2020004",
-    "fileName": "2020004_sample.yml",
-    "title": "GraphQL入門：REST APIからの移行手順とスキーマ設計",
-    "createDate": "2020-03-13",
-    "updateDate": "2020-03-13",
+    "id": "2017008",
+    "fileName": "2017008_site_renewal.yml",
+    "title": "サイトをリニューアル！",
+    "createDate": "2017-06-06",
+    "updateDate": "2017-06-06",
     "tags": [
-      "GraphQL",
-      "RestAPI"
+      "お知らせ"
     ]
   },
   {
-    "id": "2020003",
-    "fileName": "2020003_sample.yml",
-    "title": "TypeScriptによる型安全なWebフロントエンド開発",
-    "createDate": "2020-02-01",
-    "updateDate": "2020-02-01",
+    "id": "2017007",
+    "fileName": "2017007_hover_effect_on_previous_element.yml",
+    "title": "ある要素をhoverした時に、直前の要素に変化を生じさせる強気のCSS",
+    "createDate": "2017-03-17",
+    "updateDate": "2017-03-17",
     "tags": [
-      "TypeScript"
-    ]
-  },
-  {
-    "id": "2020002",
-    "fileName": "2020002_sample.yml",
-    "title": "CSS GridレイアウトとFlexboxの使い分け完全ガイド",
-    "createDate": "2020-01-31",
-    "updateDate": "2020-01-31",
-    "tags": [
+      "HTML",
       "CSS"
     ]
   },
   {
-    "id": "2020001",
-    "fileName": "2020001_sample.yml",
-    "title": "【両OS対応】React Nativeで爆速プロトタイプアプリを作ろう",
-    "createDate": "2020-01-13",
-    "updateDate": "2020-01-13",
+    "id": "2017006",
+    "fileName": "2017006_try_code_embeddings.yml",
+    "title": "ソースを埋め込むのでそのやり方を勉強してみた",
+    "createDate": "2017-03-17",
+    "updateDate": "2017-03-17",
     "tags": [
-      "TypeScript",
-      "独学"
+      "メモ"
     ]
   },
   {
-    "id": "2019003",
-    "fileName": "2019003_sample.yml",
-    "title": "Macで欲しいアレコレをAutomatorで",
-    "createDate": "2019-09-02",
-    "updateDate": "2019-09-02",
+    "id": "2017005",
+    "fileName": "2017005_python_learning.yml",
+    "title": "Pythonの学習",
+    "createDate": "2017-02-27",
+    "updateDate": "2017-02-27",
     "tags": [
-      "Mac"
+      "Python"
     ]
   },
   {
-    "id": "2019002",
-    "fileName": "2019002_sample.yml",
-    "title": "クリック座標をフラグメント識別子にして検索できるChrome拡張を開発した",
-    "createDate": "2019-07-17",
-    "updateDate": "2019-07-17",
+    "id": "2017004",
+    "fileName": "2017004_diff_doshisha_cs_depts.yml",
+    "title": "情シスとインテリの違いは？",
+    "createDate": "2017-02-22",
+    "updateDate": "2017-02-22",
     "tags": [
-      "TypeScript",
-      "個人開発",
-      "Chrome拡張"
+      "雑感"
     ]
   },
   {
-    "id": "2019001",
-    "fileName": "2019001_sample.yml",
-    "title": "matplotlibでガントチャートを実装する",
-    "createDate": "2019-07-13",
-    "updateDate": "2019-07-13",
+    "id": "2017003",
+    "fileName": "2017003_spring_break_coding.yml",
+    "title": "春休みに進める学習は。",
+    "createDate": "2017-02-21",
+    "updateDate": "2017-02-21",
     "tags": [
-      "Python",
-      "個人開発"
+      "雑感"
+    ]
+  },
+  {
+    "id": "2017002",
+    "fileName": "2017002_java_learning.yml",
+    "title": "Javaは一回生の時に大学で。",
+    "createDate": "2017-02-20",
+    "updateDate": "2017-02-20",
+    "tags": [
+      "Java"
+    ]
+  },
+  {
+    "id": "2017001",
+    "fileName": "2017001_site_release.yml",
+    "title": "『Reegのプログラミング開発日記』を開設！",
+    "createDate": "2017-02-20",
+    "updateDate": "2017-02-20",
+    "tags": [
+      "お知らせ"
     ]
   }
 ]
