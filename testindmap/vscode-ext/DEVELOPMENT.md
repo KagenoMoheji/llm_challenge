@@ -42,7 +42,7 @@ docker run --rm -v "$(pwd):/app" -w /app/testindmap-vscode-ext node:20-alpine np
 
 **Windows PowerShellで実行:**
 ```powershell
-wsl docker run --rm -v /mnt/$HOME/git/llm_challenge/main/llm_challenge/testindmap/vscode-ext:/app -w /app/testindmap-vscode-ext node:20-alpine npx @vscode/vsce package --allow-missing-repository -o /app/dist/
+wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/testindmap/vscode-ext:/app -w /app/testindmap-vscode-ext node:20-alpine npx @vscode/vsce package --allow-missing-repository -o /app/dist/
 ```
 
 ※パッケージ化コマンドを実行する際、ソースコード外の `vscode-ext/dist/` に出力されるため、`vsce` のパッケージ自己巻き込み事故（前回の `.vsix` を取り込んでサイズが肥大化する問題）を防ぐことができます。
