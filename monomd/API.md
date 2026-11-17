@@ -493,6 +493,7 @@ Currently not supported. Use CommonJS or browser globals.
 
 ## Version History
 
+- **v1.0.2**: Fix inline code parser
 - **v1.0.1**: Improved list parsing for mixed types
 - **v1.0.0**: Initial release
 
