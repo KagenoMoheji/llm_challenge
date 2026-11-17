@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "capass"
+dynamic = ["version"]
+requires-python = ">=3.10"
+dependencies = [
+  "cryptography",
+]
+
+[project.optional-dependencies]
+# モード(サーバの役割)ごとの、別のパッケージ。1つのサーバに、1つのモードだけをインストールする(使わない機能を、持ち込まない)。
+#   pip install "capass[toolserver]"  ツールサーバ(capass-toolserver)
+#   pip install "capass[agent]"       AIエージェントの作業環境(capass-agent)。待ち受けの機能は、入らない
+#   pip install "capass[server]"      CaPassサーバ(capass-server)
+# バージョンは、全てのパッケージで、同じ値に固定する(上げるときは、各pyprojectの固定も、そろえる)。
+server = ["capass-server==0.1.6"]
+toolserver = ["capass-toolserver==0.1.6"]
+agent = ["capass-agent==0.1.6"]
+dev = ["pytest"]
+
+[project.scripts]
+capass = "capass_core.cli.main:run"
+
+[tool.setuptools.packages.find]
+include = ["capass_core*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# ut=unit test, it=integration test, st=system test, uat=user acceptance test
+python_files = ["ut_*.py", "it_*.py", "st_*.py", "uat_*.py"]
+
+[tool.setuptools.dynamic]
+version = {attr = "capass_core.__version__"}
