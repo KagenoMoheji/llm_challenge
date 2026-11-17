@@ -32,7 +32,7 @@ function escapeHtml(text) {
  */
 function parseInline(text) {
     // インラインコード `code`
-    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    text = text.replace(/`([^`]+)`/g, (match, code) => `<code>${escapeHtml(code)}</code>`);
     
     // 太字 **text**
     text = text.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
