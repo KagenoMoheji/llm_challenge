@@ -79,127 +79,65 @@
 > `-v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace`
 > （※WSL bash 内から実行する場合は `$(pwd)` や `/mnt/c/Users/<user>/...` に適宜置き換えてください）
 
-### 3.1 CSS 構文チェック
-`index.html` 内の `<style>` タグに含まれる CSS の開き括弧 `{` と閉じ括弧 `}` の整合性を検証します。
+### 3.1 フロントエンド自動テスト一括実行 (Test Suite)
+CSS/JS構文チェック、Store状態管理、仮想スライダー、リンクバリデーション、DOMPurify/SRI、記事プレビュー等の全フロントエンドテストを一括実行します。
 
 ```bash
 wsl docker run --rm \
   -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace \
   -w /workspace \
   node:20-alpine \
-  node -e "
-const fs = require('fs');
-const html = fs.readFileSync('index.html', 'utf8');
-const styleMatches = [...html.matchAll(/<style>([\s\S]*?)<\/style>/gi)];
-console.log('Found', styleMatches.length, 'style blocks');
-styleMatches.forEach((match, i) => {
-    const css = match[1];
-    const openBraces = (css.match(/\{/g) || []).length;
-    const closeBraces = (css.match(/\}/g) || []).length;
-    console.log('Style block', i + 1, 'Open braces:', openBraces, 'Close braces:', closeBraces);
-    if (openBraces !== closeBraces) {
-        console.error('Mismatch in CSS braces!');
-        process.exit(1);
-    }
-});
-console.log('CSS syntax validation passed!');
-"
+  node tests/run_all_tests.js
 ```
 
-### 3.2 JavaScript 構文チェック (Syntax Validation)
-`index.html` 内の `<script>` タグの JavaScript に文法エラー（SyntaxError）がないかを検証します。
+### 3.2 フロントエンド個別テストスクリプト (`tests/`)
+機能ごとに単体テストを個別実行する場合は、以下のコマンドを使用します。
 
-```bash
-wsl docker run --rm \
-  -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace \
-  -w /workspace \
-  node:20-alpine \
-  node -e "
-const fs = require('fs');
-const html = fs.readFileSync('index.html', 'utf8');
-const scriptMatches = [...html.matchAll(/<script(?![^>]*src=)>([\s\S]*?)<\/script>/gi)];
-console.log('Found', scriptMatches.length, 'inline scripts');
-scriptMatches.forEach((match, i) => {
-    try {
-        new Function(match[1]);
-        console.log('Script block', i + 1, 'syntax OK');
-    } catch (e) {
-        console.error('Script block', i + 1, 'syntax error:', e.message);
-        process.exit(1);
-    }
-});
-console.log('JavaScript syntax validation passed!');
-"
-```
+1. **CSS 構文チェック**:
+   ```bash
+   wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/validate_css.js
+   ```
+2. **JavaScript 構文チェック**:
+   ```bash
+   wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/validate_js.js
+   ```
+3. **状態管理（Redux Store）単体テスト (`test_top_store.js`)**:
+   - `topStore`（Action、Reducer、Store、フィルタ関数、履歴復元・リセット）の検証
+   ```bash
+   wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/test_top_store.js
+   ```
+4. **仮想スライダー単体テスト (`test_virtual_slider.js`)**:
+   - 前後1ページ（`±1`）のウィンドウイング制御、動的DOM展開・自動破棄、HTML生成、ドット全数描画の検証
+   ```bash
+   wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/test_virtual_slider.js
+   ```
+5. **記事タグ表示＆ナビゲーションテスト (`test_article_tags.js`)**:
+   - 記事詳細画面下部のタグ一覧UIデザイン、タグクリック時のトップページ遷移（`navigateToTag`）とフィルタ設定の検証
+   ```bash
+   wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/test_article_tags.js
+   ```
+6. **リンク＆URLセキュリティ検証テスト (`test_link_validation.js`)**:
+   - `https://`, `#`, 相対パスの許可と `http://`, `javascript:`, `//` 等の拒絶、YAML内リンク抽出の検証
+   ```bash
+   wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/test_link_validation.js
+   ```
+7. **DOMPurify サニタイズ＆SRI検証テスト (`test_dompurify_sanitizer.js`)**:
+   - DOMPurify ホワイトリスト（iframe/section）、CodePen フォールバック正規化、CDNリソースの SRI (`integrity`, `crossorigin`) 属性の検証
+   ```bash
+   wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/test_dompurify_sanitizer.js
+   ```
+8. **CDN SRI ハッシュ完全一致検証テスト (`test_sri_hash.js`)**:
+   - 全CDNスクリプトを実際に取得・ハッシュ計算し、`index.html` 内の `integrity` ハッシュと完全一致するか検証
+   ```bash
+   wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/test_sri_hash.js
+   ```
+9. **記事プレビュー＆YAML解析テスト (`test_article_preview.js`)**:
+   - `/articles/preview` ルーティング、YAML必須属性検証、制限外リンク警告エラーメッセージ生成の検証
+   ```bash
+   wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/test_article_preview.js
+   ```
 
-### 3.3 状態管理（Redux Store）＆フロントエンド単体テスト
-`index.html` 内の `topStore`（Action、Reducer、Store、フィルタ関数、復元・リセットロジック）を Node.js の VM コンテキスト上で実行し、アサーションテストを行います。
-
-```bash
-wsl docker run --rm \
-  -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace \
-  -w /workspace \
-  node:20-alpine \
-  node -e "
-const fs = require('fs');
-const vm = require('vm');
-const html = fs.readFileSync('index.html', 'utf8');
-const scriptMatch = html.match(/<script(?![^>]*src=)>([\s\S]*?)<\/script>/i);
-if (!scriptMatch) { console.error('No script found'); process.exit(1); }
-
-const testScript = scriptMatch[1] + \`
-console.log('--- Running topStore Unit Tests ---');
-// 1. 初期状態
-let s = topStore.getState();
-console.assert(s.filter.type === 'all' && s.pageIndex === 0 && s.mobilePageIndex === 0, 'Initial state failed');
-
-// 2. タグフィルタ設定
-topStore.dispatch(actions.setFilter('tag', 'Docker'));
-s = topStore.getState();
-console.assert(s.filter.type === 'tag' && s.filter.value === 'Docker' && s.pageIndex === 0, 'Tag filter failed');
-
-// 3. ページ番号設定
-topStore.dispatch(actions.setPage(2));
-topStore.dispatch(actions.setMobilePage(3));
-s = topStore.getState();
-console.assert(s.pageIndex === 2 && s.mobilePageIndex === 3, 'Page set failed');
-
-// 4. フィルタ変更時のページリセット
-topStore.dispatch(actions.setFilter('search', 'Python'));
-s = topStore.getState();
-console.assert(s.pageIndex === 0 && s.filter.value === 'Python', 'Filter change page reset failed');
-
-// 5. 履歴復元 (ページバック時)
-topStore.dispatch(actions.restoreState({ filter: { type: 'tag', value: 'React' }, pageIndex: 1, mobilePageIndex: 2 }));
-s = topStore.getState();
-console.assert(s.filter.value === 'React' && s.pageIndex === 1 && s.mobilePageIndex === 2, 'Restore failed');
-
-// 6. 初期化 (ヘッダークリック時)
-topStore.dispatch(actions.resetState());
-s = topStore.getState();
-console.assert(s.filter.type === 'all' && s.pageIndex === 0, 'Reset failed');
-
-// 7. フィルタ関数
-const dummy = [{ title: 'A', tags: ['X'] }, { title: 'B', tags: ['Y'] }];
-console.assert(filterArticles(dummy, { type: 'tag', value: 'X' }).length === 1, 'filterArticles tag failed');
-console.assert(filterArticles(dummy, { type: 'search', value: 'b' }).length === 1, 'filterArticles search failed');
-
-console.log('All Store unit tests passed successfully!');
-\`;
-
-const context = {
-    console,
-    window: { location: { search: '', pathname: '/' }, history: { pushState(){}, replaceState(){} }, addEventListener(){} },
-    document: { createElement: () => ({ appendChild(){}, textContent: '' }), head: { appendChild(){} }, title: '', getElementById: () => null, querySelectorAll: () => [], querySelector: () => null },
-    MonoMD: { getMonoMDCSS: () => '' },
-    fetch: () => Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
-};
-vm.createContext(context);
-vm.runInContext(testScript, context);
-"
-```
-
-### 3.4 Python ユニット＆結合テスト (Pytest)
+### 3.3 Python ユニット＆結合テスト (Pytest)
 GitHub Actions で動作する記事テーブル生成スクリプト（`generate_table.py`）の単体・結合テストを実行します。
 
 ```bash
@@ -210,7 +148,7 @@ wsl docker run --rm \
   sh -c "pip install --no-cache-dir -r github_actions/tbl_articles/requirements.txt && pytest github_actions/tbl_articles/test_generate_table.py -v"
 ```
 
-### 3.5 Python テーブル生成ワンライナー実行
+### 3.4 Python テーブル生成ワンライナー実行
 実際に YAML 群から `table.json` を生成するテスト実行コマンドです。
 
 ```bash
