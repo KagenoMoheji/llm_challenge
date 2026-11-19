@@ -19,6 +19,7 @@ https://kagenomoheji.github.io/llm_challenge/monomd/workspace/sample.html
 - `- [ ]` / `- [x]` = Checkboxes
 - `:::info` / `:::warn` / `:::alert` = Information blocks
 - Code blocks with `:::output` = Code with output sections
+- Code blocks with `[caption]` = Code blocks with captions
 - Tables with `[caption]` = Tables with captions
 
 ## ✨ Features
@@ -165,6 +166,16 @@ console.log(hello);
 **Code Block with Output:**
 ````markdown
 ```python
+print("Hello, World!")
+:::output
+Hello, World!
+:::
+```
+````
+
+**Code Block with Caption:**
+````markdown
+```python[Sample Script]
 print("Hello, World!")
 :::output
 Hello, World!

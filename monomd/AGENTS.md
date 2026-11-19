@@ -84,6 +84,10 @@ renderMarkdown(input).then(r => console.log('renderMarkdown:', r.html));
    - インラインコード（`` `code` ``）内の文字列は `escapeHtml` を通す必要があります。
    - `<iframe>` や `<script>` などのHTMLタグがそのまま渡ると、ブラウザ描画時にHTMLとして解釈されてレイアウト崩れやXSSの原因となるため、`<code>&lt;iframe&gt;</code>` のようにエスケープされる仕様となっています。
 
-2. **Node.js とブラウザのハイブリッド対応**:
+2. **コードブロックのキャプション**:
+   - ```` ```[キャプション] ```` または ```` ```lang[キャプション] ```` の形式で指定された角括弧内のテキストは、コードブロック（または出力付きコードブロックコンテナ）の直下に `<div class="code-caption">` として出力されます。
+   - キャプション内の文字列は `escapeHtml` でエスケープされ、テーブルの `caption` と同様に中央揃え（`text-align: center;`）でスタイリングされます。
+
+3. **Node.js とブラウザのハイブリッド対応**:
    - `escapeHtml` はブラウザ環境（`typeof document !== 'undefined'`）では DOM 要素を使い、Node.js 環境では正規表現置換でエスケープを行います。
    - モジュールエクスポートは CommonJS（`module.exports`）とブラウザ用グローバル（`window.MonoMD`）の両方に対応しています。
