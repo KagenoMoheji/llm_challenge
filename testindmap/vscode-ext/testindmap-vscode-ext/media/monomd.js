@@ -248,8 +248,25 @@ async function renderMarkdown(markdown, options = {}) {
     
     // コードブロックを先に処理（```で囲まれた部分）
     const codeBlocks = [];
-    html = html.replace(/```([^\n]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    html = html.replace(/([ \t]*)```([^\n]*)\n([\s\S]*?)```/g, (match, indent, lang, code) => {
         const placeholder = `!!CODEBLOCK!${codeBlocks.length}!!`;
+        
+        // インデントされたコードブロックの場合、各行からインデントを除去
+        if (indent) {
+            const indentRegex = new RegExp(`^[ \t]{1,${indent.length}}`);
+            code = code
+                .split('\n')
+                .map(line => line.replace(indentRegex, ''))
+                .join('\n');
+        }
+        
+        // キャプション [caption] を検出
+        let innerCaption = '';
+        const captionMatch = lang.match(/\[([^\]]*)\]/);
+        if (captionMatch) {
+            innerCaption = captionMatch[1];
+        }
+        const captionHtml = captionMatch ? `<div class="code-caption">${escapeHtml(innerCaption)}</div>` : '';
         
         // :::output\n...\n::: 部分を検出
         const outputMatch = code.match(/([\s\S]*?):::output\n([\s\S]*?)\n:::/);
@@ -259,15 +276,23 @@ async function renderMarkdown(markdown, options = {}) {
             const programCode = outputMatch[1].trim().replace(/!!BR!!\n/g, '');
             const outputCode = outputMatch[2].trim();
             
-            codeBlocks.push(`
+            let blockHtml = `
                 <div class="code-block-container">
                     <pre class="code-program"><code>${escapeHtml(programCode)}</code></pre>
                     <pre class="code-output"><code>${escapeHtml(outputCode)}</code></pre>
                 </div>
-            `);
+            `;
+            if (captionHtml) {
+                blockHtml += `\n${captionHtml}`;
+            }
+            codeBlocks.push(blockHtml);
         } else {
             // 通常のコードブロック
-            codeBlocks.push(`<pre><code>${escapeHtml(code.trim().replace(/!!BR!!\n/g, ''))}</code></pre>`);
+            let blockHtml = `<pre><code>${escapeHtml(code.trim().replace(/!!BR!!\n/g, ''))}</code></pre>`;
+            if (captionHtml) {
+                blockHtml += `\n${captionHtml}`;
+            }
+            codeBlocks.push(blockHtml);
         }
         
         return placeholder;
@@ -546,6 +571,14 @@ function getMonoMDCSS() {
     border-radius: 0 0 8px 8px;
     margin-top: 0;
     border-top: 2px solid #cccccc;
+}
+
+/* コードブロックキャプション */
+.monomd-body .code-caption {
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--ink);
+    text-align: center;
 }
 
 /* インフォメーションブロック */
