@@ -359,6 +359,94 @@ async function runTests() {
         failed++;
     }
 
+    // Test 22: Code Block with Caption
+    console.log('Test 22: Code Block with Caption');
+    try {
+        const md = '```javascript[Sample Script]\nconsole.log("Hello");\n```';
+        const result = await renderMarkdown(md);
+        if (result.html.includes('<pre><code>') && 
+            result.html.includes('<div class="code-caption">Sample Script</div>')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('Code block caption not generated correctly');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
+    // Test 23: Code Block with Output and Caption
+    console.log('Test 23: Code Block with Output and Caption');
+    try {
+        const md = '```[Calculation Demo]\nprint(10 + 20)\n:::output\n30\n:::\n```';
+        const result = await renderMarkdown(md);
+        if (result.html.includes('code-block-container') && 
+            result.html.includes('code-program') && 
+            result.html.includes('code-output') && 
+            result.html.includes('<div class="code-caption">Calculation Demo</div>')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('Code block with output and caption not generated correctly');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
+    // Test 24: Code Block Caption HTML Escaping and CSS
+    console.log('Test 24: Code Block Caption HTML Escaping and CSS');
+    try {
+        const md = '```[<Danger> & "Quote"]\ntest\n```';
+        const result = await renderMarkdown(md);
+        const css = getMonoMDCSS();
+        if (result.html.includes('<div class="code-caption">&lt;Danger&gt; &amp; &quot;Quote&quot;</div>') && 
+            css.includes('.code-caption') && 
+            css.includes('text-align: center')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('Caption escaping or CSS styling not correct');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
+    // Test 25: Code Block Indentation inside List Item
+    console.log('Test 25: Code Block Indentation inside List Item');
+    try {
+        const md = '- hogehoge  \n  ```\n  aaa\n  bbb\n  ```';
+        const result = await renderMarkdown(md);
+        if (result.html.includes('<code>aaa\nbbb</code>')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('Code block lines in list item contain unwanted indentation');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
+    // Test 26: Code Block with Output inside List Item
+    console.log('Test 26: Code Block with Output inside List Item');
+    try {
+        const md = '- item  \n  ```\n  line1\n  :::output\n  output1\n  :::\n  ```';
+        const result = await renderMarkdown(md);
+        if (result.html.includes('<code>line1</code>') && 
+            result.html.includes('<code>output1</code>')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('Code block with output inside list item not parsed correctly');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
     // Summary
     console.log('='.repeat(50));
     console.log(`Tests Passed: ${passed}/${passed + failed}`);

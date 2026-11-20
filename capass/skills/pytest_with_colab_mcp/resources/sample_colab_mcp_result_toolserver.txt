@@ -1,0 +1,133 @@
+cellId=xxxxxxxx
+{"outputs":[{"output_type":"stream","name":"stdout","text":["EXTRACT_OK /content/capass-src/capass-v0.1.6-3/toolserver\n","TEST_FILES ['it_cli.py']\n","INSTALL_CORE ['/usr/bin/python3', '-m', 'pip', 'install', '-e', '/content/capass-src/capass-v0.1.6-3/core']\n","Obtaining file:///content/capass-src/capass-v0.1.6-3/core\n","  Installing build dependencies: started\n","  Installing build dependencies: finished with status 'done'\n","  Checking if build backend supports build_editable: started\n","  Checking if build backend supports build_editable: finished with status 'done'\n","  Getting requirements to build editable: started\n","  Getting requirements to build editable: finished with status 'done'\n","  Preparing editable metadata (pyproject.toml): started\n","  Preparing editable metadata (pyproject.toml): finished with status 'done'\n","Requirement already satisfied: cryptography in /usr/local/lib/python3.13/dist-packages (from capass==0.1.6) (50.0.2)\n","Requirement already satisfied: cffi>=2.0.0 in /usr/local/lib/python3.13/dist-packages (from cryptography->capass==0.1.6) (2.1.1)\n","Requirement already satisfied: pycparser in /usr/local/lib/python3.13/dist-packages (from cffi>=2.0.0->cryptography->capass==0.1.6) (3.12)\n","Building wheels for collected packages: capass\n","  Building editable for capass (pyproject.toml): started\n","  Building editable for capass (pyproject.toml): finished with status 'done'\n","  Created wheel for capass: filename=capass-0.1.6-0.editable-py3-none-any.whl size=2981 sha256=d635e628015d99b8d981ca2038b9319ead18fa43a757e30b093d37f386193990\n","  Stored in directory: /tmp/pip-ephem-wheel-cache-p7g9_tjf/wheels/ce/12/ec/40a816ea959cf48c5febb1733bed543faef8c513ed144c1d15\n","Successfully built capass\n","Installing collected packages: capass\n","  Attempting uninstall: capass\n","    Found existing installation: capass 0.1.6\n","    Uninstalling capass-0.1.6:\n","      Successfully uninstalled capass-0.1.6\n","Successfully installed capass-0.1.6\n","\n","INSTALL_TOOLSERVER ['/usr/bin/python3', '-m', 'pip', 'install', '-e', '.[dev]']\n"]},{"output_type":"stream","name":"stderr","text":["\n"]},{"output_type":"stream","name":"stdout","text":["Obtaining file:///content/capass-src/capass-v0.1.6-3/toolserver\n","  Installing build dependencies: started\n","  Installing build dependencies: finished with status 'done'\n","  Checking if build backend supports build_editable: started\n","  Checking if build backend supports build_editable: finished with status 'done'\n","  Getting requirements to build editable: started\n","  Getting requirements to build editable: finished with status 'done'\n","  Preparing editable metadata (pyproject.toml): started\n","  Preparing editable metadata (pyproject.toml): finished with status 'done'\n","Requirement already satisfied: capass==0.1.6 in /usr/local/lib/python3.13/dist-packages (from capass-toolserver==0.1.6) (0.1.6)\n","Requirement already satisfied: pytest in /usr/local/lib/python3.13/dist-packages (from capass-toolserver==0.1.6) (8.4.2)\n","Requirement already satisfied: cryptography in /usr/local/lib/python3.13/dist-packages (from capass==0.1.6->capass-toolserver==0.1.6) (50.0.2)\n","Requirement already satisfied: cffi>=2.0.0 in /usr/local/lib/python3.13/dist-packages (from cryptography->capass==0.1.6->capass-toolserver==0.1.6) (2.1.1)\n","Requirement already satisfied: pycparser in /usr/local/lib/python3.13/dist-packages (from cffi>=2.0.0->cryptography->capass==0.1.6->capass-toolserver==0.1.6) (3.12)\n","Requirement already satisfied: iniconfig>=1 in /usr/local/lib/python3.13/dist-packages (from pytest->capass-toolserver==0.1.6) (2.3.1)\n","Requirement already satisfied: packaging>=20 in /usr/local/lib/python3.13/dist-packages (from pytest->capass-toolserver==0.1.6) (26.3)\n","Requirement already satisfied: pluggy<2,>=1.5 in /usr/local/lib/python3.13/dist-packages (from pytest->capass-toolserver==0.1.6) (1.7.0)\n","Requirement already satisfied: pygments>=2.7.2 in /usr/local/lib/python3.13/dist-packages (from pytest->capass-toolserver==0.1.6) (2.21.0)\n","Building wheels for collected packages: capass-toolserver\n","  Building editable for capass-toolserver (pyproject.toml): started\n","  Building editable for capass-toolserver (pyproject.toml): finished with status 'done'\n","  Created wheel for capass-toolserver: filename=capass_toolserver-0.1.6-0.editable-py3-none-any.whl size=2850 sha256=fb1da82f1a59e4522a38019f2cf418f692e7192411eb2b85f4fe7a102667fe0f\n","  Stored in directory: /tmp/pip-ephem-wheel-cache-qizjz0q9/wheels/d3/fa/36/032fadd573de45d30891b1426e4acd4b6e172b3f8374794a3b\n","Successfully built capass-toolserver\n","Installing collected packages: capass-toolserver\n","  Attempting uninstall: capass-toolserver\n","    Found existing installation: capass-toolserver 0.1.6\n","    Uninstalling capass-toolserver-0.1.6:\n","      Successfully uninstalled capass-toolserver-0.1.6\n","Successfully installed capass-toolserver-0.1.6\n","\n","PYTEST ['/usr/bin/python3', '-m', 'pytest', '-vv', 'tests']\n"]},{"output_type":"stream","name":"stderr","text":["\n"]},{"output_type":"stream","name":"stdout","text":["============================= test session starts ==============================\n","platform linux -- Python 3.13.18, pytest-8.4.2, pluggy-1.7.0 -- /usr/bin/python3\n","cachedir: .pytest_cache\n","rootdir: /content/capass-src/capass-v0.1.6-3/toolserver\n","configfile: pyproject.toml\n","plugins: platformdirs-4.14.3, langsmith-0.14.17, anyio-4.16.0, typeguard-4.6.0\n","collecting ... collected 6 items\n","\n","tests/it_cli.py::test_init_spec_describes_the_receiver_service PASSED    [ 16%]\n","tests/it_cli.py::test_capass_init_with_the_real_toolserver_cli PASSED    [ 33%]\n","tests/it_cli.py::test_init_help_names_the_mode PASSED                    [ 50%]\n","tests/it_cli.py::test_help_lists_init_as_a_toolserver_command PASSED     [ 66%]\n","tests/it_cli.py::test_init_is_refused_on_a_server_that_is_set_up_as_an_agent PASSED [ 83%]\n","tests/it_cli.py::test_daemon_package_exists_but_is_not_implemented_yet PASSED [100%]\n","\n","============================== 6 passed in 0.11s ===============================\n","\n","PYTEST_EXIT 0\n"]},{"output_type":"stream","name":"stderr","text":["\n"]},{"output_type":"error","ename":"SystemExit","evalue":"0","traceback":["An exception has occurred, use %tb to see the full traceback.\n","\u001b[0;31mSystemExit\u001b[0m\u001b[0;31m:\u001b[0m 0\n"]}]}
+{
+  "outputs": [
+    {
+      "output_type": "stream",
+      "name": "stdout",
+      "text": [
+        "EXTRACT_OK /content/capass-src/capass-v0.1.6-3/toolserver\n",
+        "TEST_FILES ['it_cli.py']\n",
+        "INSTALL_CORE ['/usr/bin/python3', '-m', 'pip', 'install', '-e', '/content/capass-src/capass-v0.1.6-3/core']\n",
+        "Obtaining file:///content/capass-src/capass-v0.1.6-3/core\n",
+        "  Installing build dependencies: started\n",
+        "  Installing build dependencies: finished with status 'done'\n",
+        "  Checking if build backend supports build_editable: started\n",
+        "  Checking if build backend supports build_editable: finished with status 'done'\n",
+        "  Getting requirements to build editable: started\n",
+        "  Getting requirements to build editable: finished with status 'done'\n",
+        "  Preparing editable metadata (pyproject.toml): started\n",
+        "  Preparing editable metadata (pyproject.toml): finished with status 'done'\n",
+        "Requirement already satisfied: cryptography in /usr/local/lib/python3.13/dist-packages (from capass==0.1.6) (50.0.2)\n",
+        "Requirement already satisfied: cffi>=2.0.0 in /usr/local/lib/python3.13/dist-packages (from cryptography->capass==0.1.6) (2.1.1)\n",
+        "Requirement already satisfied: pycparser in /usr/local/lib/python3.13/dist-packages (from cffi>=2.0.0->cryptography->capass==0.1.6) (3.12)\n",
+        "Building wheels for collected packages: capass\n",
+        "  Building editable for capass (pyproject.toml): started\n",
+        "  Building editable for capass (pyproject.toml): finished with status 'done'\n",
+        "  Created wheel for capass: filename=capass-0.1.6-0.editable-py3-none-any.whl size=2981 sha256=d635e628015d99b8d981ca2038b9319ead18fa43a757e30b093d37f386193990\n",
+        "  Stored in directory: /tmp/pip-ephem-wheel-cache-p7g9_tjf/wheels/ce/12/ec/40a816ea959cf48c5febb1733bed543faef8c513ed144c1d15\n",
+        "Successfully built capass\n",
+        "Installing collected packages: capass\n",
+        "  Attempting uninstall: capass\n",
+        "    Found existing installation: capass 0.1.6\n",
+        "    Uninstalling capass-0.1.6:\n",
+        "      Successfully uninstalled capass-0.1.6\n",
+        "Successfully installed capass-0.1.6\n",
+        "\n",
+        "INSTALL_TOOLSERVER ['/usr/bin/python3', '-m', 'pip', 'install', '-e', '.[dev]']\n"
+      ]
+    },
+    {
+      "output_type": "stream",
+      "name": "stderr",
+      "text": [
+        "\n"
+      ]
+    },
+    {
+      "output_type": "stream",
+      "name": "stdout",
+      "text": [
+        "Obtaining file:///content/capass-src/capass-v0.1.6-3/toolserver\n",
+        "  Installing build dependencies: started\n",
+        "  Installing build dependencies: finished with status 'done'\n",
+        "  Checking if build backend supports build_editable: started\n",
+        "  Checking if build backend supports build_editable: finished with status 'done'\n",
+        "  Getting requirements to build editable: started\n",
+        "  Getting requirements to build editable: finished with status 'done'\n",
+        "  Preparing editable metadata (pyproject.toml): started\n",
+        "  Preparing editable metadata (pyproject.toml): finished with status 'done'\n",
+        "Requirement already satisfied: capass==0.1.6 in /usr/local/lib/python3.13/dist-packages (from capass-toolserver==0.1.6) (0.1.6)\n",
+        "Requirement already satisfied: pytest in /usr/local/lib/python3.13/dist-packages (from capass-toolserver==0.1.6) (8.4.2)\n",
+        "Requirement already satisfied: cryptography in /usr/local/lib/python3.13/dist-packages (from capass==0.1.6->capass-toolserver==0.1.6) (50.0.2)\n",
+        "Requirement already satisfied: cffi>=2.0.0 in /usr/local/lib/python3.13/dist-packages (from cryptography->capass==0.1.6->capass-toolserver==0.1.6) (2.1.1)\n",
+        "Requirement already satisfied: pycparser in /usr/local/lib/python3.13/dist-packages (from cffi>=2.0.0->cryptography->capass==0.1.6->capass-toolserver==0.1.6) (3.12)\n",
+        "Requirement already satisfied: iniconfig>=1 in /usr/local/lib/python3.13/dist-packages (from pytest->capass-toolserver==0.1.6) (2.3.1)\n",
+        "Requirement already satisfied: packaging>=20 in /usr/local/lib/python3.13/dist-packages (from pytest->capass-toolserver==0.1.6) (26.3)\n",
+        "Requirement already satisfied: pluggy<2,>=1.5 in /usr/local/lib/python3.13/dist-packages (from pytest->capass-toolserver==0.1.6) (1.7.0)\n",
+        "Requirement already satisfied: pygments>=2.7.2 in /usr/local/lib/python3.13/dist-packages (from pytest->capass-toolserver==0.1.6) (2.21.0)\n",
+        "Building wheels for collected packages: capass-toolserver\n",
+        "  Building editable for capass-toolserver (pyproject.toml): started\n",
+        "  Building editable for capass-toolserver (pyproject.toml): finished with status 'done'\n",
+        "  Created wheel for capass-toolserver: filename=capass_toolserver-0.1.6-0.editable-py3-none-any.whl size=2850 sha256=fb1da82f1a59e4522a38019f2cf418f692e7192411eb2b85f4fe7a102667fe0f\n",
+        "  Stored in directory: /tmp/pip-ephem-wheel-cache-qizjz0q9/wheels/d3/fa/36/032fadd573de45d30891b1426e4acd4b6e172b3f8374794a3b\n",
+        "Successfully built capass-toolserver\n",
+        "Installing collected packages: capass-toolserver\n",
+        "  Attempting uninstall: capass-toolserver\n",
+        "    Found existing installation: capass-toolserver 0.1.6\n",
+        "    Uninstalling capass-toolserver-0.1.6:\n",
+        "      Successfully uninstalled capass-toolserver-0.1.6\n",
+        "Successfully installed capass-toolserver-0.1.6\n",
+        "\n",
+        "PYTEST ['/usr/bin/python3', '-m', 'pytest', '-vv', 'tests']\n"
+      ]
+    },
+    {
+      "output_type": "stream",
+      "name": "stderr",
+      "text": [
+        "\n"
+      ]
+    },
+    {
+      "output_type": "stream",
+      "name": "stdout",
+      "text": [
+        "============================= test session starts ==============================\n",
+        "platform linux -- Python 3.13.18, pytest-8.4.2, pluggy-1.7.0 -- /usr/bin/python3\n",
+        "cachedir: .pytest_cache\n",
+        "rootdir: /content/capass-src/capass-v0.1.6-3/toolserver\n",
+        "configfile: pyproject.toml\n",
+        "plugins: platformdirs-4.14.3, langsmith-0.14.17, anyio-4.16.0, typeguard-4.6.0\n",
+        "collecting ... collected 6 items\n",
+        "\n",
+        "tests/it_cli.py::test_init_spec_describes_the_receiver_service PASSED    [ 16%]\n",
+        "tests/it_cli.py::test_capass_init_with_the_real_toolserver_cli PASSED    [ 33%]\n",
+        "tests/it_cli.py::test_init_help_names_the_mode PASSED                    [ 50%]\n",
+        "tests/it_cli.py::test_help_lists_init_as_a_toolserver_command PASSED     [ 66%]\n",
+        "tests/it_cli.py::test_init_is_refused_on_a_server_that_is_set_up_as_an_agent PASSED [ 83%]\n",
+        "tests/it_cli.py::test_daemon_package_exists_but_is_not_implemented_yet PASSED [100%]\n",
+        "\n",
+        "============================== 6 passed in 0.11s ===============================\n",
+        "\n",
+        "PYTEST_EXIT 0\n"
+      ]
+    },
+    {
+      "output_type": "stream",
+      "name": "stderr",
+      "text": [
+        "\n"
+      ]
+    },
+    {
+      "output_type": "error",
+      "ename": "SystemExit",
+      "evalue": "0",
+      "traceback": [
+        "An exception has occurred, use %tb to see the full traceback.\n",
+        "\u001b[0;31mSystemExit\u001b[0m\u001b[0;31m:\u001b[0m 0\n"
+      ]
+    }
+  ]
+}

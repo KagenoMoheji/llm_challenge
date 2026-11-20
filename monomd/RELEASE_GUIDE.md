@@ -86,7 +86,7 @@ npmアカウントを持っていない場合は、https://www.npmjs.com/ で作
 ### 2. npmにログイン
 
 ```bash
-npm login --auth-type legacy
+npm login --auth-type web
 ```
 
 ユーザー名、パスワード、メールアドレスを入力します。
@@ -105,7 +105,7 @@ npm view monomd
 
 ```bash
 cd /home/claude/monomd
-npm publish --auth-type legacy
+npm publish --auth-type web
 ```
 
 ### 5. 公開の確認

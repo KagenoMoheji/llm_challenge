@@ -1,0 +1,48 @@
+======================================================================
+Google Colab MCP pytest 実行ログ例 (capass-v0.1.5-4 server/ 配下)
+======================================================================
+
+[コマンド]
+uv run --python 3.13 --with git+https://github.com/googlecolab/colab-mcp python run_colab_pytest.py capass-v0.1.5-4.zip --target server
+
+[Colab URL]
+https://colab.research.google.com/notebooks/empty.ipynb#mcpProxyToken=TaKJADJJPkdhLtNFT1W6pg&mcpProxyPort=65189
+
+[Colab MCP ツール一覧]
+[
+  "open_colab_browser_connection",
+  "add_code_cell",
+  "add_text_cell",
+  "delete_cell",
+  "get_cells",
+  "move_cell",
+  "run_code_cell",
+  "update_cell"
+]
+
+[実行セル出力 (抜粋)]
+EXTRACT_OK /content/capass-src/capass-v0.1.5-4/server
+TEST_FILES ['conftest.py', 'it_agent.py', 'it_agent_exec.py', 'it_agent_grant.py', 'it_agent_tools.py', 'it_rate_limit.py', 'it_root.py', 'it_tool_addtool.py', 'it_tool_chtkn.py', 'it_toolserver.py', 'it_toolserver_replace.py', 'testlib.py', 'ut_crypto.py', 'ut_globals.py', 'ut_params_schema.py', 'ut_rate_limit.py', 'ut_signature.py', 'ut_tool_client.py']
+INSTALL ['/usr/bin/python3', '-m', 'pip', 'install', '-e', '.[dev]']
+Obtaining file:///content/capass-src/capass-v0.1.5-4/server
+Successfully installed capass-server-0.1.5 psycopg-3.3.8 psycopg-binary-3.3.8
+
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-8.4.2, pluggy-1.7.0 -- /usr/bin/python3
+rootdir: /content/capass-src/capass-v0.1.5-4/server
+configfile: pyproject.toml
+plugins: langsmith-0.14.17, typeguard-4.6.0, anyio-4.16.0, platformdirs-4.14.3
+collected 218 items
+
+tests/it_agent.py::test_register_ok_is_pending PASSED                    [  0%]
+tests/it_agent.py::test_register_duplicate_agent_id_is_conflict PASSED   [  0%]
+tests/it_agent.py::test_register_duplicate_public_key_is_conflict PASSED [  1%]
+...
+tests/ut_tool_client.py::test_times_out_on_slow_server PASSED            [ 98%]
+tests/ut_tool_client.py::test_rejects_too_large_response PASSED          [ 99%]
+tests/ut_tool_client.py::test_connection_refused_is_unavailable PASSED   [ 99%]
+tests/ut_tool_client.py::test_invalid_url_is_unavailable PASSED          [100%]
+
+============================= 218 passed in 10.69s =============================
+
+PYTEST_EXIT 0

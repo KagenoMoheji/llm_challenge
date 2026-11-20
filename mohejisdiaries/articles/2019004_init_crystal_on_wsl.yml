@@ -1,0 +1,176 @@
+creator: KagenoMoheji
+createDate: 2019-04-01
+updateDate: !!timestamp 2019-04-01
+title: 【Crystal】環境構築(Windows Subsystem for Linux)
+tags:
+  - Crystal
+  - 環境構築
+content:
+  - headline: Crystal言語とは
+    body: |
+      いろんな記事を読んでまとめると，
+      - Rubyライクな構文．
+      - ただしRubyと互換性を持つわけではない．
+      - (コンパイルすれば)C言語並に爆速．
+      - 静的型付け言語で型チェックが厳しい．
+      - なのに型推論もできて，配列に異なる型を格納できるらしい，マジか．
+      - 並行処理に長けてそう．
+      - HTTPサーバライブラリなどあるがまだまだこれから増える！な感じ？
+      - 4年前からあるみたいだけどTwitterで話題にならなさすぎんか？？？
+      
+      正直Rubyよりこっち触ってみたいな(・∀・)
+      
+      【参考】
+      - [1][Rubyのように書きやすくCのように速いプログラミング言語「Crystal」 | DMM INSIDE](https://inside.dmm.com/entry/2018/05/30/crystal-lang)
+      - [2][Crystalの紹介：Cのように速く、Rubyのように滑らか | FAworks](https://fa-works.com/blog/an-introduction-to-crystal-fast-as-c-slick-as-ruby)
+  - headline: 環境構築の前に
+    body: |
+      今回はWindows10での環境構築をします．  
+      まずCrystalのダウンロードを…と思いますが，実はWindows向けのインストーラーが現在無いようです．  
+      MacOS，LinuxOS向けのみ用意されています．  
+      そのためWindows Subsystem for Linux(WSL)のUbuntuを用いてやっていこうと思います．~~Windows10じゃなくて実質Ubuntuで構築やん．~~
+      
+      とはいえ，dockerを導入してそこにLinuxOSをインストールしてその上で環境構築するのが最善だと思いますが…Windows10 Homeであることと「とりあえずHello World!」気分なのでWSLで軽くやりますｗ
+  - headline: 環境構築
+    body: |
+      ### ①WSLの導入・設定
+      参考になるサイトがいっぱいあるので簡単にまとめる．
+      - `設定＞アプリと機能＞プログラムと機能＞Windowsの機能の有効化または無効化`を開き，「Windows Subsystem for Linux」にチェックを入れる．
+      - Microsoft StoreからUbuntuをインストール．
+      - 初回起動の場合はユーザネーム・パスワードを設定する．
+      - 以下コマンドで最新版にし，バージョンを確認する(本記事投稿時はUbuntu18.04.2 LTS)．  
+        ```bash
+        $ sudo apt update
+        $ sudo apt upgrade
+        $ lsb_release -a
+        ```
+      - 以下コマンドで共有フォルダを指定する．  
+        Vimの上書き保存はファイル編集後に`Esc→「:wq」→Enter`．  
+        ```bash
+        $ vi .bashrc
+        :::output
+        # Vimでファイル最後尾に下記を追加．
+        cd /mnt/c/Users/(ユーザーネーム)/(ホストOSであるWindowsと共有したいフォルダのPath)
+        :::
+        ```
+      上記の共有フォルダ内にCrystalのプロジェクトフォルダを作ってそこからVSCodeを開く流れにします．
+      
+      ### ②Crystalのインストール
+      以下コマンドをとりあえず打つ．途中で止まってパスワードを求められるので`sudo`のパスワードを入力する．
+      ```bash[curlでインストール]
+      $ curl http://dist.crystal-lang.org/apt/setup.sh | sudo bash
+      :::output
+        % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                       Dload  Upload   Total   Spent    Left  Speed
+      100   200  100   200    0     0    597      0 --:--:-- --:--:-- --:--:--   595
+      (このあたりでパスワードを求められる)
+      Executing: /tmp/apt-key-gpghome.iX3OUMN0Mf/gpg.1.sh --keyserver keys.gnupg.net --recv-keys 09617FD37CC06B54
+      gpg: connecting dirmngr at '/tmp/apt-key-gpghome.iX3OUMN0Mf/S.dirmngr' failed: IPC connect call failed
+      gpg: keyserver receive failed: No dirmngr
+      bash: line 3: /etc/apt/sources.list.d/crystal.list: Permission denied
+      Reading package lists... Done
+      E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
+      E: Unable to lock directory /var/lib/apt/lists/
+      W: Problem unlinking the file /var/cache/apt/pkgcache.bin - RemoveCaches (13: Permission denied)
+      W: Problem unlinking the file /var/cache/apt/srcpkgcache.bin - RemoveCaches (13: Permission denied)
+      :::
+      ```
+      なんかエラーが出た．  
+      どうも対象リポジトリの公開鍵を信用していないらしい…ので，キーである「09617FD37CC06B54」を用いて鍵サーバから鍵を取得してapt-keyに登録してみる．
+      ```bash
+      $ apt-key adv --keyserver http://dist.crystal-lang.org/apt/setup.sh --recv-keys 09617FD37CC06B54
+      :::output
+      Executing: /tmp/apt-key-gpghome.5cWLXP7vFE/gpg.1.sh --keyserver http://dist.crystal-lang.org/apt/setup.sh --recv-keys 09617FD37CC06B54
+      gpg: connecting dirmngr at '/tmp/apt-key-gpghome.5cWLXP7vFE/S.dirmngr' failed: IPC connect call failed
+      gpg: keyserver receive failed: No dirmngr
+      :::
+      ```
+      ええ…ダメかよ．  
+      参考[7]によるとどうやらこれはWSL特有の不具合のようだ．  
+      (参考[7]の方法でも行けそうだけど)参考[8][9]の方法でやる．~~できちゃったので．~~  
+      まずは以下コマンドを実行．初回は「failed: No dirmgr」と出ることがあるらしいがもう1度実行すると通った．(あれ，てことはさっきのコマンドももう1度やれば通るのか？)
+      ```bash
+      $ gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 09617FD37CC06B54
+      :::output
+      gpg: (...)/trustdb.gpg: trustdb created
+      ...
+      gpg: Total number processed: 1
+      gpg:               imported: 1
+      :::
+      ```
+      記の実行結果のようになればOK．次に以下のコマンドを実行．
+      ```bash
+      $ gpg -a --export 09617FD37CC06B54 | sudo apt-key add -
+      :::output
+      OK
+      :::
+      ```
+      これで「curlでインストール」のコマンドを再チャレンジするとうまくDoneできるはず．  
+      できたら次の下記コマンドを実行してCrystalをインストール．
+      ```bash
+      $ sudo apt-get install crystal
+      ```
+      わりと時間かかるけど，終わったらバージョン確認で動くかチェック．
+      ```bash
+      $ crystal -v
+      :::output
+      Crystal 0.27.2 [...] (2019-02-05)
+
+      LLVM: 4.0.0
+      Default target: x86_64-unknown-linux-gnu
+      :::
+      ```
+      「unknown-linux」…？よく分からんけど，crystalコマンド使えているしこれでいいのかな．  
+      まぁいっか．
+      
+      【参考】
+      - [3][インストール | Crystal日本語ドキュメント](https://ja.crystal-lang.org/install/)
+      - [4]WSL:WindowsでUbuntu環境を実行する | ある計算機屋さんの手帳(http://my-web-site.iobb.net/~yuki/2018-03/soft-tool/wsl-ubuntu/ だったがリンク切れ)
+      - [5][Rubyのように書け、Cのように速いプログラム言語 Crystal の基本的な使い方 | ラボラジアン](https://laboradian.com/how-to-use-crystal-lang/)
+      - [6][GPG error: 〜 the public key is not available: NO_PUBKEY の対処 | Qiita](https://qiita.com/tukiyo3/items/95c68d0e4d70a838ed76)
+      - [7][【期間限定】WSLのUbuntu 18.04でapt-keyコマンドを実行した時に「IPC connect call failed」のエラーになった時のワークアラウンド | bluebird](https://blog.fieldnotes.jp/entry/workaround-wsl-1804-apt-key-bug)
+      - [8][WSLのUbuntu 18.04にRをインストールする | Qiita](https://qiita.com/yutannihilation/items/78708fa9f3a9c22e56b3)
+      - [9][Linux: apt-get 時の GPG error (NO_PUBKEY) の解決例 | Yukun's Blog](https://yukun.info/linux-apt-get-gpg-error-no-pubkey/)
+  - headline: VSCodeでの用意
+    body: |
+      ### ①拡張機能
+      ![VSCode拡張機能](media/2019004_vscode.PNG)
+      「crystal」で探してみると色々あったが，シンタックスハイライトのために，とりあえず上図の「Crystal Language」をインストールするだけにした．
+      
+      ### ②ターミナルをWSLのものにする
+      CrystalのワークスペースにしているWSLとの共有フォルダにおいてVSCodeのワークスペース設定を用意することで設定を変更する．
+      - `ファイル＞基本設定＞設定`もしくは`Ctrl + ,`で設定タブを開き，ワークスペース設定を選択して右上の「{}」をクリックしてjsonファイルを開く．
+      - 下記を入力．  
+        ```
+        {
+          "terminal.integrated.shell.windows": "C:\\Users\\(ユーザ名)\\AppData\\Local\\Microsoft\\WindowsApps\\CanonicalGroupLimited.UbuntuonWindows(...)\\ubuntu.exe"
+        }
+        ```
+      これでVSCodeを再起動すればWSL(Ubuntu)のターミナルがVSCode内でいじることができ，コンパイル等のコマンドも実行できる．
+      
+      【参考】
+      - [10][WSLのインストールとVSCodeターミナル設定 | Stomach Tech](https://haraita-train.blogspot.com/2018/09/wslvscode.html)
+  - headline: Hello, World!
+    body: |
+      あとはRubyライクな構文通りプログラムを書いてみるだけ．
+      ```crystal[hello.cr]
+      puts "Hello World!"
+      ```
+      コンパイル＆実行のコマンドは以下2通り．
+      ```bash
+      $ crystal hello.cr
+      $ crystal run hello.cr
+      :::output
+      Hello World!
+      :::
+      ```
+      ビルドのコマンドは下記．  
+      2行目はファイル名を指定して保存するオプション付き．
+      ```bash
+      $ crystal build hello.cr
+      $ crystal build hello.cr -o (実行ファイル名)
+      ```
+  - headline: まとめ
+    body: |
+      思ったより簡単に導入できました．  
+      まだHello World!しかしていませんが，[公式ドキュメント](https://ja.crystal-lang.org/docs/)も踏まえ今後色々実装してみたいですね．

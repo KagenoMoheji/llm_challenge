@@ -1,0 +1,135 @@
+creator: KagenoMoheji
+createDate: 2019-01-27
+updateDate: !!timestamp 2019-01-27
+title: 【jQuery】サーバからの変数をページ読み込み時に外部JSに渡したい
+tags:
+  - JavaScript
+  - jQuery
+  - HTML
+content:
+  - headline: どゆこと？
+    body: |
+      サーバから渡された変数を，クリックやオンマウスといったアクションをトリガーとしてJavaScriptの関数を呼び出し，その引数として渡して・・・というわけではなく，**ページ読み込み時に実行される外部ファイルのJavaScriptに**渡したいというものです．
+      
+      ページ読み込み時に実行されるスクリプトといえば，
+      ```[jQueryのページ読み込み時処理されるスクリプト]
+      /*
+      ================================
+      タグ検出時に実行
+      ================================
+      */
+      // JavaScript
+      document.addEventListener("DOMContentLoaded", function() {
+        
+      });
+
+      // jQuery
+      jQuery(function(){
+
+      });
+      $(document).ready(function(){
+
+      });
+      $(function(){
+
+      });
+
+
+      /*
+      ================================
+      ページ読み込み後に実行
+      ================================
+      */
+      // JavaScript
+      document.addEventListener("load", function() {
+
+      });
+      window.onload = function(){
+
+      };
+
+      // jQuery
+      $(window).on("load", function(){
+
+      });
+      ```
+      こんなもんでしょうか．ページ読み込み前・途中・後という感じでいろいろ書き方があります．  
+      これがテンプレートとは別のファイルに「.js」として記述されているものとしています．
+      
+      これに対応する方法を自分なりにいくつか考えて(jQueryで)実装しました．  
+      最後に採用した手法は「日報」機能で使用しています．
+      
+      ※ここでの使用環境は以下のようにしているとします．
+      - サーバサイド言語：PHP
+      - テンプレートエンジン：Smarty
+  - headline: ①headタグ内でグローバル宣言
+    body: |
+      ページ読み込みの際の「上から下」の順番に処理される性質を利用した手法です．
+      ```html[hoge.html]
+      <head>
+        <script type="text/javascript">
+          var hoge = {$hoge};
+        </script>
+        <script type="text/javascript" src="hoge.js"></script>
+      </head>
+      ```
+      ```javascript[hoge.js]
+      console.log(hoge);
+      ```
+      これで実行はできているのですが，外部の「.js」において変数宣言がなされていないので，どこか気持ち悪いですね．
+  - headline: ②bodyタグでonload
+    body: |
+      bodyタグのonload属性は**ページ読み込み後に**実行される性質があります．  
+      これを利用した手法です．
+      
+      つまり，onload属性で関数を呼び出し，そこの引数にサーバからの変数を書きます．
+      ```html[hoge.html]
+      <head>
+        <script type="text/javascript" src="hoge.js"></script>
+      </head>
+      <body onload="hogefunc({$hoge});">
+      </body>
+      ```
+      ```javascript[hoge.js]
+      function hogefunc(hoge){
+        console.log(hoge);
+      }
+      ```
+      これで実行はできますね．  
+      ただ，headタグ部分を共通ファイルとしてbodyタグ部分とファイルを別にしたときに，bodyタグ部分のファイルが多くなってしまうので，その数だけonload書かないといけないのは面倒ですね（bodyタグまでを共通ファイルにすればいいかもしれませんが，「</body>」を別の下部共通ファイルとする書き方が個人的にまとまり効かなくてスッキリしないなぁというのもある）．
+  - headline: ③カスタムデータ属性を使う
+    body: |
+      HTMLタグの属性の一つであるカスタムデータ属性「data-」を用いた手法です．  
+      これには以下2つの注意点があります．  
+      - **id属性を指定しておく**．  
+      - **ページ読み込み後に実行されるスクリプトである**．
+      
+      headタグ内のみで済ませる場合は以下のように．
+      ```html[hoge.html]
+      <head>
+        <script id="hogeid" type="text/javascript" src="hoge.js" data-hoge="{$hoge}"></script>
+      </head>
+      ```
+      ```javascript[hoge.js]
+      $(window).on("load", function(){
+        var hoge = $("#hogeid").data("hoge");
+        console.log(hoge);
+      });
+      ```
+      また，任意の位置へのJavaScriptの読み込みの場合は以下のように（hoge.jsは上に同じ）できますね．
+      ```html[hoge.html]
+      <head>
+        <script type="text/javascript" src="hoge.js"></script>
+      </head>
+      <body>
+        <div id="hogeid" data-hoge="{$hoge}"></div>
+      </body>
+      ```
+      このように任意の位置へのJavaScriptの呼び出しであっても，そこに必要な変数を渡すことができるので見やすいかなと思います．  
+      ただページ読み込み後に処理されるので，ページの表示直後にその部分が遅れて表示されるということがありますが・・・．  
+      タグ検出時の書き方では処理できない場合があるので仕方ない書き方になっています．
+  - headline: まとめ
+    body: |
+      まぁこんな感じで，弊サイトの「日報」機能では③の手法を採用しています（だからページ表示の際に遅れて表示されるｗ）．
+      
+      もっと良い方法があったらご教授ください(・∀・)

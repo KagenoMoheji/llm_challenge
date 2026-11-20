@@ -1,0 +1,45 @@
+======================================================================
+Google Colab MCP pytest 実行ログ例 (capass-v0.1.6-3 toolserver/ 配下)
+======================================================================
+
+[コマンド]
+uv run --python 3.13 --with git+https://github.com/googlecolab/colab-mcp python run_colab_pytest.py capass-v0.1.6-3.zip --target toolserver
+
+[Colab URL]
+https://colab.research.google.com/notebooks/empty.ipynb#mcpProxyToken=W5xlhM8oVieaiVwnVxyXqA&mcpProxyPort=59261
+
+[実行セル出力]
+EXTRACT_OK /content/capass-src/capass-v0.1.6-3/toolserver
+CORE_PATH /content/capass-src/capass-v0.1.6-3/core
+TEST_FILES ['it_cli.py']
+
+INSTALL_CORE ['/usr/bin/python3', '-m', 'pip', 'install', '-e', '/content/capass-src/capass-v0.1.6-3/core']
+Obtaining file:///content/capass-src/capass-v0.1.6-3/core
+Successfully built capass
+Installing collected packages: capass
+Successfully installed capass-0.1.6
+
+INSTALL_TOOLSERVER ['/usr/bin/python3', '-m', 'pip', 'install', '-e', '.[dev]']
+Obtaining file:///content/capass-src/capass-v0.1.6-3/toolserver
+Successfully built capass-toolserver
+Installing collected packages: capass-toolserver
+Successfully installed capass-toolserver-0.1.6
+
+PYTEST ['/usr/bin/python3', '-m', 'pytest', '-vv', 'tests']
+============================= test session starts ==============================
+platform linux -- Python 3.13.18, pytest-8.4.2, pluggy-1.7.0 -- /usr/bin/python3
+rootdir: /content/capass-src/capass-v0.1.6-3/toolserver
+configfile: pyproject.toml
+plugins: langsmith-0.14.17, typeguard-4.6.0, anyio-4.16.0, platformdirs-4.14.3
+collected 6 items
+
+tests/it_cli.py::test_init_spec_describes_the_receiver_service PASSED    [ 16%]
+tests/it_cli.py::test_capass_init_with_the_real_toolserver_cli PASSED    [ 33%]
+tests/it_cli.py::test_init_help_names_the_mode PASSED                    [ 50%]
+tests/it_cli.py::test_help_lists_init_as_a_toolserver_command PASSED     [ 66%]
+tests/it_cli.py::test_init_is_refused_on_a_server_that_is_set_up_as_an_agent PASSED [ 83%]
+tests/it_cli.py::test_daemon_package_exists_but_is_not_implemented_yet PASSED [100%]
+
+============================== 6 passed in 0.12s ===============================
+
+PYTEST_EXIT 0
