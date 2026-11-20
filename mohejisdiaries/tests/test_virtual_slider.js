@@ -62,14 +62,25 @@ console.assert(m0Html.includes('記事タイトル 10'), 'Mobile page 0 should c
 console.assert(!m0Html.includes('記事タイトル 11'), 'Mobile page 0 must not contain article 11');
 
 // 5. 動的DOMウィンドウ更新 (updateDesktopVirtualWindow)
+// 実際のブラウザDOMと同様に children (Element子ノード) を正しく追跡するモックを作成
+function createMockPageDiv() {
+    let _html = '';
+    return {
+        get innerHTML() { return _html; },
+        set innerHTML(v) {
+            _html = v;
+        },
+        get children() {
+            // HTML内のタグ（Element）の数を検出するシミュレーション
+            const elementMatches = _html.match(/<[a-z0-9-]+(?:\s+[^>]*?)?>/gi) || [];
+            return elementMatches;
+        }
+    };
+}
+
 const mockPages = [];
 for (let p = 0; p < totalPages; p++) {
-    const pageDiv = {
-        _html: '',
-        get innerHTML() { return this._html; },
-        set innerHTML(v) { this._html = v; },
-        hasChildNodes() { return this._html.trim().length > 0; }
-    };
+    const pageDiv = createMockPageDiv();
     if (p <= SLIDER_VIRTUAL_WINDOW) {
         pageDiv.innerHTML = generateDesktopPageHtml(p, totalPages, dummyArticles, ARTICLES_PER_PAGE);
     }
@@ -78,23 +89,28 @@ for (let p = 0; p < totalPages; p++) {
 const mockTrack = { children: mockPages };
 
 // 初期状態チェック: 0と1のみ実DOMが存在し、2〜7は空
-console.assert(mockPages[0].hasChildNodes() === true, 'Page 0 has DOM initially');
-console.assert(mockPages[1].hasChildNodes() === true, 'Page 1 has DOM initially');
-console.assert(mockPages[2].hasChildNodes() === false, 'Page 2 is empty initially');
-console.assert(mockPages[7].hasChildNodes() === false, 'Page 7 is empty initially');
+console.assert(mockPages[0].children.length > 0, 'Page 0 has DOM initially');
+console.assert(mockPages[1].children.length > 0, 'Page 1 has DOM initially');
+console.assert(mockPages[2].children.length === 0, 'Page 2 is empty initially');
+console.assert(mockPages[7].children.length === 0, 'Page 7 is empty initially');
 
-// ページ3へジャンプ移動 (centerPage = 3)
-// 仮想ウィンドウ範囲: |p - 3| <= 1 (2, 3, 4)
-// 0, 1 は範囲外なので破棄されること
-// 2, 3, 4 は動的に実DOMが生成されること
-// 5, 6, 7 は空のままであること
-updateDesktopVirtualWindow(mockTrack, 3, totalPages, dummyArticles, ARTICLES_PER_PAGE);
-console.assert(mockPages[0].hasChildNodes() === false, 'Page 0 was pruned');
-console.assert(mockPages[1].hasChildNodes() === false, 'Page 1 was pruned');
-console.assert(mockPages[2].hasChildNodes() === true, 'Page 2 was dynamically created');
-console.assert(mockPages[3].hasChildNodes() === true, 'Page 3 was dynamically created');
-console.assert(mockPages[4].hasChildNodes() === true, 'Page 4 was dynamically created');
-console.assert(mockPages[5].hasChildNodes() === false, 'Page 5 remains empty');
+// テストケースA: ページ0から最後のページ(Page 7)へ直接ジャンプ移動 (slider-dotでの一発ジャンプ)
+const lastPageIndex = totalPages - 1; // 7
+updateDesktopVirtualWindow(mockTrack, lastPageIndex, totalPages, dummyArticles, ARTICLES_PER_PAGE);
+console.assert(mockPages[lastPageIndex].children.length > 0, 'Last page must be rendered after direct jump from page 0');
+console.assert(mockPages[lastPageIndex].innerHTML.includes('最　古'), 'Last page must contain oldest tile');
+console.assert(mockPages[lastPageIndex - 1].children.length > 0, 'Page before last must be rendered within window');
+console.assert(mockPages[0].children.length === 0, 'Page 0 must be pruned when at last page');
+
+// テストケースB: 最後のページ(7)から1つ前(6)に戻る
+updateDesktopVirtualWindow(mockTrack, lastPageIndex - 1, totalPages, dummyArticles, ARTICLES_PER_PAGE);
+console.assert(mockPages[lastPageIndex - 1].children.length > 0, 'Page 6 must have tiles');
+console.assert(mockPages[lastPageIndex].children.length > 0, 'Page 7 should stay loaded within window');
+
+// テストケースC: 再び最後のページ(7)へ進む
+updateDesktopVirtualWindow(mockTrack, lastPageIndex, totalPages, dummyArticles, ARTICLES_PER_PAGE);
+console.assert(mockPages[lastPageIndex].children.length > 0, 'Last page must still be rendered when returning to it');
+console.assert(mockPages[lastPageIndex].innerHTML.includes('最　古'), 'Last page must still contain oldest tile');
 
 console.log('test_virtual_slider.js passed successfully!');
 `;
@@ -143,3 +159,11 @@ const context = {
 
 vm.createContext(context);
 vm.runInContext(scriptContent + '\n' + testCode, context);
+
+// 6. 上下両方のページネーションドットコンテナのHTML検証
+console.log('6. Verifying dual pagination containers (top & bottom) in HTML...');
+console.assert(html.includes('id="slider-pagination-desktop"'), 'Top desktop pagination exists');
+console.assert(html.includes('id="slider-pagination-desktop-bottom"'), 'Bottom desktop pagination exists');
+console.assert(html.includes('id="slider-pagination-mobile"'), 'Top mobile pagination exists');
+console.assert(html.includes('id="slider-pagination-mobile-bottom"'), 'Bottom mobile pagination exists');
+console.log('Dual pagination containers HTML check passed.');
