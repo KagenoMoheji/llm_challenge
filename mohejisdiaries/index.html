@@ -440,6 +440,10 @@
             box-sizing: border-box;
         }
 
+        .slider-pagination-bottom {
+            padding: 16px 0 20px;
+        }
+
         .slider-dot {
             width: 10px;
             height: 10px;
@@ -1199,6 +1203,10 @@
                 width: 100%;
                 padding: 12px 0 16px;
             }
+
+            .mobile-pagination.slider-pagination-bottom {
+                padding: 16px 0 24px;
+            }
         }
     </style>
 </head>
@@ -1221,7 +1229,7 @@
         <img id="modal-image" src="" alt="">
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/monomd@1.0.4/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/monomd@1.0.4/index.js" integrity="sha384-/1nOxiUiFF3dfhjZLGjY9afybHaX+4sZn5RUNJ5y0jByO7eqPmMTYBI15lCYw4Bv" crossorigin="anonymous"></script>
     <script>
         const appName = "もへじの編綴";
         // monomdのCSSを追加
@@ -1620,11 +1628,11 @@
                 if (!pageElem) continue;
                 const isNear = Math.abs(p - centerPage) <= SLIDER_VIRTUAL_WINDOW;
                 if (isNear) {
-                    if (!pageElem.hasChildNodes()) {
+                    if (pageElem.children.length === 0) {
                         pageElem.innerHTML = generateDesktopPageHtml(p, totalPages, filteredArticles, ARTICLES_PER_PAGE);
                     }
                 } else {
-                    if (pageElem.hasChildNodes()) {
+                    if (pageElem.children.length > 0) {
                         pageElem.innerHTML = '';
                     }
                 }
@@ -1640,11 +1648,11 @@
                 if (!pageElem) continue;
                 const isNear = Math.abs(mp - centerPage) <= SLIDER_VIRTUAL_WINDOW;
                 if (isNear) {
-                    if (!pageElem.hasChildNodes()) {
+                    if (pageElem.children.length === 0) {
                         pageElem.innerHTML = generateMobilePageHtml(mp, mobileTotalPages, filteredArticles, MOBILE_ARTICLES_PER_PAGE);
                     }
                 } else {
-                    if (pageElem.hasChildNodes()) {
+                    if (pageElem.children.length > 0) {
                         pageElem.innerHTML = '';
                     }
                 }
@@ -1669,11 +1677,7 @@
                 for (let p = 0; p < totalPages; p++) {
                     const isWithinWindow = Math.abs(p - targetPage) <= SLIDER_VIRTUAL_WINDOW;
                     const innerHtml = isWithinWindow ? generateDesktopPageHtml(p, totalPages, filteredArticles, ARTICLES_PER_PAGE) : '';
-                    pagesHtml += `
-                        <div class="slider-page-grid" data-page-index="${p}">
-                            ${innerHtml}
-                        </div>
-                    `;
+                    pagesHtml += `<div class="slider-page-grid" data-page-index="${p}">${innerHtml}</div>`;
                 }
             }
 
@@ -1699,11 +1703,7 @@
                 for (let mp = 0; mp < mobileTotalPages; mp++) {
                     const isWithinWindow = Math.abs(mp - targetMobilePage) <= SLIDER_VIRTUAL_WINDOW;
                     const innerHtml = isWithinWindow ? generateMobilePageHtml(mp, mobileTotalPages, filteredArticles, MOBILE_ARTICLES_PER_PAGE) : '';
-                    mobilePagesHtml += `
-                        <div class="mobile-slider-page" data-page-index="${mp}">
-                            ${innerHtml}
-                        </div>
-                    `;
+                    mobilePagesHtml += `<div class="mobile-slider-page" data-page-index="${mp}">${innerHtml}</div>`;
                 }
             }
 
@@ -1715,16 +1715,20 @@
 
             // DOMへ反映
             const desktopPagination = document.getElementById('slider-pagination-desktop');
+            const desktopPaginationBottom = document.getElementById('slider-pagination-desktop-bottom');
             const desktopTrack = document.getElementById('articles-slider-track');
             const mobilePagination = document.getElementById('slider-pagination-mobile');
+            const mobilePaginationBottom = document.getElementById('slider-pagination-mobile-bottom');
             const mobileTrack = document.getElementById('articles-slider-track-mobile');
 
             if (desktopPagination) desktopPagination.innerHTML = dotsHtml;
+            if (desktopPaginationBottom) desktopPaginationBottom.innerHTML = dotsHtml;
             if (desktopTrack) {
                 desktopTrack.innerHTML = pagesHtml;
                 desktopTrack.style.transform = `translateX(-${targetPage * 100}%)`;
             }
             if (mobilePagination) mobilePagination.innerHTML = mobileDotsHtml;
+            if (mobilePaginationBottom) mobilePaginationBottom.innerHTML = mobileDotsHtml;
             if (mobileTrack) {
                 mobileTrack.innerHTML = mobilePagesHtml;
                 mobileTrack.style.transform = `translateX(-${targetMobilePage * 100}%)`;
@@ -1757,12 +1761,13 @@
                 if (desktopTrack) {
                     desktopTrack.style.transform = `translateX(-${currentPage * 100}%)`;
                 }
-                desktopDots.forEach((dot, idx) => {
-                    dot.classList.toggle('active', idx === currentPage);
+                desktopDots.forEach((dot) => {
+                    const dotIdx = parseInt(dot.getAttribute('data-dot-index'), 10);
+                    dot.classList.toggle('active', dotIdx === currentPage);
                 });
             }
 
-            // ドットクリックイベント
+            // ドットクリックイベント (上下両方のドットにバインド)
             desktopDots.forEach(dot => {
                 dot.addEventListener('click', function(e) {
                     e.stopPropagation();
@@ -1827,12 +1832,13 @@
                 if (mobileTrack) {
                     mobileTrack.style.transform = `translateX(-${currentMobilePage * 100}%)`;
                 }
-                mobileDots.forEach((dot, idx) => {
-                    dot.classList.toggle('active', idx === currentMobilePage);
+                mobileDots.forEach((dot) => {
+                    const dotIdx = parseInt(dot.getAttribute('data-dot-index'), 10);
+                    dot.classList.toggle('active', dotIdx === currentMobilePage);
                 });
             }
 
-            // ドットクリックイベント
+            // ドットクリックイベント (上下両方のドットにバインド)
             mobileDots.forEach(dot => {
                 dot.addEventListener('click', function(e) {
                     e.stopPropagation();
@@ -2034,18 +2040,20 @@
 
                             <!-- PC/タブレット版スライダー (3x3 グリッド: 7記事/ページ) -->
                             <div class="articles-slider-desktop">
-                                <div class="slider-pagination" id="slider-pagination-desktop"></div>
+                                <div class="slider-pagination slider-pagination-top" id="slider-pagination-desktop"></div>
                                 <div class="slider-viewport">
                                     <div class="slider-track" id="articles-slider-track"></div>
                                 </div>
+                                <div class="slider-pagination slider-pagination-bottom" id="slider-pagination-desktop-bottom"></div>
                             </div>
 
                             <!-- スマホ版スライダー (縦一列: 10記事/ページ) -->
                             <div class="articles-slider-mobile">
-                                <div class="slider-pagination mobile-pagination" id="slider-pagination-mobile"></div>
+                                <div class="slider-pagination mobile-pagination slider-pagination-top" id="slider-pagination-mobile"></div>
                                 <div class="mobile-viewport" id="mobile-slider-viewport">
                                     <div class="mobile-track" id="articles-slider-track-mobile"></div>
                                 </div>
+                                <div class="slider-pagination mobile-pagination slider-pagination-bottom" id="slider-pagination-mobile-bottom"></div>
                             </div>
                         </section>
                     </div>
