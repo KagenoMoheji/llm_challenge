@@ -1221,7 +1221,7 @@
         <img id="modal-image" src="" alt="">
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/monomd@1.0.2/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/monomd@1.0.4/index.js"></script>
     <script>
         const appName = "もへじの編綴";
         // monomdのCSSを追加
@@ -1521,7 +1521,137 @@
             return `[${filter.value}]`;
         }
 
-        // スライダー描画関数 (PC版 3x3 / スマホ版 縦1列)
+        // 仮想スライダーの前後描画ウィンドウ幅 (現在ページ ± VIRTUAL_WINDOW ページのみ実DOMを保持)
+        const SLIDER_VIRTUAL_WINDOW = 1;
+
+        // PC版特定ページのタイルHTMLを生成する純粋関数
+        function generateDesktopPageHtml(p, totalPages, filteredArticles, ARTICLES_PER_PAGE = 7) {
+            const pageArticles = filteredArticles.slice(p * ARTICLES_PER_PAGE, (p + 1) * ARTICLES_PER_PAGE);
+            const isLastPage = (p === totalPages - 1);
+            const oldestSlotIndex = isLastPage ? (1 + pageArticles.length) : -1;
+
+            let tilesHtml = '';
+            for (let slot = 0; slot < 9; slot++) {
+                if (slot === 0) {
+                    if (p === 0) {
+                        tilesHtml += `
+                            <div class="slider-tile nav-tile nav-tile-latest">
+                                最　新<br>の<br>記　事
+                            </div>
+                        `;
+                    } else {
+                        tilesHtml += `
+                            <div class="slider-tile nav-tile nav-tile-link nav-tile-prev" data-target-page="${p - 1}" role="button" tabindex="0">
+                                最　近<br>の<br>記事へ
+                            </div>
+                        `;
+                    }
+                } else if (isLastPage && slot === oldestSlotIndex && slot <= 8) {
+                    tilesHtml += `
+                        <div class="slider-tile nav-tile nav-tile-oldest">
+                            最　古<br>の<br>記　事
+                        </div>
+                    `;
+                } else if (!isLastPage && slot === 8) {
+                    tilesHtml += `
+                        <div class="slider-tile nav-tile nav-tile-link nav-tile-next" data-target-page="${p + 1}" role="button" tabindex="0">
+                            過　去<br>の<br>記事へ
+                        </div>
+                    `;
+                } else {
+                    const articleIdx = slot - 1;
+                    if (articleIdx >= 0 && articleIdx < pageArticles.length) {
+                        const article = pageArticles[articleIdx];
+                        let targetPath = '/articles/2019/1';
+                        if (article.id) {
+                            const yMatch = article.id.match(/^(\d{4})(\d+)$/);
+                            if (yMatch) {
+                                targetPath = `/articles/${yMatch[1]}/${parseInt(yMatch[2], 10)}`;
+                            }
+                        }
+
+                        tilesHtml += `
+                            <div class="slider-tile article-tile" data-path="${targetPath}">
+                                <div class="article-tile-content">
+                                    <div class="article-tile-title">${escapeHtml(article.title)}</div>
+                                </div>
+                                <div class="tile-readmore-btn" data-path="${targetPath}">
+                                    <span class="btn-label">続きを読む</span>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        tilesHtml += `<div class="slider-tile empty-tile"></div>`;
+                    }
+                }
+            }
+            return tilesHtml;
+        }
+
+        // スマホ版特定ページのアイテムHTMLを生成する純粋関数
+        function generateMobilePageHtml(mp, mobileTotalPages, filteredArticles, MOBILE_ARTICLES_PER_PAGE = 10) {
+            const pageArticles = filteredArticles.slice(mp * MOBILE_ARTICLES_PER_PAGE, (mp + 1) * MOBILE_ARTICLES_PER_PAGE);
+            let itemsHtml = '';
+            for (const article of pageArticles) {
+                let targetPath = '/articles/2019/1';
+                if (article.id) {
+                    const yMatch = article.id.match(/^(\d{4})(\d+)$/);
+                    if (yMatch) {
+                        targetPath = `/articles/${yMatch[1]}/${parseInt(yMatch[2], 10)}`;
+                    }
+                }
+                const formattedDate = article.createDate ? formatDate(article.createDate) : '';
+                itemsHtml += `
+                    <div class="mobile-article-item" data-path="${targetPath}">
+                        <div class="mobile-article-title">${escapeHtml(article.title)}</div>
+                        ${formattedDate ? `<div class="mobile-article-meta"><span class="meta-date">${formattedDate}</span></div>` : ''}
+                    </div>
+                `;
+            }
+            return itemsHtml;
+        }
+
+        // PC版スライダー仮想ウィンドウ更新 (現在ページの前後1ページの実DOMを動的に生成・解放)
+        function updateDesktopVirtualWindow(desktopTrack, centerPage, totalPages, filteredArticles, ARTICLES_PER_PAGE = 7) {
+            if (!desktopTrack) return;
+            const pages = desktopTrack.children;
+            for (let p = 0; p < totalPages; p++) {
+                const pageElem = pages[p];
+                if (!pageElem) continue;
+                const isNear = Math.abs(p - centerPage) <= SLIDER_VIRTUAL_WINDOW;
+                if (isNear) {
+                    if (!pageElem.hasChildNodes()) {
+                        pageElem.innerHTML = generateDesktopPageHtml(p, totalPages, filteredArticles, ARTICLES_PER_PAGE);
+                    }
+                } else {
+                    if (pageElem.hasChildNodes()) {
+                        pageElem.innerHTML = '';
+                    }
+                }
+            }
+        }
+
+        // スマホ版スライダー仮想ウィンドウ更新 (現在ページの前後1ページの実DOMを動的に生成・解放)
+        function updateMobileVirtualWindow(mobileTrack, centerPage, mobileTotalPages, filteredArticles, MOBILE_ARTICLES_PER_PAGE = 10) {
+            if (!mobileTrack) return;
+            const pages = mobileTrack.children;
+            for (let mp = 0; mp < mobileTotalPages; mp++) {
+                const pageElem = pages[mp];
+                if (!pageElem) continue;
+                const isNear = Math.abs(mp - centerPage) <= SLIDER_VIRTUAL_WINDOW;
+                if (isNear) {
+                    if (!pageElem.hasChildNodes()) {
+                        pageElem.innerHTML = generateMobilePageHtml(mp, mobileTotalPages, filteredArticles, MOBILE_ARTICLES_PER_PAGE);
+                    }
+                } else {
+                    if (pageElem.hasChildNodes()) {
+                        pageElem.innerHTML = '';
+                    }
+                }
+            }
+        }
+
+        // スライダー描画関数 (PC版 3x3 / スマホ版 縦1列: 前後1ページのみ実DOMレンダリングする仮想化)
         function renderSliders(filteredArticles, initialPage = 0, initialMobilePage = 0) {
             // 1. PC版スライダーHTML生成 (1ページ7記事)
             const ARTICLES_PER_PAGE = 7;
@@ -1537,74 +1667,17 @@
                 `;
             } else {
                 for (let p = 0; p < totalPages; p++) {
-                    const pageArticles = filteredArticles.slice(p * ARTICLES_PER_PAGE, (p + 1) * ARTICLES_PER_PAGE);
-                    const isLastPage = (p === totalPages - 1);
-                    const oldestSlotIndex = isLastPage ? (1 + pageArticles.length) : -1;
-
-                    let tilesHtml = '';
-                    for (let slot = 0; slot < 9; slot++) {
-                        if (slot === 0) {
-                            if (p === 0) {
-                                tilesHtml += `
-                                    <div class="slider-tile nav-tile nav-tile-latest">
-                                        最　新<br>の<br>記　事
-                                    </div>
-                                `;
-                            } else {
-                                tilesHtml += `
-                                    <div class="slider-tile nav-tile nav-tile-link nav-tile-prev" data-target-page="${p - 1}" role="button" tabindex="0">
-                                        最　近<br>の<br>記事へ
-                                    </div>
-                                `;
-                            }
-                        } else if (isLastPage && slot === oldestSlotIndex && slot <= 8) {
-                            tilesHtml += `
-                                <div class="slider-tile nav-tile nav-tile-oldest">
-                                    最　古<br>の<br>記　事
-                                </div>
-                            `;
-                        } else if (!isLastPage && slot === 8) {
-                            tilesHtml += `
-                                <div class="slider-tile nav-tile nav-tile-link nav-tile-next" data-target-page="${p + 1}" role="button" tabindex="0">
-                                    過　去<br>の<br>記事へ
-                                </div>
-                            `;
-                        } else {
-                            const articleIdx = slot - 1;
-                            if (articleIdx >= 0 && articleIdx < pageArticles.length) {
-                                const article = pageArticles[articleIdx];
-                                let targetPath = '/articles/2019/1';
-                                if (article.id) {
-                                    const yMatch = article.id.match(/^(\d{4})(\d+)$/);
-                                    if (yMatch) {
-                                        targetPath = `/articles/${yMatch[1]}/${parseInt(yMatch[2], 10)}`;
-                                    }
-                                }
-
-                                tilesHtml += `
-                                    <div class="slider-tile article-tile" data-path="${targetPath}">
-                                        <div class="article-tile-content">
-                                            <div class="article-tile-title">${escapeHtml(article.title)}</div>
-                                        </div>
-                                        <div class="tile-readmore-btn" data-path="${targetPath}">
-                                            <span class="btn-label">続きを読む</span>
-                                        </div>
-                                    </div>
-                                `;
-                            } else {
-                                tilesHtml += `<div class="slider-tile empty-tile"></div>`;
-                            }
-                        }
-                    }
-
+                    const isWithinWindow = Math.abs(p - targetPage) <= SLIDER_VIRTUAL_WINDOW;
+                    const innerHtml = isWithinWindow ? generateDesktopPageHtml(p, totalPages, filteredArticles, ARTICLES_PER_PAGE) : '';
                     pagesHtml += `
                         <div class="slider-page-grid" data-page-index="${p}">
-                            ${tilesHtml}
+                            ${innerHtml}
                         </div>
                     `;
                 }
             }
 
+            // PC版ページネーションドット（全記事数に対応する全ページ分を網羅して描画）
             let dotsHtml = '';
             for (let p = 0; p < totalPages; p++) {
                 dotsHtml += `<div class="slider-dot desktop-dot ${p === targetPage ? 'active' : ''}" data-dot-index="${p}"></div>`;
@@ -1624,32 +1697,17 @@
                 `;
             } else {
                 for (let mp = 0; mp < mobileTotalPages; mp++) {
-                    const pageArticles = filteredArticles.slice(mp * MOBILE_ARTICLES_PER_PAGE, (mp + 1) * MOBILE_ARTICLES_PER_PAGE);
-                    let itemsHtml = '';
-                    for (const article of pageArticles) {
-                        let targetPath = '/articles/2019/1';
-                        if (article.id) {
-                            const yMatch = article.id.match(/^(\d{4})(\d+)$/);
-                            if (yMatch) {
-                                targetPath = `/articles/${yMatch[1]}/${parseInt(yMatch[2], 10)}`;
-                            }
-                        }
-                        const formattedDate = article.createDate ? formatDate(article.createDate) : '';
-                        itemsHtml += `
-                            <div class="mobile-article-item" data-path="${targetPath}">
-                                <div class="mobile-article-title">${escapeHtml(article.title)}</div>
-                                ${formattedDate ? `<div class="mobile-article-meta"><span class="meta-date">${formattedDate}</span></div>` : ''}
-                            </div>
-                        `;
-                    }
+                    const isWithinWindow = Math.abs(mp - targetMobilePage) <= SLIDER_VIRTUAL_WINDOW;
+                    const innerHtml = isWithinWindow ? generateMobilePageHtml(mp, mobileTotalPages, filteredArticles, MOBILE_ARTICLES_PER_PAGE) : '';
                     mobilePagesHtml += `
                         <div class="mobile-slider-page" data-page-index="${mp}">
-                            ${itemsHtml}
+                            ${innerHtml}
                         </div>
                     `;
                 }
             }
 
+            // スマホ版ページネーションドット（全記事数に対応する全ページ分を網羅して描画）
             let mobileDotsHtml = '';
             for (let mp = 0; mp < mobileTotalPages; mp++) {
                 mobileDotsHtml += `<div class="slider-dot mobile-dot ${mp === targetMobilePage ? 'active' : ''}" data-dot-index="${mp}"></div>`;
@@ -1672,32 +1730,39 @@
                 mobileTrack.style.transform = `translateX(-${targetMobilePage * 100}%)`;
             }
 
-            // スライダーイベントバインド
-            bindSliderEvents(totalPages, mobileTotalPages, targetPage, targetMobilePage);
+            // スライダーイベントバインド (仮想ウィンドウ更新関数を含む)
+            bindSliderEvents(totalPages, mobileTotalPages, targetPage, targetMobilePage, filteredArticles, ARTICLES_PER_PAGE, MOBILE_ARTICLES_PER_PAGE);
         }
 
-        // スライダーイベントバインド関数
-        function bindSliderEvents(totalPages, mobileTotalPages, initialPage = 0, initialMobilePage = 0) {
+        // スライダーイベントバインド関数 (仮想ウィンドウ動的更新 & イベント委譲)
+        function bindSliderEvents(totalPages, mobileTotalPages, initialPage = 0, initialMobilePage = 0, filteredArticles = [], ARTICLES_PER_PAGE = 7, MOBILE_ARTICLES_PER_PAGE = 10) {
             const mainContent = document.getElementById('main-content');
             if (!mainContent) return;
 
-            // PCスライダー
+            // ===================================================
+            // PC版スライダー (仮想ウィンドウ制御 & イベント委譲)
+            // ===================================================
             let currentPage = initialPage;
-            const track = document.getElementById('articles-slider-track');
+            const desktopTrack = document.getElementById('articles-slider-track');
             const desktopDots = mainContent.querySelectorAll('.desktop-dot');
 
             function goToPage(pageIndex) {
                 if (pageIndex < 0 || pageIndex >= totalPages) return;
                 currentPage = pageIndex;
                 topStore.dispatch(actions.setPage(currentPage));
-                if (track) {
-                    track.style.transform = `translateX(-${currentPage * 100}%)`;
+
+                // 移動先の前後ページの実DOMを事前にレンダリング
+                updateDesktopVirtualWindow(desktopTrack, currentPage, totalPages, filteredArticles, ARTICLES_PER_PAGE);
+
+                if (desktopTrack) {
+                    desktopTrack.style.transform = `translateX(-${currentPage * 100}%)`;
                 }
                 desktopDots.forEach((dot, idx) => {
                     dot.classList.toggle('active', idx === currentPage);
                 });
             }
 
+            // ドットクリックイベント
             desktopDots.forEach(dot => {
                 dot.addEventListener('click', function(e) {
                     e.stopPropagation();
@@ -1706,29 +1771,47 @@
                 });
             });
 
-            const navLinks = mainContent.querySelectorAll('.nav-tile-link');
-            navLinks.forEach(navBtn => {
-                navBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const targetPage = parseInt(this.getAttribute('data-target-page'), 10);
-                    goToPage(targetPage);
-                });
-            });
+            // PCスライダートラックへのイベント委譲 (DOM差し替え時もイベントを自動維持)
+            if (desktopTrack) {
+                desktopTrack.addEventListener('click', function(e) {
+                    // ナビタイル（過　去の記　事へ、最　近の記事へ）
+                    const navBtn = e.target.closest('.nav-tile-link');
+                    if (navBtn) {
+                        e.stopPropagation();
+                        const targetPage = parseInt(navBtn.getAttribute('data-target-page'), 10);
+                        if (!isNaN(targetPage)) {
+                            goToPage(targetPage);
+                        }
+                        return;
+                    }
 
-            const articleTiles = mainContent.querySelectorAll('.article-tile, .tile-readmore-btn');
-            articleTiles.forEach(elem => {
-                elem.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const path = this.getAttribute('data-path');
-                    if (path) {
-                        // 遷移前のトップページ状態を現在の履歴エントリに保存
-                        window.history.replaceState({ topState: topStore.getState() }, '', window.location.href);
-                        navigateTo(path);
+                    // 記事タイルまたは「続きを読む」ボタン
+                    const tile = e.target.closest('.article-tile, .tile-readmore-btn');
+                    if (tile) {
+                        e.stopPropagation();
+                        const path = tile.getAttribute('data-path');
+                        if (path) {
+                            window.history.replaceState({ topState: topStore.getState() }, '', window.location.href);
+                            navigateTo(path);
+                        }
                     }
                 });
-            });
 
-            // スマホスライダー
+                // キーボードアクセシビリティ対応
+                desktopTrack.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        const targetElem = e.target.closest('.nav-tile-link, .article-tile, .tile-readmore-btn');
+                        if (targetElem) {
+                            e.preventDefault();
+                            targetElem.click();
+                        }
+                    }
+                });
+            }
+
+            // ===================================================
+            // スマホ版スライダー (仮想ウィンドウ制御 & イベント委譲)
+            // ===================================================
             let currentMobilePage = initialMobilePage;
             const mobileTrack = document.getElementById('articles-slider-track-mobile');
             const mobileDots = mainContent.querySelectorAll('.mobile-dot');
@@ -1737,6 +1820,10 @@
                 if (pageIndex < 0 || pageIndex >= mobileTotalPages) return;
                 currentMobilePage = pageIndex;
                 topStore.dispatch(actions.setMobilePage(currentMobilePage));
+
+                // 移動先の前後ページの実DOMを事前にレンダリング
+                updateMobileVirtualWindow(mobileTrack, currentMobilePage, mobileTotalPages, filteredArticles, MOBILE_ARTICLES_PER_PAGE);
+
                 if (mobileTrack) {
                     mobileTrack.style.transform = `translateX(-${currentMobilePage * 100}%)`;
                 }
@@ -1745,6 +1832,7 @@
                 });
             }
 
+            // ドットクリックイベント
             mobileDots.forEach(dot => {
                 dot.addEventListener('click', function(e) {
                     e.stopPropagation();
@@ -1753,19 +1841,22 @@
                 });
             });
 
-            const mobileArticleItems = mainContent.querySelectorAll('.mobile-article-item');
-            mobileArticleItems.forEach(elem => {
-                elem.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const path = this.getAttribute('data-path');
-                    if (path) {
-                        // 遷移前のトップページ状態を現在の履歴エントリに保存
-                        window.history.replaceState({ topState: topStore.getState() }, '', window.location.href);
-                        navigateTo(path);
+            // スマホスライダートラックへのイベント委譲
+            if (mobileTrack) {
+                mobileTrack.addEventListener('click', function(e) {
+                    const item = e.target.closest('.mobile-article-item');
+                    if (item) {
+                        e.stopPropagation();
+                        const path = item.getAttribute('data-path');
+                        if (path) {
+                            window.history.replaceState({ topState: topStore.getState() }, '', window.location.href);
+                            navigateTo(path);
+                        }
                     }
                 });
-            });
+            }
 
+            // スワイプ操作対応
             const mobileViewport = document.getElementById('mobile-slider-viewport');
             if (mobileViewport) {
                 let touchStartX = 0;
@@ -2206,6 +2297,74 @@
             setupArticleTagLinks();
         }
 
+        // ===================================================
+        // 記事リンク & メディアURL セキュリティ検証
+        // ===================================================
+        // URLが「https://始まり」「#始まり」「相対パス」のいずれかに適合するか検証
+        function isAllowedUrl(rawUrl) {
+            if (typeof rawUrl !== 'string') return false;
+            const url = rawUrl.trim();
+            if (!url) return false;
+
+            // 1. https:// で始まる
+            if (/^https:\/\//i.test(url)) return true;
+
+            // 2. # で始まる（ページ内アンカー）
+            if (url.startsWith('#')) return true;
+
+            // 3. プロトコル相対 (//example.com) は禁止
+            if (url.startsWith('//')) return false;
+
+            // 4. スキーム（コロン）を含むものは https:// 以外禁止 (http:, javascript:, data:, file: 等)
+            const beforeQueryOrHash = url.split(/[?#]/)[0];
+            if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(beforeQueryOrHash)) {
+                return false;
+            }
+
+            // 5. それ以外は相対パスとして許可 (例: media/image.png, ./foo, /bar, ?path=...)
+            return true;
+        }
+
+        // 記事データ内のすべてのリンク・メディアURLを抽出して検証
+        function validateArticleLinks(articleData) {
+            const invalidUrls = [];
+
+            function checkUrl(url, contextInfo) {
+                if (!url) return;
+                const trimmed = url.trim();
+                const actualUrl = trimmed.split(/\s+/)[0];
+                if (!isAllowedUrl(actualUrl)) {
+                    invalidUrls.push({
+                        url: actualUrl,
+                        context: contextInfo
+                    });
+                }
+            }
+
+            if (Array.isArray(articleData.content)) {
+                articleData.content.forEach((section, sIdx) => {
+                    const body = section.body || '';
+                    const secTitle = section.headline || `セクション${sIdx + 1}`;
+
+                    // 1. マークダウンのリンク・画像・内部リンク: [text](url), ![alt](url), !!text!!(path)
+                    const mdMatches = [...body.matchAll(/!?\[[^\]]*\]\(([^)]+)\)|!![^!]+!!\(([^)]+)\)/g)];
+                    mdMatches.forEach(m => {
+                        const targetUrl = m[1] || m[2];
+                        checkUrl(targetUrl, `「${secTitle}」のマークダウンリンク`);
+                    });
+
+                    // 2. HTMLタグ内の href 属性、src 属性: <tag href="..." src="...">
+                    const htmlAttrMatches = [...body.matchAll(/\b(?:href|src)\s*=\s*(["'])(.*?)\1/gi)];
+                    htmlAttrMatches.forEach(m => {
+                        const targetUrl = m[2];
+                        checkUrl(targetUrl, `「${secTitle}」のHTMLタグ属性`);
+                    });
+                });
+            }
+
+            return invalidUrls;
+        }
+
         // 記事プレビュー画面をレンダリング (/articles/preview)
         async function renderArticlePreviewPage() {
             const mainContent = document.getElementById('main-content');
@@ -2248,71 +2407,6 @@
             const errorElem = document.getElementById('article-preview-error');
             const fileInfoElem = document.getElementById('article-preview-file-info');
             const previewContainer = document.getElementById('article-preview-output');
-
-            // URLが「https://始まり」「#始まり」「相対パス」のいずれかに適合するか検証
-            function isAllowedUrl(rawUrl) {
-                if (typeof rawUrl !== 'string') return false;
-                const url = rawUrl.trim();
-                if (!url) return false;
-
-                // 1. https:// で始まる
-                if (/^https:\/\//i.test(url)) return true;
-
-                // 2. # で始まる（ページ内アンカー）
-                if (url.startsWith('#')) return true;
-
-                // 3. プロトコル相対 (//example.com) は禁止
-                if (url.startsWith('//')) return false;
-
-                // 4. スキーム（コロン）を含むものは https:// 以外禁止 (http:, javascript:, data:, file: 等)
-                const beforeQueryOrHash = url.split(/[?#]/)[0];
-                if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(beforeQueryOrHash)) {
-                    return false;
-                }
-
-                // 5. それ以外は相対パスとして許可 (例: media/image.png, ./foo, /bar, ?path=...)
-                return true;
-            }
-
-            // 記事データ内のすべてのリンク・メディアURLを抽出して検証
-            function validateArticleLinks(articleData) {
-                const invalidUrls = [];
-
-                function checkUrl(url, contextInfo) {
-                    if (!url) return;
-                    const trimmed = url.trim();
-                    const actualUrl = trimmed.split(/\s+/)[0];
-                    if (!isAllowedUrl(actualUrl)) {
-                        invalidUrls.push({
-                            url: actualUrl,
-                            context: contextInfo
-                        });
-                    }
-                }
-
-                if (Array.isArray(articleData.content)) {
-                    articleData.content.forEach((section, sIdx) => {
-                        const body = section.body || '';
-                        const secTitle = section.headline || `セクション${sIdx + 1}`;
-
-                        // 1. マークダウンのリンク・画像・内部リンク: [text](url), ![alt](url), !!text!!(path)
-                        const mdMatches = [...body.matchAll(/!?\[[^\]]*\]\(([^)]+)\)|!![^!]+!!\(([^)]+)\)/g)];
-                        mdMatches.forEach(m => {
-                            const targetUrl = m[1] || m[2];
-                            checkUrl(targetUrl, `「${secTitle}」のマークダウンリンク`);
-                        });
-
-                        // 2. HTMLタグ内の href 属性、src 属性: <tag href="..." src="...">
-                        const htmlAttrMatches = [...body.matchAll(/\b(?:href|src)\s*=\s*(["'])(.*?)\1/gi)];
-                        htmlAttrMatches.forEach(m => {
-                            const targetUrl = m[2];
-                            checkUrl(targetUrl, `「${secTitle}」のHTMLタグ属性`);
-                        });
-                    });
-                }
-
-                return invalidUrls;
-            }
 
             // YAML読み込み＆プレビュー処理
             async function processYamlFile(file) {
