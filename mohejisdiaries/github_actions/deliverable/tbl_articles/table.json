@@ -1,5 +1,89 @@
 [
   {
+    "id": "2019004",
+    "fileName": "2019004_init_crystal_on_wsl.yml",
+    "title": "【Crystal】環境構築(Windows Subsystem for Linux)",
+    "createDate": "2019-04-01",
+    "updateDate": "2019-04-01",
+    "tags": [
+      "Crystal",
+      "環境構築"
+    ]
+  },
+  {
+    "id": "2019003",
+    "fileName": "2019003_bxslider_link_issue_on_chrome.yml",
+    "title": "最新Chromeでスライダー内のリンクをクリックできない問題",
+    "createDate": "2019-03-28",
+    "updateDate": "2019-03-28",
+    "tags": [
+      "JavaScript",
+      "jQuery"
+    ]
+  },
+  {
+    "id": "2019002",
+    "fileName": "2019002_job_hunting_experience.yml",
+    "title": "就活体験談（20新卒）",
+    "createDate": "2019-02-28",
+    "updateDate": "2019-02-28",
+    "tags": [
+      "雑感"
+    ]
+  },
+  {
+    "id": "2019001",
+    "fileName": "2019001_pass_server_vars_to_external_js_onload.yml",
+    "title": "【jQuery】サーバからの変数をページ読み込み時に外部JSに渡したい",
+    "createDate": "2019-01-27",
+    "updateDate": "2019-01-27",
+    "tags": [
+      "JavaScript",
+      "jQuery",
+      "HTML"
+    ]
+  },
+  {
+    "id": "2018003",
+    "fileName": "2018003_site_refactoring.yml",
+    "title": "サイトをリファクタリング！",
+    "createDate": "2018-08-25",
+    "updateDate": "2018-08-25",
+    "tags": [
+      "お知らせ"
+    ]
+  },
+  {
+    "id": "2018002",
+    "fileName": "2018002_php_udf_merge_common_key_values.yml",
+    "title": "【PHP】共通キーのバリューを合併する関数を自作した",
+    "createDate": "2018-04-05",
+    "updateDate": "2018-04-05",
+    "tags": [
+      "PHP"
+    ]
+  },
+  {
+    "id": "2018001",
+    "fileName": "2018001_pacman_with_clang.yml",
+    "title": "組み込みCでPAC-MANを作っちゃった",
+    "createDate": "2018-02-22",
+    "updateDate": "2018-02-22",
+    "tags": [
+      "C言語"
+    ]
+  },
+  {
+    "id": "2017011",
+    "fileName": "2017011_lecture_proposal.yml",
+    "title": "我流の講義を組んでみた",
+    "createDate": "2017-12-29",
+    "updateDate": "2017-12-29",
+    "tags": [
+      "雑感"
+    ]
+  },
+  {
     "id": "2017010",
     "fileName": "2017010_init_python_ml_on_win10.yml",
     "title": "Windows10でPython機械学習の初期構築（PyCharm+Anaconda+Tensorflow-CPU/GPU）",
@@ -7,7 +91,8 @@
     "updateDate": "2017-08-18",
     "tags": [
       "Python",
-      "機械学習"
+      "機械学習",
+      "環境構築"
     ]
   },
   {
