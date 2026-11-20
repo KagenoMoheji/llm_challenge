@@ -1,0 +1,66 @@
+creator: KagenoMoheji
+createDate: 2019-03-28
+updateDate: !!timestamp 2019-03-28
+title: 最新Chromeでスライダー内のリンクをクリックできない問題
+tags:
+  - JavaScript
+  - jQuery
+content:
+  - headline: おやっ？弊サイトの様子が…
+    body: |
+      ある日私が所持するPCの内１台のPCで，Chromeの(バージョン73.0.3683.86への)自動アップデートをした後，弊サイトの一部のリンクをクリックすることができないという異変に直面しました．  
+      この時は他のPCのChromeやそのPCの他のブラウザでは異変が見られなかったので，このPC自体のエラーなんだろうと思って放置していました．  
+      しかし！再起動しても改善される様子が一向に現れず，もしやと思い他PCのChromeをアップデートしたところ，同様に異変が見られるようになったのです．  
+      更に，Vivaldiの最新版でも同様の異変が見られ，「これはサイト側かブラウザ側の問題か！？」と危機感を抱き，問題箇所を調べました．
+      
+      しかし私が実装したJavaScriptなどを見てもエラーと思われる箇所は見当たらず…．Twitterに投げることにしました．
+      <blockquote class="twitter-tweet"><p lang="ja" dir="ltr">まさかと思い別のノーパソでVivaldiアップデートするところをスクリーンレコードしましたがこちらでもクリックできなくなってました．
+
+      なんでぇぇぇぇぇ😂😂😂 https://t.co/VZtzVqvzRg</p>&mdash; へのへのもへじ (@KagenoMoheji) <a href="https://x.com/KagenoMoheji/status/1111078215882149888?ref_src=twsrc%5Etfw">March 28, 2019</a></blockquote>
+      <script async src="https://platform.x.com/widgets.js" charset="utf-8"></script>
+      
+      すると親切な方から問題箇所を指摘頂き，最近上げられたissueリンクを提供してくださりました．  
+      [Links in sliders aren't working - Error in the latest version of Chrome (73.0.3683.75) #1240 | Github](https://github.com/stevenwanderski/bxslider-4/issues/1240)  
+      ２週間前て…最近やんｗ
+      
+      上記リンクに書かれていた応急処置を2つ(ただし課題あり)を簡単にまとめていきたいと思います．
+  - headline: 問題のまとめ
+    body: |
+      - bxsliderの内部にあるリンクをクリックできない．
+      - Chrome:73.0.3683.75～のバージョンで上記の挙動が発生している．
+  - headline: 応急処置1
+    body: |
+      ```javascript[jquery.bxslider.js]
+      if (slider.settings.touchEnabled &&！slider.settings.ticker) { initTouch(); }
+
+      // 上記を下記に変更．
+
+      if (navigator.maxTouchPoints> 0) { initTouch(); }
+      ```
+      【問題点】
+      - SafariがmaxTouchPointsをサポートしていないため，iPhoneにおいてタッチ操作できなくなる可能性．<br>
+      - スワイプできなくなる可能性．
+  - headline: 応急処置2
+    body: |
+      ```javascript[jquery.bxslider.js]
+      if (slider.viewport.get(0).setPointerCapture) {
+        slider.pointerId = orig.pointerId;
+        slider.viewport.get(0).setPointerCapture(slider.pointerId);
+      }
+
+      // 上記を下記に変更．
+
+      if (e.target.setPointerCapture) {
+        slider.pointerId = orig.pointerId;
+        e.target.setPointerCapture(slider.pointerId);
+      }
+      ```
+      【問題点】
+      - Edge/IE11において問題がある可能性．<br>
+      - Apple製品やSafariにおいて問題がある可能性．
+  - headline: まとめ
+    body: |
+      私は**応急処置2**を採用しました．  
+      SafariやApple製品は手元に無いため検証できていませんが，現状Chrome・Vivaldi・Edge・Firefoxではクリックやスワイプができていることを確認できています．
+      
+      より良い改善策が出ることとbxsliderがアップデートすることに期待します．
