@@ -414,6 +414,39 @@ async function runTests() {
         failed++;
     }
 
+    // Test 25: Code Block Indentation inside List Item
+    console.log('Test 25: Code Block Indentation inside List Item');
+    try {
+        const md = '- hogehoge  \n  ```\n  aaa\n  bbb\n  ```';
+        const result = await renderMarkdown(md);
+        if (result.html.includes('<code>aaa\nbbb</code>')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('Code block lines in list item contain unwanted indentation');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
+    // Test 26: Code Block with Output inside List Item
+    console.log('Test 26: Code Block with Output inside List Item');
+    try {
+        const md = '- item  \n  ```\n  line1\n  :::output\n  output1\n  :::\n  ```';
+        const result = await renderMarkdown(md);
+        if (result.html.includes('<code>line1</code>') && 
+            result.html.includes('<code>output1</code>')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('Code block with output inside list item not parsed correctly');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
     // Summary
     console.log('='.repeat(50));
     console.log(`Tests Passed: ${passed}/${passed + failed}`);

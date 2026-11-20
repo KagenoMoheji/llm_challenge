@@ -248,8 +248,17 @@ async function renderMarkdown(markdown, options = {}) {
     
     // コードブロックを先に処理（```で囲まれた部分）
     const codeBlocks = [];
-    html = html.replace(/```([^\n]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    html = html.replace(/([ \t]*)```([^\n]*)\n([\s\S]*?)```/g, (match, indent, lang, code) => {
         const placeholder = `!!CODEBLOCK!${codeBlocks.length}!!`;
+        
+        // インデントされたコードブロックの場合、各行からインデントを除去
+        if (indent) {
+            const indentRegex = new RegExp(`^[ \t]{1,${indent.length}}`);
+            code = code
+                .split('\n')
+                .map(line => line.replace(indentRegex, ''))
+                .join('\n');
+        }
         
         // キャプション [caption] を検出
         let innerCaption = '';
