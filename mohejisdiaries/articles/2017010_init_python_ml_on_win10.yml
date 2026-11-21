@@ -32,7 +32,7 @@ content:
       - GPU：Gforce1070（8GB）
   - headline: まずはPyCharmのパス設定。
     body: |
-      これは普通にプロジェクトを作成したときの「Interpreter」の項目にインストールしたAnacondaにあるPythonパス《C:\.....\Anaconda3\python.exe》を設定すればいいです。  
+      これは普通にプロジェクトを作成したときの「Interpreter」の項目にインストールしたAnacondaにあるPythonパス`C:\\.....\\Anaconda3\\python.exe`を設定すればいいです。  
       これでPython3.6としてPyCharmでの、機械学習を除く基本的なPythonプログラミングは可能です。
       
       Anacondaの中にあるモジュール、またはパッケージにはどんなものがあるか、何が不足しているか、ということの確認は、PyCharmからでも、コマンドプロンプトからでも行うことができます。
@@ -47,13 +47,13 @@ content:
 
       #### ①condaコマンドを使う
       ```
-      C:\>conda list
+      C:\\>conda list
       ```
       これでAnacondaの中にどんあモジュール、もといパッケージが入っているのか確認できます。
       
       #### ②pipコマンドを使う
       ```
-      C:\>python -m pip list
+      C:\\>python -m pip list
       ```
       こちらでも確認することができますが、Anacondaをインストールしたときのパッケージがズラ～っと並んでいるもののようなので、この後述べる環境構築において確認していくには、1つ目の方法がいいです。  
       基礎的なPythonプログラミングのみでやっていく人は、2つ目の方法でやっても問題ないとは思います。
@@ -68,22 +68,22 @@ content:
       まず仮想環境を構築するために、**管理者権限で**コマンドプロンプトを起動し、以下のコマンドを入力します。  
       ちなみに、管理者権限でコマンドプロンプトを起動させるには、《スタートメニュー→Windowsシステムツール》にあるコマンドプロンプトを**右クリックして**管理者権限で起動してください。（仮想環境絡みでは毎回管理者権限でやった方がいいです。）
       ```
-      C:\>conda create --name=（仮想環境の名前） python=（Pythonのバージョン）
+      C:\\>conda create --name=（仮想環境の名前） python=（Pythonのバージョン）
       ```
       上のコマンドのPythonのバージョンに「3.5」と入力すれば、Python3.5の仮想環境が構築されます。  
-      ちなみに仮想環境は《C:\...\Anaconda3\envs\（仮想環境の名前）》という感じのディレクトリで存在しています。仮想環境内のPythonのバージョンに合わせたパスもこの中にあります。
+      ちなみに仮想環境は`C:\\...\\Anaconda3\\envs\\（仮想環境の名前）`という感じのディレクトリで存在しています。仮想環境内のPythonのバージョンに合わせたパスもこの中にあります。
       
       ここで、仮想環境内でなんらかの処理を行う場合に、仮想環境の起動をしなくてはなりません。つまり仮想環境のON/OFFのやり方を以下に述べます。  
       仮想環境をONにする場合は・・・
       ```
-      C:\>activate （仮想環境の名前）
-      (仮想環境の名前)C:\>
+      C:\\>activate （仮想環境の名前）
+      (仮想環境の名前)C:\\>
       ```
-      仮想環境がONになると、上のコマンドの2行目のようにディスク名（上のコマンドの場合「C:\>」）の前に仮想環境の名前が表示されます。  
+      仮想環境がONになると、上のコマンドの2行目のようにディスク名（上のコマンドの場合`C:\\>`）の前に仮想環境の名前が表示されます。  
       逆に、OFFにするには・・・
       ```
-      (仮想環境の名前)C:\>deactivate
-      C:\>
+      (仮想環境の名前)C:\\>deactivate
+      C:\\>
       ```
       「deactivate」だけ入力すればいいですね。
       
@@ -91,7 +91,7 @@ content:
       仮想環境の構築が終わったら、Tensorflow（CPU版）をインストールしていきます。
       **インストールする前に必ず「activate」して仮想環境をONにしてください。**その状態のままコマンドを書いてインストールしていきます。
       ```
-      (仮想環境の名前)C:\>pip install tensorflow
+      (仮想環境の名前)C:\\>pip install tensorflow
       ```
       これでTensorflow（CPU版）をインストールできました。  
       ここで動作確認をしてみます。こちらもPyCharmとコマンドプロンプトの2通りやり方があります。
@@ -99,7 +99,7 @@ content:
       #### PyCharmの場合
       こちらの方法でやる場合、必ずしも**仮想環境を「activate」してONする必要はありません。**  
       まずプロジェクトを新しく作成する際に、Interpreterの項目で新しいPython3.5のパスを追加します。  
-      Interpreterの右にある歯車をクリックして「Add Local」を選択し、先ほど構築した仮想環境があるディレクトリにあるPythonのパス`...\Anaconda3\env\（仮想環境の名前）\python.exe`を選択して、これで仮想環境のPython3.5のパスが設定されました。
+      Interpreterの右にある歯車をクリックして「Add Local」を選択し、先ほど構築した仮想環境があるディレクトリにあるPythonのパス`...\\Anaconda3\\env\\（仮想環境の名前）\\python.exe`を選択して、これで仮想環境のPython3.5のパスが設定されました。
       
       元々Python3.6で作成されたプロジェクトでも、先ほどPyCharmのパス設定で、パッケージの確認として補足説明した、`File→Setting→...`のやり方でInterpreterを変更することが可能です。
       
@@ -125,7 +125,7 @@ content:
       こちらの方法でやる場合は
       **必ず「activate」して仮想環境をONにしてください。**
       ```
-      (仮想環境の名前)C:\>python
+      (仮想環境の名前)C:\\>python
       ...（環境かなんらかの説明が数行出てくる。）
       >>>#ここからPythonのコードを書いていく。
       >>>import tensorflow
@@ -149,7 +149,7 @@ content:
       - [2][Windows版AnacondaでTensorflow環境構築 | Qiita](https://qiita.com/exy81/items/48314b968d9fad6170c8)
       
       **※※**仮想環境の構築（PyCharmで）  
-      新しくプロジェクトを作成する際のInterpreterの右の歯車で「Create Conda Env」を選択し、「Name」に仮想環境の名前、「Location」は`...\Anaconda3\env`以下にあるかを確認し、「Python version」でバージョンを選択すれば仮想環境が構築される・・・ようです（私はやってないですが、これでもいけそうですね）。  
+      新しくプロジェクトを作成する際のInterpreterの右の歯車で「Create Conda Env」を選択し、「Name」に仮想環境の名前、「Location」は`...\\Anaconda3\\env`以下にあるかを確認し、「Python version」でバージョンを選択すれば仮想環境が構築される・・・ようです（私はやってないですが、これでもいけそうですね）。  
       **※※**
   - headline: ついでにKerasも。
     body: |
@@ -157,7 +157,7 @@ content:
       
       まぁ、このままTensorflowと同じようにインストールすればいいでしょ！っと・・・
       ```
-      (仮想環境の名前)C:\>pip install keras
+      (仮想環境の名前)C:\\>pip install keras
       :::output
       エラーエラーエラーエラーエラーエラーエラーエラーエラーエラー（※実際はこんなエラー表示は出てきません。分かりやすいように書いているだけ。）
       :::
@@ -167,7 +167,7 @@ content:
       エラー文を読んでみると、「Scipyがインストールされていない」とのことでした。  
       めんどくせぇなぁ、でも先にScipyをインストールすればなんとかなるっしょっと・・・
       ```
-      (仮想環境の名前)C:\>pip install scipy
+      (仮想環境の名前)C:\\>pip install scipy
       :::output
       エラーエラーエラーエラーエラーエラーエラーエラーエラーエラー
       :::
@@ -180,7 +180,7 @@ content:
       **バージョン間違えないでね！？**Tensorflowのための仮想環境、つまりPython3.5に対応させるので「35」のものを選んでください。  
       そしてコマンドプロンプトを起動して仮想環境を起動し、以下のコマンドを入力します。
       ```
-      (仮想環境の名前)C:\>pip install ...(Scipyのダウンロード先まで辿る)\scipy‑0.19.1‑cp35‑cp35m‑win_amd64.whl
+      (仮想環境の名前)C:\\>pip install ...(Scipyのダウンロード先まで辿る)\\scipy‑0.19.1‑cp35‑cp35m‑win_amd64.whl
       ```
       ぜぇ、はぁ、やっとインストールできた。  
       再度Kerasのインストールに挑戦します。やり方は最初のと同じで良いです。
@@ -196,7 +196,7 @@ content:
       上のPythonコードを書いて実行すると、上の実行結果が出てくるはずです。今回私の場合、「Tensorflowが背景で動いていますよ」と出ていましたので、これでKerasは正確に動作していると判断し、ここでのインストール作業を終了することにしました。
       
       ただ、場合によっては、「Using Theano backend.」といった結果が出てしまうこともあるようなので、『詳解　ディープラーニング ~TensorFlow・Kerasによる時系列データ処理~』に記載されていたやり方を書いていきます。参考にしてください。  
-      まず`C:\User\(ユーザー名)\.keras\keras.json`をメモ帳で開きます。  
+      まず`C:\\User\\(ユーザー名)\\.keras\\keras.json`をメモ帳で開きます。  
       次に、その中におそらく「"backend":"theano"」と書かれている行があると思うので、この「theano」を「tensorflow」に書き換え保存します。  
       最後にもう一度Pythonで先ほどの「import keras」を実行して確認してみてください。
       
@@ -224,7 +224,7 @@ content:
       ダウンロードしたらインストールします。途中「インストール オプション」が出てきますが、私は「高速」で行いました（カスタム選択で、過去verではVisualStudioも入っていたらしいが、CUDA8には無かった・・・？）。  
       インストールが済んだら、動作確認のためにコマンドプロンプトを起動して（仮想環境の起動はどっちでもいいかな？）、以下のコマンドを入力。
       ```
-      C:\>nvcc
+      C:\\>nvcc
       :::output
       ...（なんか書いてる）
       nvcc fatal  :No input files specified; use option --help for more information
@@ -240,7 +240,7 @@ content:
       ![【図1】](media/2017010_cudnnpage.png)
       そしてインストール画面に移るわけですが、【図1】のように、展開していくとズラ～と表示されます。今回は最新バージョンである`for CUDA8.0→cuDNN v7.0 Library for Windows10`を選択してダウンロードします。  
       **①でインストールしたCUDAのバージョンに合わせてくださいね。**  
-      cuDNNはzip形式になっているので、ダウンロード先で展開し、展開した中身のbin・include・libフォルダをコピーし、CUDAのデフォルトディレクトリ`C:\Program Files\NVIDIA GPU Computing\Toolkit\CUDA\v8.0`にペーストします。  
+      cuDNNはzip形式になっているので、ダウンロード先で展開し、展開した中身のbin・include・libフォルダをコピーし、CUDAのデフォルトディレクトリ`C:\\Program Files\\NVIDIA GPU Computing\\Toolkit\\CUDA\\v8.0`にペーストします。  
       これで、とりあえずのTensorflowに対応したGPU環境が出来上がった段階になると思います。
       
       ### ③
@@ -248,12 +248,12 @@ content:
       インストールする前に先に入れてあるTensorflow（CPU版）をアンインストールします。  
       コマンドプロンプト・仮想環境を起動して・・・
       ```
-      (仮想環境の名前)C:\>pip uninstall tensorflow
+      (仮想環境の名前)C:\\>pip uninstall tensorflow
       ```
       これでアンインストールが済みました。  
       さてさて、Tensorflow（CPU版）と同じようにGPU版をpipでインストールすればいいでしょ～！
       ```
-       (仮想環境の名前)C:\>pip install tensorflow-gpu
+       (仮想環境の名前)C:\\>pip install tensorflow-gpu
       ```
       インストールできた！Tensorflow（CPU版）もTensorBoardもセットでインストールされてる！イイネ！  
       じゃ、TensorflowがGPUで動くか動作確認しましょうか。CPUの時と同じPythonコードを実行すれば良いです。  
@@ -288,12 +288,12 @@ content:
       こうなっってしまっては別の方法でインストールし直すしかありません。  
       先ほど入れたtensorflow-gpuをアンインストールして・・・
       ```
-      (仮想環境の名前)C:\>pip uninstall tensorflow-gpu
+      (仮想環境の名前)C:\\>pip uninstall tensorflow-gpu
       ```
       tensorflow-gpuの配布サイトにアクセスして、そのファイルのダウンロード・インストールをいっぺんにする方法をしてみます。  
       コマンドプロンプト・仮想環境を起動して以下を入力。
       ```
-      (仮想環境の名前)C:\>pip install --ignore-installed --upgrade https://storage.googleapis.com/tensorflow/windows/gpu/tensorflow_gpu-1.3.0rc2-cp35-cp35m-win_amd64.whl
+      (仮想環境の名前)C:\\>pip install --ignore-installed --upgrade https://storage.googleapis.com/tensorflow/windows/gpu/tensorflow_gpu-1.3.0rc2-cp35-cp35m-win_amd64.whl
       ```
       インストールが済んだらもう一度動作確認を・・・  
       ・・・・・・・またまた問題発生。  
@@ -304,7 +304,7 @@ content:
       Anacondaのcondaコマンドでインストールするのです。  
       先ほど入れたtensorflow-gpuをアンインストールして、以下のコマンドを入力。
       ```
-       (仮想環境の名前)C:\>conda install tensorflow-gpu
+       (仮想環境の名前)C:\\>conda install tensorflow-gpu
       ```
       これをすると、Anacondaに入っている<strong>過去バージョンの</strong>tensorflow-gpuと同時に、**過去バージョンの**numpyやzlib、protobufなどが入ってきます。  
       つまり2つのバージョンのにパッケージを抱えないといけないことになります。  
@@ -330,27 +330,27 @@ content:
       
       ### コマンドプロンプトでディスクの切り替えをしたい。
       ```
-      C:\>D:<br>
-      D:\>
+      C:\\>D:<br>
+      D:\\>
       ```
       例えばディスクCからディスクDに切り替えをしたい場合、上のコマンドのように書けば、2行目の切り替わった結果が出ます。
       
       ### condaで特定のパッケージをアンインストールをしたい。
       ```
-      C:\>conda uninstall (パッケージ名)
+      C:\\>conda uninstall (パッケージ名)
       ```
       アンインストールするには、上のコマンドのようにuninstallコマンドを使えばよいです。  
       ただし、**仮想環境を起動しているか否かで削除するパッケージの場所が違うことに注意して、仮想環境の起動を忘れないように！**
       
       ### Anacondaに入っているパッケージをすべてアップデートしたい。
       ```
-      C:\>conda update --all
+      C:\\>conda update --all
       ```
       こちらも**仮想環境の起動の必要があるか注意！**
       
       ### pipで最新バージョンのインストールをしたい。
       ```
-      C:\>pip install -U (パッケージ名)
+      C:\\>pip install -U (パッケージ名)
       ```
       こちらも**仮想環境の起動の必要があるか注意！**
   - headline: まとめ
