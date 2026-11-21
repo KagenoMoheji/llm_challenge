@@ -1,5 +1,39 @@
 [
   {
+    "id": "2019007",
+    "fileName": "2019007_mac_automator.yml",
+    "title": "Macで欲しいアレコレをAutomatorで",
+    "createDate": "2019-04-19",
+    "updateDate": "2019-10-09",
+    "tags": [
+      "Mac"
+    ]
+  },
+  {
+    "id": "2019006",
+    "fileName": "2019006_mysql_resequence_auto_increment_pk.yml",
+    "title": "【MySQL】レコード残したままオートインクリメントの主キーを採番し直す",
+    "createDate": "2019-04-04",
+    "updateDate": "2019-04-04",
+    "tags": [
+      "SQL",
+      "MySQL"
+    ]
+  },
+  {
+    "id": "2019005",
+    "fileName": "2019005_init_mecab_on_wsl.yml",
+    "title": "Windows10にMeCabをインストールする",
+    "createDate": "2019-04-04",
+    "updateDate": "2019-04-04",
+    "tags": [
+      "Python",
+      "機械学習",
+      "自然言語処理",
+      "環境構築"
+    ]
+  },
+  {
     "id": "2019004",
     "fileName": "2019004_init_crystal_on_wsl.yml",
     "title": "【Crystal】環境構築(Windows Subsystem for Linux)",
@@ -110,7 +144,7 @@
     "fileName": "2017008_site_renewal.yml",
     "title": "サイトをリニューアル！",
     "createDate": "2017-06-06",
-    "updateDate": "2017-06-06",
+    "updateDate": "2017-08-18",
     "tags": [
       "お知らせ"
     ]
@@ -141,7 +175,7 @@
     "fileName": "2017005_python_learning.yml",
     "title": "Pythonの学習",
     "createDate": "2017-02-27",
-    "updateDate": "2017-02-27",
+    "updateDate": "2017-06-09",
     "tags": [
       "Python"
     ]
