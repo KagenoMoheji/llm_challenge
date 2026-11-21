@@ -1,0 +1,44 @@
+creator: KagenoMoheji
+createDate: 2019-04-04
+updateDate: !!timestamp 2019-04-04
+title: 【MySQL】レコード残したままオートインクリメントの主キーを採番し直す
+tags:
+  - SQL
+  - MySQL
+content:
+  - headline: どういう状況？
+    body: |
+      - MySQLでプライマリーキーにしているアトリビュートではオートインクリメントで連番に設定している．
+      - ある日レコードを削除したため連番に穴ができてしまった．
+      - レコードを残したまま連番を採番したい！！
+      
+      **※念の為エクスポートしてバックアップ取っていてください．**
+  - headline: 手順
+    body: |
+      ### ①主キー・オートインクリメント解除
+      ```sql[主キーの解除]
+      ALTER TABLE `table_name` DROP PRIMARY KEY;
+      ```
+      ```sql[オートインクリメントの解除]
+      ALTER TABLE `table_name` MODIFY `id` INT(数値) NOT NULL;
+      ```
+
+      ### ②採番し直す
+      ```
+      SET @N:=0;
+      
+      UPDATE `table_name`
+      SET `id`=@N:=@N+1 
+      ORDER BY `id` ASC;
+      ```
+
+      ### ③設定を元に戻す
+      ```sql[主キーの設定]
+      ALTER TABLE `table_name` ADD PRIMARY KEY (`id`);
+      ```
+      ```sql[オートインクリメントの設定]
+      ALTER TABLE `table_name` MODIFY `id` INT(数値) NOT NULL AUTO_INCREMENT;
+      ```
+  - headline: まとめ
+    body: |
+      「レコードを削除した後にオートインクリメントを1から振り直す」が多かったからあえてこの記事を書いたのですが使う人少ないのか，頭の中に置いてあるのか…．
