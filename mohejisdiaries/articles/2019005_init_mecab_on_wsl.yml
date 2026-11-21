@@ -1,0 +1,189 @@
+creator: KagenoMoheji
+createDate: 2019-04-04
+updateDate: !!timestamp 2019-04-04
+title: Windows10にMeCabをインストールする
+tags:
+  - Python
+  - 機械学習
+  - 自然言語処理
+  - 環境構築
+content:
+  - headline: なぜ書いた？
+    body: |
+      一応同様の内容で既存記事はあります．  
+      が，そのままの書き方ではうまくいかず，自分なりに解決した部分があったので自分メモとして記事を書きます．
+  - headline: 環境
+    body: |
+      - Windows10 Home(64bit)
+      - Python3.6/pip(64bit)
+      - Ubuntu18.04.1 LTS on WSL
+  - headline: MeCabのインストール
+    body: |
+      ### ①MeCabのダウンロード
+      今回はWindows10やPythonに合わせるため64bit版が必要になるので，[公式ページ](https://taku910.github.io/mecab/#download)からではなく，[こちらのGitHub](https://github.com/ikegami-yukino/mecab/releases)から`mecab-64-?.???.?.exe`をダウンロードします．  
+      そしてインストールしますが，Pythonに合わせるため文字コードではUTF-8を選択します．(個人的に理由関係なくUTF-8に統一したさある)
+      
+      ### ②環境変数に登録
+      `スタート＞設定＞システム＞ハージョン情報＞システム情報＞システムの詳細設定＞環境変数`から，システム環境変数のPathにインストール先である`C:\Program Files\Mecab\bin`を追加する．
+      
+      ### ③動作確認
+      コマンドプロンプト(PowerShell)を再起動し，以下コマンドで実行して何か文章を打って正常に動作するか確認する．  
+      ただしアプリケーションの文字コードをUTF-8に設定しているので，Shift-JIS環境であるコマンドプロンプトでは文字化けしますがとりあえず最後に「EOS」と出れば大丈夫だと思います．
+      ```powershell
+      mecab
+      :::output
+      すもももももももものうち(入力文章)
+      すもももももももものうち        險伜捷,荳闊ｬ,*,*,*,*,*
+      EOS
+      :::
+      ```
+  - headline: Pythonでの実行
+    body: |
+      ### ①Pythonパッケージのインストール
+      「mecab-python3」があるらしいが，Windows上で実行するので`mecab-python-windows`の方が良さそうです．  
+      ということで，pipでそれをインストールします．
+      ```powershell
+      pip install mecab-python-windows
+      ```
+
+      ### ②動作確認
+      以下コードで動作するか・文字コードが大丈夫か確認しましょう．
+      ```python[mecab.py]
+      import MeCab
+
+      m = MeCab.Tagger()
+      output = m.parse("すもももももももものうち")
+      print(output)
+
+      print("==================================================================")
+
+      m = MeCab.Tagger("-Ochasen")
+      output = m.parse("すもももももももものうち")
+      print(output)
+
+      print("==================================================================")
+
+      m = MeCab.Tagger("-Owakati")
+      output = m.parse("すもももももももものうち")
+      print(output)
+      :::output
+            すもも  名詞,一般,*,*,*,*,すもも,スモモ,スモモ
+      も      助詞,係助詞,*,*,*,*,も,モ,モ
+      もも    名詞,一般,*,*,*,*,もも,モモ,モモ
+      も      助詞,係助詞,*,*,*,*,も,モ,モ
+      もも    名詞,一般,*,*,*,*,もも,モモ,モモ
+      の      助詞,連体化,*,*,*,*,の,ノ,ノ
+      うち    名詞,非自立,副詞可能,*,*,*,うち,ウチ,ウチ
+      EOS
+
+      ==================================================================
+      すもも  スモモ  すもも  名詞-一般
+      も      モ      も      助詞-係助詞
+      もも    モモ    もも    名詞-一般
+      も      モ      も      助詞-係助詞
+      もも    モモ    もも    名詞-一般
+      の      ノ      の      助詞-連体化
+      うち    ウチ    うち    名詞-非自立-副詞可能
+      EOS
+
+      ==================================================================
+      すもも も もも も もも の うち
+      :::
+      ```
+      上記の結果になれば大丈夫です．次に進みます．
+  - headline: mecab-ipadic-NEologdのインストール
+    body: |
+      単語辞書はインストール当初のままでは最新の単語が含まれていません．
+      ```python[mecab.py]
+      import MeCab
+
+      m = MeCab.Tagger("-Ochasen")
+      output = m.parse("キンタロー。が恋ダンスを踊っている。")
+      print(output)
+      :::output
+      キンタロー      キンタロー      キンタロー      名詞-一般
+      。      。      。      記号-句点
+      が      ガ      が      助詞-格助詞-一般
+      恋      コイ    恋      名詞-一般
+      ダンス  ダンス  ダンス  名詞-サ変接続
+      を      ヲ      を      助詞-格助詞-一般
+      踊っ    オドッ  踊る    動詞-自立       五段・ラ行      連用タ接続
+      て      テ      て      助詞-接続助詞
+      いる    イル    いる    動詞-非自立     一段    基本形
+      。      。      。      記号-句点
+      EOS
+      :::
+      ```
+      上の例では「キンタロー。」と「恋ダンス」で正しく区切りを付けられていません．  
+      そのため最新の単語も含めた単語辞書であるmecab-ipadic-NEologdをインストールし，新しい単語の区切りができるようにします．  
+      ここでWSLを使います．インストールにあたりビルドが必要であり，LinuxOS上でないとできない現状にあるためです．
+      
+      ### ①WSLの導入
+      !!【Crystal】環境構築(Windows Subsystem for Linux)!![/articles/2019/4]の環境構築①でまとめてあります．
+      
+      ### ②MeCab関連のインストール
+      Ubuntu on WSLを管理者として起動し，以下コマンドでMeCab関連をインストールする．
+      ```bash
+      $ sudo apt install -y make mecab libmecab-dev (mecab-ipadic-utf8)
+      ```
+
+      ### ③mecab-ipadic-NEologdのインストール
+      以下コマンドでmecab-ipadic-NEologdをダウンロード・ビルドする．
+      ```bash
+      $ git clone https://github.com/neologd/mecab-ipadic-neologd.git
+      $ cd mecab-ipadic-neologd
+      $ sudo bin/install-mecab-ipadic-neologd -n -y
+      ```
+      ①で共有フォルダの設定を済ませていれば，そこに「mecab-ipadic-neologd」がクローンされているとこを確認できます．  
+      ビルドでできたファイルは恐らく，`C:\Users\(ユーザ名)\AppData\Local\Packages\CanonicalGroupLimited.UbuntuonWindows_(...)\LocalState\rootfs`のlib，tmpフォルダのいずれかにあると思われますが，確認できていません．~~(多分tmpだろうなぁ)~~  
+      コマンドによってコピーしているので気にしない人はそのまま進めましょう．
+      
+      ### ④WindowsのMeCabに反映させる
+      ビルドで生成されたファイルをWindowsのインストール済みMeCabの辞書フォルダに移すことで反映させることができます．  
+      下記コマンドでWindowsのMeCabフォルダにある辞書フォルダにコピーし，WSLのビルドしたファイルを削除しています．
+      ```bash
+      $ cp -R `mecab-config --dicdir`/mecab-ipadic-neologd "/mnt/c/Program Files/MeCab/dic"
+      $ rm -rf /tmp/mecab-ipadic-neologd
+      ```
+      これでひとまずmecab-ipadic-NEologdのインストールは終わりです．  
+      次章でPythonで動作確認しましょう．
+  - headline: Pythonで新辞書を使う
+    body: |
+      ```python[mecab.py]
+      import MeCab
+
+      tagger = MeCab.Tagger("-d $(rcpath)\..\dic\mecab-ipadic-neologd")
+      result = tagger.parse("キンタロー。が恋ダンスを踊っている。")
+      print(result)
+
+      print("==================================================================")
+
+      tagger = MeCab.Tagger("-d $(rcpath)\..\dic\mecab-ipadic-neologd -Ochasen")
+      result = tagger.parse("キンタロー。が恋ダンスを踊っている。")
+      print(result)
+      :::output
+      キンタロー。    キンタロー      キンタロー。    名詞-固有名詞-人名-一般
+      が      ガ      が      助詞-格助詞-一般
+      恋ダンス        コイダンス      恋ダンス        名詞-固有名詞-一般
+      を      ヲ      を      助詞-格助詞-一般
+      踊っ    オドッ  踊る    動詞-自立       五段・ラ行      連用タ接続
+      て      テ      て      助詞-接続助詞
+      いる    イル    いる    動詞-非自立     一段    基本形
+      。      。      。      記号-句点
+      EOS
+      :::
+      ```
+      上記コードで実行して結果の「キンタロー。」と「恋ダンス」が正しく認識できていれば成功です．
+      
+      また上記コードではMeCab.Taggerをインスタンス化する際に引数の「-d」オプションで先程インストールした新辞書を指定しています．  
+      ここで`$(rcpath)\`を書かなくても実行できるらしい参考記事が多かったのですが，エラーになっちゃったので上記のように追記して実行できるようにしました．
+  - headline: 参考
+    body: |
+      - [1][Python3でMeCab on Windows](https://oita.oika.me/2018/05/03/python3-mecab-on-windows/)
+      - [2][PythonとMeCabで形態素解析(on Windows) | Qiita](https://qiita.com/menon/items/f041b7c46543f38f78f7)
+      - [3][MeCab NEologd辞書をWindows Subsystem for LinuxでビルドしてWindowsで使うための手順 | Qiita](https://qiita.com/yukinoi/items/6475285c00f90e802b4b)
+      - [4][NEologd 辞書 を Windows 用 MeCab に導入して Python で使う方法 | Qiita](https://qiita.com/ChenZheChina/items/42f1fcc763e88cb02cca)
+  - headline: まとめ
+    body: |
+      自然言語処理も頑張って学んでいきたい．  
+      というか，Windows64bit版の野良MeCab作るってすげぇな…．
