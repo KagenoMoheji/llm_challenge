@@ -274,7 +274,7 @@ async function renderMarkdown(markdown, options = {}) {
         if (outputMatch) {
             // プログラム部分と出力部分を分離
             const programCode = outputMatch[1].trim().replace(/!!BR!!\n/g, '');
-            const outputCode = outputMatch[2].trim();
+            const outputCode = outputMatch[2].trim().replace(/!!BR!!\n/g, '');
             
             let blockHtml = `
                 <div class="code-block-container">

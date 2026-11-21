@@ -447,6 +447,24 @@ async function runTests() {
         failed++;
     }
 
+    // Test 27: Code Block Output Empty Line Spacing
+    console.log('Test 27: Code Block Output Empty Line Spacing');
+    try {
+        const md = '```\nline 1\n\nline 2\n:::output\nout 1\n\nout 2\n:::\n```';
+        const result = await renderMarkdown(md);
+        if (result.html.includes('<code>line 1\n\nline 2</code>') && 
+            result.html.includes('<code>out 1\n\nout 2</code>') && 
+            !result.html.includes('<br>\nout 2')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('Code block output contains unexpected <br> or invalid empty line spacing');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
     // Summary
     console.log('='.repeat(50));
     console.log(`Tests Passed: ${passed}/${passed + failed}`);
