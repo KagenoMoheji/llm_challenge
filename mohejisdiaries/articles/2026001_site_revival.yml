@@ -1,0 +1,75 @@
+creator: KagenoMoheji
+createDate: 2026-11-24
+updateDate: !!timestamp 2026-11-24
+title: 「もへじの編綴」復活！！
+tags:
+  - お知らせ
+  - Vibe個人開発
+content:
+  - headline: どうも、ご無沙汰しすぎたようです
+    body: |
+      どうも、2023/04頃に下記ツイートして一時閉鎖してから4年弱でしょうか。
+      <blockquote class="twitter-tweet"><p lang="ja" dir="ltr">ドメイン死んでたのでサイト仮閉鎖</p>&mdash; へのへのもへじ (@KagenoMoheji) <a href="https://x.com/KagenoMoheji/status/1652346942234701831?ref_src=twsrc%5Etfw">April 29, 2023</a></blockquote>
+      <script async src="https://platform.x.com/widgets.js" charset="utf-8"></script>
+
+      ようやく復活しました。ご無沙汰しております。  
+      …というのも、記事管理する管理者的な機能面が課題としてやり残したままにしていて、HTMLべた書きで記事書くのとその改修ををめんどくさがってたのもあって遅くなりました…m(__)m  
+      改修自体の構想は2023/04頃の下記ツイートで既にあった気はしますけどね…。
+      <blockquote class="twitter-tweet"><p lang="ja" dir="ltr">わい「知見集まったし記事書きたいな」
+      わい「記事投稿機能含めリファクタリング中やったわ」</p>&mdash; へのへのもへじ (@KagenoMoheji) <a href="https://x.com/KagenoMoheji/status/1647618350439358464?ref_src=twsrc%5Etfw">April 16, 2023</a></blockquote>
+      <script async src="https://platform.x.com/widgets.js" charset="utf-8"></script>
+
+      ということで、改修もしっかりやって復活しました！！
+
+      ![一時閉鎖前のサイト外観](media/2019008_coordinatehopper_demo.gif)
+      ちなみに以前のサイト外観ですが、一時閉鎖前に取り忘れていて!!過去記事!!(/articles/2019/8)の引用ですが上の図の感じでした。  
+      右サイドバーの検索機能も全然実装できてないですね～～～～～()
+
+      どんな改修してきたのか、今何やっていて今後どうするのか、喋ります！ｗ
+  - headline: 復活したサイトはどう変わったのか？
+    body: |
+      ### このサイト、Vibeコーディングで作りました！
+      Claude(web)に大枠作ってもらって、あとはGemini(Antigravity)に小分けの指示でどんどん改修していくって感じですね。  
+      その甲斐あって、トップページの記事一覧・右サイドバーや記事詳細ページの見た目が、アニメーション含め一時閉鎖前とあまり変わってないと思います。  
+      まぁ、MaLMaMとかSEDNsとかよくわからんページはもうやめたのでそのボタンがトップページから無くなってますがｗ(スッキリしてますでしょう？←)
+
+      そして一時閉鎖前はPHP＋MySQLの動的サイトでしたが、復活版は静的サイトとして作りました。  
+      `index.html`のシングルファイルにHTML/CSS/Vanillajsを実装させる形で、NodeJSとフレームワークを使ったりトランスパイルしたりの手間を省いてみています。(Reactとかのフレームワークを使った方がセキュリティ的にまだ良い、という話がありそうですが、個人のものなので多少はね…？)  
+      そしてその裏で動いている色んな機能があり、それを含めVibeコーディングのさくさくと作ってこれました。
+      
+      ### 記事執筆を「yaml ＋ マークダウン」に！！
+      前述のとおり、一時閉鎖前は記事執筆をHTMLべた書きでやってました。ぶっちゃけしんどかったです←  
+      今後は[Github](https://github.com/KagenoMoheji/llm_challenge/tree/main/mohejisdiaries/articles)でマークダウンを書いたyamlを管理できるようにしました！  
+      記事詳細ページで左・右・左…とセクションが分かれていると思いますが、これもyamlにおける`content[].headline`単位で書き分けるフォーマットにしています。  
+      記事詳細画面の表示においてJavaScriptで下記の処理を動かすようにしています。
+      - [1]Githubからyaml取得
+      - [2]yamlをパースし、`content[].body`のマークダウンパース
+        - ちなみにこのマークダウンパーサもVibeコーディングで自作したんですよ～。!!こちらの記事!!(/articles/2026/2)に詳しく記載してます。
+      - [3][2]の結果のHTMLとyamlの`content[].headline`で記事詳細画面のレンダリング
+
+      ### 静的サイトなら「記事テーブル」は？タグ機能は？
+      一時閉鎖前もあったタグ機能はPHP＋MySQLのDB操作によって実現してました。  
+      現在の静的サイトでもタグ機能がありますが、どうやって実現しているのか…？  
+      答えは**Github Actions**を活用しています！  
+      「記事を書いたyamlができあがって公開する＝mainブランチにマージする」をトリガーとして、`tbl_articles/table.json`を更新する[Github Actions](https://github.com/KagenoMoheji/llm_challenge/tree/main/mohejisdiaries/github_actions/tbl_articles)が動いてます。  
+      この`tbl_articles/table.json`がテーブル代わりになり、Githubから取得＆キャッシュしてタグ機能などを実現しました。
+
+      ### 検索機能もようやく実装！
+      一時閉鎖前に全然実装できてなかった検索機能も、静的サイトの中でようやく実装しました！  
+      具体的には、タグ機能と同じく`tbl_articles/table.json`を活用してJavaScriptでインクリメンタルサーチさせています。
+  - headline: 今何してんの？今後は？
+    body: |
+      現在はデータエンジニアとしてLLM/AIエージェントを組み込んだデータ基盤サービスや業務フローの構築する職種をメインに、Web開発保守もやってます！
+
+      今後このサイトでは、以下について投稿していこうかなと思います。
+      - 「Vibeコーディングでの個人開発」を「Vibe個人開発」と称してその活動記録
+        - 個人的に、LLMが強くなってきてからはIT開発が芸術活動化してきてしまっているように思っちゃっているので、その気軽な形での記録になります。  
+          厳密にはセキュリティ対策/パフォーマンス改善/品質管理/保守もあってのITエンジニア職なので、その意識はプロ現場で引き続き大事にはしますが。
+        - そしてVibe個人開発したものは、LLM便りで威張れることでもないし品質管理を徹底する予定も無いので、あまりGithubでリポジトリを分けて作ることはしないようにしようと思ってます。  
+          LLMで作ったものとして「[llm_challenge](https://github.com/KagenoMoheji/llm_challenge)」というリポジトリに全部まとめて置こうかと。  
+          ぜひたまに覗きに来てもらえればと思いますｗ
+      - (多くの参考を踏まえて)自身で編み出したナレッジ記録
+      - その他雑感 (ビジネス論争/愚痴( ﾟДﾟ)/...)
+  - headline: 最後に
+    body: |
+      また今後ともゆる～～～～～りと、よろしくお願いします！！(∩´∀｀)∩
