@@ -24,7 +24,7 @@ content:
       そしてインストールしますが，Pythonに合わせるため文字コードではUTF-8を選択します．(個人的に理由関係なくUTF-8に統一したさある)
       
       ### ②環境変数に登録
-      `スタート＞設定＞システム＞ハージョン情報＞システム情報＞システムの詳細設定＞環境変数`から，システム環境変数のPathにインストール先である`C:\Program Files\Mecab\bin`を追加する．
+      `スタート＞設定＞システム＞ハージョン情報＞システム情報＞システムの詳細設定＞環境変数`から，システム環境変数のPathにインストール先である`C:\\Program Files\\Mecab\\bin`を追加する．
       
       ### ③動作確認
       コマンドプロンプト(PowerShell)を再起動し，以下コマンドで実行して何か文章を打って正常に動作するか確認する．  
@@ -135,7 +135,7 @@ content:
       $ sudo bin/install-mecab-ipadic-neologd -n -y
       ```
       ①で共有フォルダの設定を済ませていれば，そこに「mecab-ipadic-neologd」がクローンされているとこを確認できます．  
-      ビルドでできたファイルは恐らく，`C:\Users\(ユーザ名)\AppData\Local\Packages\CanonicalGroupLimited.UbuntuonWindows_(...)\LocalState\rootfs`のlib，tmpフォルダのいずれかにあると思われますが，確認できていません．~~(多分tmpだろうなぁ)~~  
+      ビルドでできたファイルは恐らく，`C:\\Users\\(ユーザ名)\\AppData\\Local\\Packages\\CanonicalGroupLimited.UbuntuonWindows_(...)\\LocalState\\rootfs`のlib，tmpフォルダのいずれかにあると思われますが，確認できていません．~~(多分tmpだろうなぁ)~~  
       コマンドによってコピーしているので気にしない人はそのまま進めましょう．
       
       ### ④WindowsのMeCabに反映させる
@@ -152,13 +152,13 @@ content:
       ```python[mecab.py]
       import MeCab
 
-      tagger = MeCab.Tagger("-d $(rcpath)\..\dic\mecab-ipadic-neologd")
+      tagger = MeCab.Tagger("-d $(rcpath)\\..\\dic\\mecab-ipadic-neologd")
       result = tagger.parse("キンタロー。が恋ダンスを踊っている。")
       print(result)
 
       print("==================================================================")
 
-      tagger = MeCab.Tagger("-d $(rcpath)\..\dic\mecab-ipadic-neologd -Ochasen")
+      tagger = MeCab.Tagger("-d $(rcpath)\\..\\dic\\mecab-ipadic-neologd -Ochasen")
       result = tagger.parse("キンタロー。が恋ダンスを踊っている。")
       print(result)
       :::output
@@ -176,7 +176,7 @@ content:
       上記コードで実行して結果の「キンタロー。」と「恋ダンス」が正しく認識できていれば成功です．
       
       また上記コードではMeCab.Taggerをインスタンス化する際に引数の「-d」オプションで先程インストールした新辞書を指定しています．  
-      ここで`$(rcpath)\`を書かなくても実行できるらしい参考記事が多かったのですが，エラーになっちゃったので上記のように追記して実行できるようにしました．
+      ここで`$(rcpath)\\`を書かなくても実行できるらしい参考記事が多かったのですが，エラーになっちゃったので上記のように追記して実行できるようにしました．
   - headline: 参考
     body: |
       - [1][Python3でMeCab on Windows](https://oita.oika.me/2018/05/03/python3-mecab-on-windows/)

@@ -136,6 +136,11 @@ wsl docker run --rm \
    ```bash
    wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/test_article_preview.js
    ```
+10. **プロフィール紹介セクション表示テスト (`test_profile_section.js`)**:
+    - `#main-content` 下部のプロフィール紹介カード、`profile.svg` 正方形アイコン表示、各SNS・ブログリンクおよびレスポンシブスタイルの検証
+    ```bash
+    wsl docker run --rm -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/mohejisdiaries:/workspace -w /workspace node:20-alpine node tests/test_profile_section.js
+    ```
 
 ### 3.3 Python ユニット＆結合テスト (Pytest)
 GitHub Actions で動作する記事テーブル生成スクリプト（`generate_table.py`）の単体・結合テストを実行します。

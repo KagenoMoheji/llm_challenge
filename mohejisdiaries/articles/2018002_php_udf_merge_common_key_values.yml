@@ -59,7 +59,7 @@ content:
 
       print_r($array1);
 
-      echo "=================================\n";
+      echo "=================================\\n";
 
       $array1=array_merge($array1,$array2);
 
@@ -153,7 +153,7 @@ content:
       $arr2=array("b"=>2);
       print_r(MergeChildInAsocArray($arr1,$arr2));
 
-      echo "==============================\n";
+      echo "==============================\\n";
 
       /*バリューがリスト*/
       $arr3=array("c"=>array(5,6));
@@ -194,7 +194,7 @@ content:
       $arr2=array("a"=>2);
       print_r(MergeChildInAsocArray($arr1,$arr2));
 
-      echo "==============================\n";
+      echo "==============================\\n";
 
       /*バリューがリスト*/
       $arr3=array("b"=>array(0,1));
@@ -327,7 +327,7 @@ content:
       print_r($arr1);
       print_r($arr2);
 
-      echo "=================================\n";
+      echo "=================================\\n";
 
       print_r(MergeChildInAsocArray($arr2,
                   MergeChildInAsocArray($arr1,

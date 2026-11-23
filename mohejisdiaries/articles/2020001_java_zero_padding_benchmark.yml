@@ -1,0 +1,146 @@
+creator: KagenoMoheji
+createDate: 2020-05-28
+updateDate: !!timestamp 2020-05-28
+title: 【Java】ゼロ埋めのコード速度比較
+tags:
+  - Java
+content:
+  - headline: はじめに
+    body: |
+      どうもこんにちは！かなりご無沙汰してしまっていますね…．  
+      これでも記事ネタがあって編集しているところなんですが…(なぜ書き終えてないのか)
+      
+      それはさておき，本題に入ります．  
+      今回のテーマは，Javaでゼロ埋めするコードの処理速度の比較です．
+      ![【図1】](media/2020001_searchresult.jpg)
+      Javaでゼロ埋めで検索すると，図1のように`String.format()`を用いる方法が多く挙げられています．  
+      しかし`String.format()`は処理が遅いことでも有名です(改善して欲しい)．  
+      そこで`String.format()`を用いないゼロ埋め(に限らずほにゃらら埋め)の自作コードを実装した時，処理速度がどれほど変わるのか検証してみました．
+      
+      今回実装した自作コードは3種類あり，これらは下記リンクを参考にしています．  
+      [10進数の桁数を求める | Qiita](https://qiita.com/EqualL2/items/168e083caa5f07a1105b)
+  - headline: コードと検証結果
+    body: |
+      ※標準クラスのみ用いる．
+      ```java[検証コード]
+      import java.util.*;
+
+      public class Main {
+        public static void main(String[] args) throws Exception {
+          int l = 20;
+          int n = 1005;
+          
+          System.out.println("-------------------------[Use String.format()]-------------------------");
+          long start = System.nanoTime();
+          System.out.println(String.format("%0" + l + "d", n));
+          System.out.println(((double)(System.nanoTime() - start) / 1__000__000__000));
+          
+          System.out.println("-------------------------[Get length of 'n' with log10, and zero padding with for loop]-------------------------");
+          start = System.nanoTime();
+          int nLen = (int)Math.log10((double)n) + 1;
+          String preStr = (nLen >= l) ? "" : repeatStr("0", l - nLen);
+          System.out.println(preStr + n);
+          System.out.println(((double)(System.nanoTime() - start) / 1__000__000__000));
+          
+          System.out.println("-------------------------[Get length of 'n' by getting length of String 'n', and zero padding with for loop]-------------------------");
+          start = System.nanoTime();
+          int nLen2 = Integer.toString(n).length();
+          String preStr2 = (nLen2 >= l) ? "" : repeatStr("0", l - nLen2);
+          System.out.println(preStr2 + n);
+          System.out.println(((double)(System.nanoTime() - start) / 1__000__000__000));
+          
+          System.out.println("-------------------------[Get length of 'n' by looping dividing with 10, and zero padding with for loop]-------------------------");
+          start = System.nanoTime();
+          int nLen3 = getNumLenByDividing10(n);
+          String preStr3 = (nLen3 >= l) ? "" : repeatStr("0", l - nLen3);
+          System.out.println(preStr3 + n);
+          System.out.println(((double)(System.nanoTime() - start) / 1__000__000__000));
+        }
+        
+        public static String repeatStr(String str, int repeatNum) {
+          String res = "";
+          if(repeatNum <= 0) {
+            return res;
+          }
+          for(int i = 0; i < repeatNum; i++) {
+            res += str;
+          }
+          return res;
+        }
+        
+        public static int getNumLenByDividing10(int n) {
+          int nLen = 0;
+          while(n != 0) {
+            n /= 10;
+            nLen++;
+          }
+          return nLen;
+        }
+      }
+      :::output
+      // l=4, n=100
+      -------------------------[Use String.format()]-------------------------
+      0100
+      0.021760815
+      -------------------------[Get length of 'n' with log10, and zero padding with for loop]-------------------------
+      0100
+      0.010855948
+      -------------------------[Get length of 'n' by getting length of String 'n', and zero padding with for loop]-------------------------
+      0100
+      4.34719E-4
+      -------------------------[Get length of 'n' by looping dividing with 10, and zero padding with for loop]-------------------------
+      0100
+      2.98369E-4
+
+
+      // l=20, n=100
+      -------------------------[Use String.format()]-------------------------
+      00000000000000000100
+      0.021191799
+      -------------------------[Get length of 'n' with log10, and zero padding with for loop]-------------------------
+      00000000000000000100
+      0.010872442
+      -------------------------[Get length of 'n' by getting length of String 'n', and zero padding with for loop]-------------------------
+      00000000000000000100
+      4.8769E-4
+      -------------------------[Get length of 'n' by looping dividing with 10, and zero padding with for loop]-------------------------
+      00000000000000000100
+      3.23475E-4
+
+
+      // l=20, n=1020553
+      -------------------------[Use String.format()]-------------------------
+      00000000000001020553
+      0.020495513
+      -------------------------[Get length of 'n' with log10, and zero padding with for loop]-------------------------
+      00000000000001020553
+      0.009346566
+      -------------------------[Get length of 'n' by getting length of String 'n', and zero padding with for loop]-------------------------
+      00000000000001020553
+      4.89392E-4
+      -------------------------[Get length of 'n' by looping dividing with 10, and zero padding with for loop]-------------------------
+      00000000000001020553
+      3.36254E-4
+
+
+      // l=4, n=1020553
+      -------------------------[Use String.format()]-------------------------
+      1020553
+      0.020645082
+      -------------------------[Get length of 'n' with log10, and zero padding with for loop]-------------------------
+      1020553
+      0.01026944
+      -------------------------[Get length of 'n' by getting length of String 'n', and zero padding with for loop]-------------------------
+      1020553
+      4.14849E-4
+      -------------------------[Get length of 'n' by looping dividing with 10, and zero padding with for loop]-------------------------
+      1020553
+      2.85072E-4
+      :::
+      ```
+  - headline: 結論
+    body: |
+      10で割ることをループして数字の桁数を求めるコードがやはり強し．  
+      逆に`String.format()`が最も遅い結果になりました．
+      
+      `String.format()`は便利だけど速度面で改善して欲しいな…．

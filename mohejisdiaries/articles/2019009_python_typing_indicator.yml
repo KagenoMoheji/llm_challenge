@@ -1,0 +1,188 @@
+creator: KagenoMoheji
+createDate: 2019-07-01
+updateDate: !!timestamp 2019-07-01
+title: 【Python】クロスプラットフォームでのタイプカウンターの実装
+tags:
+  - Python
+  - 個人開発
+content:
+  - headline: はじめに
+    body: |
+      どうもこんにちは！こちらではご無沙汰しています！~~(月1ペースになっとるやないか)~~
+      
+      ということで，目的があってタイピング回数を数えるタイプカウンターをPythonで実装する必要があり，いろいろ苦労したのでメモとして書き置きします．~~(Pythonじゃなくても良かったんですけどね，選定ミスったことに気づいたときには遅かった)~~
+      
+      タイプカウンターといっても普通にカウントすれば良いってわけではなく，
+      - **1秒間隔で**タイプ数を取得する
+      - **常時タイピングを監視**し，タイピングを検出できる
+      - マルチスレッドにするが，**離脱も容易に**できる
+      - **クロスプラットフォーム(Windows/Macで使えるように)で**実装する
+      上記を満たす必要がありました．
+      
+      そこで，Pythonでタイピングを取得するモジュールに以下が挙げられます．
+      - `msvcrt`
+        - 標準入力として使われる
+        - しかしWindowsしか対応していない
+        - さらに標準入力を求めて処理が止まってしまう
+        - `msvcrt.kbhit()`というものがあったけど，無限ループになってしまい，扱いが分からなかった．
+        - [Polling the keyboard (detect a keypress) in python | stack overflow](https://stackoverflow.com/questions/292095/polling-the-keyboard-detect-a-keypress-in-python/303976#303976)
+      - `keyboard`
+        - WindowsとLinuxにしか対応していない．Macへの対応が欲しかった．  
+      - `Pygame`
+        - キーボード入力だけのために導入するにはモジュールの規模が大きすぎる
+        - 本当に何もできなかったときの最終手段にしとこう…
+      - `pynput`
+        - `pynput.keyboard.Listener()`がちょうど良さそう．
+        - しかし`threading.Thread()`を使っておりListenerからの離脱がプロセス終了操作の記事が多い
+        - さらに今回実装したい内容に類似して参考になる記事がネットに無い
+      - `termios`(と`tty`)
+        - Unix向けちゃうかこれ…．
+        - Windows/Macをメインに考えているので却下ですね．
+        - [Detecting keyboard input in Python](https://www.jonwitts.co.uk/archives/896)
+      
+      …とまぁ，いろいろ一長一短ということが分かりました．  
+      そこで今回は`pynput`での実装で行けそうと思ったので，自分なりに工夫・改良をして，今回求める内容を実現していきます．
+  - headline: 惜しい，失敗作
+    body: |
+      まずは最初に実装して惜しいと思ったコードです．  
+      以下のリンクを参考にしています．  
+      [Determine length of keypress in python](https://stackoverflow.com/questions/40649634/determine-length-of-keypress-in-python/45592445#45592445)  
+      上記リンクでは`pynput.keyboard.Listener()`を`on_press`と`on_release`別々に，**瞬間的にマルチスレッド実行して**し，その間に時間を測ることでキーを押下している時間を計測できる，というものでした．
+      
+      この処理の流れを利用して`Listener()`の間の処理をタイプカウントに置き換えたものが以下のコードです．
+      ```python[app.py(失敗版)]
+      import time
+      from pynput import keyboard
+
+      if __name__ == "__main__":
+        try:
+          recent_time = time.time()
+          sum_keyboard_cnt = 0
+          on_press = lambda key: False
+          on_release = lambda key: False 
+          while True:
+            current_time = time.time()
+
+            with keyboard.Listener(on_press=on_press) as listener:
+              listener.join()
+            sum_keyboard_cnt += 1
+            with keyboard.Listener(on_release=on_release) as listener:
+              listener.join()
+
+            if current_time - recent_time > 1.0: # 1秒程度経ったら
+              recent_time = current_time
+              print(sum_keyboard_cnt)
+              sum_keyboard_cnt = 0
+        except KeyboardInterrupt:
+          print("Exit")
+      :::output
+      図1・図2に．
+      :::
+      ```
+      `on_press`と`on_release`のコールバック関数は，すぐにスレッドを閉じるためのFalseを返すだけなのでラムダ式で書いています．  
+      そして1秒経過したら，その1秒間のタイプカウントの総数を標準出力する流れになっています．  
+      さらにマルチスレッド展開していても，`Ctrl+C`でプロセスを終了できるようにエラー処理を実装しています．
+      
+      ![【図1】](media/2019009_winfail.gif)
+      ![【図2】](media/2019009_macfail.gif)
+      その実行結果のGIFが図1(Windows10)と図2(MacOS Mojave)です．  
+      Windowsでは，ちゃんと動きはするものの「1秒間ずつ連続してカウント数の出力」ができておらず，タイプイベントを起こしてから出力されるようになっています．これはダメですね．  
+      一方のMacでは最初からエラー`python3[???] pid(???)/euid(???) is calling TIS/TSM in non-main thread environment, ERROR : This is NOT allowed. Please call TIS/TSM in main thread!!!`が出てダメでした．  
+      上記のエラーはMac特有の珍しいエラーのようで，私個人では解決できそうにありませんね．
+      
+      【参考】
+      - [1][TIS/TSM warning message with P2D/P3D/OPENGL since macOS 10.13.4 | Github](https://github.com/processing/processing/issues/5462)
+      - [2][Processingでsyphonを使いたい | teratail](https://teratail.com/questions/162170)
+  - headline: 成功！！
+    body: |
+      続いては自分なりに実装してうまくいったコードです．  
+      こちらではListenerが展開する`threading.Thread()`の上でも自分でマルチスレッドを展開することでタイプカウンターとListenerの並列処理ができるようにしています．  
+      また，`threading.Thread()`自体に`stop()`のような外部からスレッドをkillするような実装が無いので，自分でフラグを立てて外部(親)からのアクセスができるように，自分でマルチスレッドのクラスを実装しています．
+      
+      まぁ論よりコード，以下になります．
+      ```python[app.py(成功版)]
+      from pynput import keyboard
+      import threading, time
+
+      sum_keyboard_cnt = 0
+
+      class MyThread(threading.Thread):
+        callback = None
+        def __init__(self, target):
+          super(MyThread, self).__init__()
+          self.callback = target
+          self.stop_event = threading.Event()
+          self.setDaemon(True)
+        def stop(self):
+          self.stop_event.set()
+        def start(self):
+          self.callback()
+
+      def on_release(key):
+        global sum_keyboard_cnt
+        sum_keyboard_cnt += 1
+        return True
+
+      # def mainloop():
+      #   global sum_keyboard_cnt
+      #   recent_time = time.time()
+      #   while True:
+      #     current_time = time.time()
+      #     if current_time - recent_time > 1.0: # 1秒程度経ったら
+      #       recent_time = current_time
+      #       print(sum_keyboard_cnt)
+      #       sum_keyboard_cnt = 0
+      def mainloop():
+        global sum_keyboard_cnt
+        while True:
+          print(sum_keyboard_cnt)
+          sum_keyboard_cnt = 0
+          time.sleep(1) # 上のifを使ったbusy waitingではなく，単にsleepでできる
+
+      if __name__ == "__main__":
+        try:
+          listener = keyboard.Listener(on_release=on_release)
+          th1 = MyThread(target=listener.start)
+          th2 = MyThread(target=mainloop)
+          th1.start()
+          th2.start()
+        except KeyboardInterrupt:
+          print("Exit")
+          exit()
+        finally:
+          print("Finally")
+          th1.stop()
+          th2.stop()
+      :::output
+      図3・図4に．
+      :::
+      ```
+      というか`stop()`関係ないやん！て思う人もいそうです(自分もこの実装微妙やなって思ってる)けど，この書き方で  
+      「自分でマルチスレッド展開しない場合にListenerがマルチスレッド展開すると`Ctrl+C`でプロセス終了させられなくて，いちいちターミナルを閉じなきゃならないという多くのネットの記事にある流れになってしまう」  
+      というのを解決できたのでまぁ…(´・ω・｀)
+      
+      …というのは置いといて！  
+      こっちでは`MyThread`という自作クラスを実装して`threading.Thread()`を継承させています．  
+      その中にstop()関数を追加することで，スレッド停止フラグを用意して監視させるようにしています．  
+      そしてタイプカウンターの`mainloop()`と`keyboard.Listener()`の2つをコールバック関数として渡して並列処理するようにしています．
+      #### ※2019/07/01更新※
+      `mainloop()`について，「無限ループでBusy Waitingするならsleep系の関数を挟んでCPU負荷を抑えるべきだ！それに1秒ずつならsleep(1)でいけるでしょ」と助言をいただきましたので，修正しました．  
+      (Kさん on Twitterありがとうございます！)
+      
+      ![【図3】](media/2019009_winsuccess.gif)
+      ![【図4】](media/2019009_macsuccess.gif)
+      その結果のGIFが図3(Windows10)と図4(MacOS Mojave)です．  
+      どちらも1秒間隔でその間のタイプ数を出力できています(GIFにしたから微妙に1秒間隔が遅くなってる気がする？)．  
+      MacのGIFに関しては，キーボード入力の文字がターミナルに表示されてしまっているだけで，その文字列の最後尾にタイプ数が表示されています．
+      
+      ただ，Macの方は`pynput`のキーボード監視をするために少し手間が必要でした．というのは，Macマシンがキーボードを監視する権限を制限しているそうです．  
+      そのためこのPythonコードを実行するターミナルやVSCode上でroot権限で実行できるように，
+      - (1)`システム環境設定＞セキュリティとプライバシー＞プライバシー＞アクセシビリティ`を選択．
+      - (2)`+`をクリックして`アプリケーション＞Visual Studio Code.app`と`アプリケーション＞ユーティリティ＞ターミナル.app`を追加する．
+      - (3)さらにPythonコードの実行時に`sudo`を使いroot権限で実行するようにする．
+      上記のことをする必要がありました．Macは時々面倒くさいですね．
+  - headline: まとめ
+    body: |
+      少々雑に書いてしまいました(コードも汚いです)が…  
+      とりあえず，これで目的を達成する準備が整った！！  
+      頑張って開発を進めていきたいと思います！＼(^o^)／

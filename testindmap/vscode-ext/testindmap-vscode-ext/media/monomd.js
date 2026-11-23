@@ -31,8 +31,13 @@ function escapeHtml(text) {
  * @returns {string} パース後のHTML
  */
 function parseInline(text) {
-    // インラインコード `code`
-    text = text.replace(/`([^`]+)`/g, (match, code) => `<code>${escapeHtml(code)}</code>`);
+    // インラインコード `code` を一時退避（内部のマークダウン構文がパースされないように保護）
+    const inlineCodes = [];
+    text = text.replace(/`([^`]+)`/g, (match, code) => {
+        const placeholder = `%%INLINECODE${inlineCodes.length}%%`;
+        inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
+        return placeholder;
+    });
     
     // 太字 **text**
     text = text.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
@@ -45,6 +50,11 @@ function parseInline(text) {
     
     // リンク [text](url)
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent);">$1</a>');
+    
+    // インラインコードを復元
+    inlineCodes.forEach((codeHtml, i) => {
+        text = text.replace(`%%INLINECODE${i}%%`, () => codeHtml);
+    });
     
     return text;
 }

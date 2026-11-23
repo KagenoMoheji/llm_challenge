@@ -1,0 +1,161 @@
+creator: KagenoMoheji
+createDate: 2021-01-24
+updateDate: !!timestamp 2021-05-05
+title: 【Python】指定PathをRootにしてimportする
+tags:
+  - Python
+content:
+  - headline: はじめに
+    body: |
+      今回の記事は，私個人の「この書き方，個人的に書きやすいと思うけどどうなんかな～，ちょっと課題あると思うけど自分のためのメモとして残しとこ」という感じのものです．
+      そのためPython公式の推奨でも一般的に使用されているやり方でもないので，参考程度に読んでいただけたらと思います．
+      
+      今回は，Pythonのimportについて個人的に引っかかっていて，それに対して対応したコードをメモります．  
+      というのは，Pythonでのimportにおいて「TypeScriptのような**指定Path(例えばプロジェクトディレクトリとか)をRootにして，そのPathからの絶対パスでimportする**」ようなことができない状況だと思います．  
+      (でもできたりする時がある？イマイチつかめない…)
+      
+      `__init__.py`を使って対応する方法があると思うのですが，いかんせんなかなか理解が進まず…  
+      CLIとかパッケージングしてコマンドで実行させた時にディレクトリ構成を認識してくれるようなもんかなぁと雑に理解しちゃってます．つまり，`python main.py`のように純粋にPythonスクリプトを実行させた際にそのディレクトリ構成を見てくれていないのかな？と思っちゃっていますね…．
+  - headline: サンプルディレクトリ
+    body: |
+      ```
+      <プロジェクト>/
+      ├ src/
+        ├ main.py
+        ├ modules/
+          ├ moduleA/
+            ├ a.py
+          ├ moduleB/
+            ├ b.py
+        ├ test/
+          ├ testA.py
+      ```
+      上記のサンプルディレクトリで下記2点のPythonスクリプトを雑に書いてみます．
+      - 「`a.py`の`funcA()`が`b.py`の`funcB()`を呼び出す」
+      - 「`testA.py`が`a.py`の`funcA()`を呼び出す」
+  - headline: まとめ
+    body: |
+      ```python[main.py]
+      import inspect
+      import os
+      import sys
+      PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/"
+      sys.path.append(PYPATH + ".")
+      from modules.moduleA.a import funcA
+
+      if __name__ == "__main__":
+        funcA()
+      ```
+      ```python[a.py]
+      # import inspect
+      # import os
+      # import sys
+      # PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/"
+      from modules.b import funcB
+
+      def funcA():
+        print("Hello, A!")
+        funcB()
+      ```
+      ```python[b.py]
+      # import inspect
+      # import os
+      # import sys
+      # PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/"
+      # importするものは特に無いので記載せず
+
+      def funcB():
+        print("Hello, B!")
+      ```
+      ```python[testA.py]
+      import inspect
+      import os
+      import sys
+      PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/"
+      sys.path.append(PYPATH + "./../")
+      from modules.moduleA.a import funcA
+
+      funcA()
+      ```
+      とまぁ，こんな感じのコードで，「**指定Path(例えばプロジェクトディレクトリとか)をRootにして，そのPathからの絶対パスでimportする**」，今回のサンプルコードでいうと，「`src`をRootとして`modules`からのPathでimportする」とことができてるのかなぁと思ってます．  
+      ポイントとして下記のコードがpythonコマンドで実行するPythonスクリプト(今回のサンプルでは`main.py`と`testA.py`)の頭に実装されています．
+      
+      ```python[指定PathをRootにするコード]
+      import inspect
+      import os
+      import sys
+      PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/"
+      sys.path.append(PYPATH + "(Rootとしたいディレクトリ(今回のsrc)までの相対パス)")
+      ```
+      モジュール`inspect`・`os`の関数の組み合わせにより，Pythonスクリプト自体のカレントディレクトリを取得しており，そのディレクトリからの相対Pathで「(プロジェクトディレクトリのような)Rootとしたいディレクトリ」を取得し，`sys.path`というモジュール検索Pathの一覧に追加します．  
+      したがって上記のコードによりimportのPathをすべてRootとしたディレクトリ下から辿れるようになります．  
+      さらに，PYPATHに各Pythonスクリプトのカレントディレクトリを格納できるので，`os.getcwd()`や`__file__`などといったことに頭を悩ませる必要もなくなります(ぇ)．  
+        
+      難点としては，pythonコマンドで実行する全てのPythonスクリプトに上記コードをコピペしないといけないかな～というくらいでしょうか．  
+      可能なら引数として相対パスを渡す形で，上記コードを1つの関数にして使い回せれば良いのですが，その関数自体のimportがまず厳しいかもしれないということで，ひとまずコピペで落ち着いてます．
+  - headline: 注意点
+    body: |
+      #### ※2021/05/05に追加したチャプターです．※
+      ```[サンプルディレクトリ("src/test/modules/"を追加)]
+      <プロジェクト>/
+      ├ src/
+        ├ main.py
+        ├ modules/
+          ├ moduleA/
+            ├ a.py
+          ├ moduleB/
+            ├ b.py
+        ├ test/
+          ├ testA.py
+          ├ modules/
+            ├ c.py
+      ```
+      後から知ったのですが，例えば上記のように`src/test/modules/c.py`があったとして，`c.py`を`testA.py`にimportしたい時，前述の`testA.py`における`sys.path.append(PYPATH + './../')`で指定したPathからの`test.modules.c`という書き方での絶対importはできず，下記のように`testA.py`(カレントディレクトリ)からの相対importでないとModuleNotFoundErrorになります．  
+      下記コードで動いたとして`from modules.～`が2つ同じになってるのキモい…  
+      `from test.modules.c`って書きたい…(T_T)
+      ```python[testA.py(c.pyのimportを追加)]
+      import inspect
+      import os
+      import sys
+      PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/"
+      sys.path.append(PYPATH + "./../")
+      from modules.moduleA.a import funcA
+      # from test.modules.c import funcC # こっちの絶対importではダメで↓
+      from modules.c import funcC # こっちの相対importしないといけない…
+
+      funcA()
+      funcC()
+      ```
+
+      原因は，**Python標準でtestパッケージが存在しているため**でした．  
+      またtestパッケージがPython標準なので，`sys.path.insert(0, ~)`でテストコードを配置する`test`ディレクトリの優先度を高くするのは危険であることから`test`ディレクトリをテストコードを配置するディレクトリとして使用するのは避けた方が良いかもしれません．  
+      そこで私は今後下記のように`mytest`ディレクトリにディレクトリ名を変えて対応することに…しょうもないかもしれないけど…
+      ```[サンプルディレクトリ(解決案)]
+      <プロジェクト>/
+      ├ src/
+        ├ main.py
+        ├ modules/
+          ├ moduleA/
+            ├ a.py
+          ├ moduleB/
+            ├ b.py
+        ├ mytest/
+          ├ testA.py
+          ├ modules/
+            ├ c.py
+      ```
+      ```python[testA.py(解決案)]
+      import inspect
+      import os
+      import sys
+      PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/"
+      sys.path.append(PYPATH + "./../")
+      from modules.moduleA.a import funcA
+      from mytest.modules.c import funcC
+
+      funcA()
+      funcC()
+      ```
+  - headline: 終わりに
+    body: |
+      以上です．あまり強く参考にしないでください(逃)
