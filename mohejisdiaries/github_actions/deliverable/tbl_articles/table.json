@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026002",
+    "fileName": "2026002_monomd.yml",
+    "title": "重複した記号の役割を排除したマークダウンパーサ「MonoMD」を作ってみた",
+    "createDate": "2026-11-24",
+    "updateDate": "2026-11-24",
+    "tags": [
+      "Vibe個人開発",
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "2026001",
+    "fileName": "2026001_site_revival.yml",
+    "title": "「もへじの編綴」復活！！",
+    "createDate": "2026-11-24",
+    "updateDate": "2026-11-24",
+    "tags": [
+      "お知らせ",
+      "Vibe個人開発"
+    ]
+  },
+  {
     "id": "2021005",
     "fileName": "2021005_python_logging_wrapper.yml",
     "title": "【Python】我流logging使用方法 ~Databricks版を添えて~",
