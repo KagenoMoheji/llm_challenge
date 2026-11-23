@@ -9,8 +9,9 @@ const tests = [
     { name: 'Article Tags & Navigation Tests', script: 'tests/test_article_tags.js' },
     { name: 'Link & URL Validation Tests', script: 'tests/test_link_validation.js' },
     { name: 'DOMPurify & SRI Security Tests', script: 'tests/test_dompurify_sanitizer.js' },
-    { name: 'CDN SRI Hash Verification Tests', script: 'tests/test_sri_hash.js' },
-    { name: 'Article Preview & YAML Parsing Tests', script: 'tests/test_article_preview.js' }
+    { name: 'CDN SRI Hash Verification Tests', script: 'tests/sri_hash.js' ? 'tests/test_sri_hash.js' : 'tests/test_sri_hash.js' },
+    { name: 'Article Preview & YAML Parsing Tests', script: 'tests/test_article_preview.js' },
+    { name: 'Profile Section Tests', script: 'tests/test_profile_section.js' }
 ];
 
 console.log('====================================================');
