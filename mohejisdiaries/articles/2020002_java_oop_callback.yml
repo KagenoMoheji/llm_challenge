@@ -1,0 +1,375 @@
+creator: KagenoMoheji
+createDate: 2020-05-31
+updateDate: !!timestamp 2020-05-31
+title: 【Java】オブジェクト指向のコールバック実装を考えてみる
+tags:
+  - Java
+content:
+  - headline: はじめに
+    body: |
+      こんにちは，今月2記事目で，今回もJavaです．
+      
+      !!前回の記事!!(/articles/2020/1)で挙げた0埋めのサンプルコードが，冗長実装になっている部分があり，個人的にスッキリいかなかったため修正したいと思ったのが今回の記事の執筆に至った理由です(ぇ)．  
+      つまり，サンプルコードにおいて共通コードとなっている処理時間計測のコードをまとめ，更に共通コードの中で計測したい処理を呼び出す，いわばコールバックの実装をJavaでできないかと考えました．  
+      しかし今回のサンプルコードでは，コールバックへの引数渡しが必要でした．
+      
+      そこでいろんなサイトを調べてみると…
+      - [1]Java コールバックの必要性と実装方法(超初心者)(http://www.kisse-logs.com/2017/05/31/java-callback/ だったがリンク切れ)
+        - `someMethod()`がコールバックを実行するメソッドらしい(そう理解するまでコードの解読に時間かかった)
+        - ClassAがCallback，ClassBがCaller(勝手に命名)か…
+        - 「Callbackして良い/良くないメソッド」をInner Interfaceで指定することで区別可能．
+        - いちいちInner Interfaceに同じメソッド(名)を書かなければならず，肥大化する．
+        - `someMethod() -> callbackMethod()`の流れで，引数も渡せそうだが，1：1の関係になり，異なる引数のコールバックを実装しようとすると，また別の`someMethod()`を用意しなければならない．
+        - Callback側(ClassA)にCallerの存在を実装(ClassBをimplements)により明記しなければならない．(つまりCallbackとCallerのコードが絡む…言い方合ってるかな…？)
+      - [2][Java でコールバックの簡単サンプル](https://qiita.com/softbase/items/94984fa7821ecbc02f5b)
+        - 「callbackoNotify」てめっちゃスペルミスしてね？  
+          コメントに修正してくれているコードがあったけど，`@FunctionalInterface`で関数型にしているのか．ふむ…？(分かってない)
+        - class AがCallback，class BがCallerかな
+        - Callback側(class A)にCaller(class B)の存在を明記(Callback側のコンストラクタでインスタンス化)しなければならない．(つまりCallbackとCallerのコードが絡む…言い方合ってるかな…？)
+        - `call()`において引数の有無・異なる引数のコールバックを用意する際にCallbackインタフェースとclass Aの両方に新たなコールバック関数を追加していかなければならず肥大化する．
+        - [1]から言わせるとCallback側のメソッドをCaller側で全て実行できてしまう．
+      - [3][\[java\]コールバックの実装](https://peitechblog.com/?p=260)
+        - main()におけるCallbackInterfaceのインスタンス化でCallbackを定義しており，`ThreadWithCallback.run()`がCallerのようだ．
+        - [1][2]と同じく，異なる引数のコールバックを定義する際に，CallbackInterfaceと`main()`の両方で記述が必要になり肥大化する．
+      - [4][Callback functions in Java](https://stackoverflow.com/questions/443708/callback-functions-in-java/26776520)
+        - [インタフェースを使う方法](https://stackoverflow.com/a/443741)と[`Runnable`を使う方法](https://stackoverflow.com/a/20571565)を合わせたものが[3]の方法ということかな．
+        - [`java.util.function`を使う方法](https://stackoverflow.com/a/26776520)もあるのか…なるほど…．
+      - [5]`JavaFX.util.Callback`
+        - よく分からんけど使う機会あるんかな…？
+      - [6]Observerパターン
+        - まだよく分からんけど，コールバックとは別物っぽい．勉強しておくか…．
+      
+      インタフェースを用いる方法や関数型で記述する方法が一般的のようですが，
+      - コールバックの引数渡しをどうにか簡潔にまとめられないか
+      - オブジェクト指向のままCallerとCallbackを別々に書けないか
+      と感じ，ちょっと方法を考えてみました．  
+      その際，コールバックの実装自体は難しくなかったが，引数の渡し方に工夫が必要に思われました．そして今回は2つの案を実装してみました．  
+      その結果，案2が自分の中ではスッキリしていると感じており，案2を機能拡張して，[1]に挙げられていた「Callbackして良い/良くないメソッド」の存在があることを示せるようにしてみました．コードや導入・使い方は下記のGithubに上げてあります．  
+      [github.com/KagenoMoheji/MyLibraries/Java/callback/src/samples/](https://github.com/KagenoMoheji/MyMiniLibraries/tree/master/Java/callback/src/samples/method2)
+  - headline: 事前知識
+    body: |
+      2案を述べる前に，いずれの案でも使用している共通のコード(`Callback.java`，ただし引数だけ異なる)で用いられているリフレクション`java.lang.reflect`という事前知識を説明していきます．
+      - `Class<?>`と`(Class).class`
+        - クラスを，クラス名という文字列で取得し格納するために用いる．
+      - `Class.forName()`と`(this|Object).getClass()`
+        - 前者はクラスのクラス名を，後者は(インスタンス化済みの)オブジェクトのクラス名を取得する．
+        - 後者はオブジェクトなのでサブクラスでインスタンス化されている場合は，サブクラスのクラス名を取得できる
+      - `(Class).newInstance()`
+        - クラスをインスタンス化し，Object型で返す．
+      - `Method`と`(Class).getMthod()`
+        - メソッドを，メソッド名という文字列で取得し格納するために用いる．
+      - `(Method).invoke()`
+        - メソッド名で取得し格納したメソッドを実行する．
+      
+      以降は，機能拡張した案2(Githubにあります)に実装したものですが…
+      - `(Method).isAnnotationPresent()`
+        - メソッド名で取得し格納したメソッドにアノテーションが付与されているか調べる．
+  - headline: 【案1(ボツ)】Interface + HashMap
+    body: |
+      まず，案1はCallbackインタフェースを用意し，そこにコールバックを実際に実行する`callback`メソッドをデフォルトメソッドとして実装します．  
+      そしてコールバックに渡す引数を，HashMapで表現してみました．  
+      したがって，HashMapのキーには引数の変数名，バリューには変数の値(ただしObject型)を指定していくことで，最終的にコールバックの中で`(HashMap).get("変数名")`で引数を使えるようにしています．
+      
+      ```java[Callback.java]
+      import java.util.*;
+      import java.lang.reflect.*;
+
+      public interface Callback {
+        public default void callback(String methodName, HashMap<String, Object> args) {
+          try {
+            Class<?> callbackClass = Class.forName(this.getClass().getName());
+            Object callbackInstance = callbackClass.newInstance();
+            
+            Method callbackMethod = callbackClass.getMethod(methodName, HashMap.class);
+            callbackMethod.invoke(callbackInstance, args);
+          } catch(Exception e) {
+            e.printStackTrace();
+          }
+        }
+      }
+      ```
+      核であるCallbackインタフェースです(ほぼライブラリ化したと言って差し支えないかな←)．  
+      デフォルトメソッド`callback()`の引数は2つあり，まずコールバックのメソッド名を文字列型で受け取り，コールバックを実行できるようにしました．  
+      2つ目の引数がコールバックの引数であり，案1ではHashMapで表現するようにしています．
+      ```java[Timer.java]
+      import java.util.*;
+
+      public class Timer {
+        // Caller Method
+        public void nanoTimer(Callback callbackInstance, String methodName, HashMap<String, Object> args) {
+          double start = System.nanoTime();
+          // Run callback
+          callbackInstance.callback(methodName, args);
+          System.out.println((System.nanoTime() - start) / 1__000__000__000);
+        }
+      }
+      ```
+      コールバックを好きなタイミングで実行するCallerメソッドを持つクラスの例です．  
+      今回はコールバックの処理速度を計測するために，コールバックの前後に開始時刻と終了時刻を取得する必要があるということで，`Timer`クラスを例に実装しました．
+      ```java[ZeroPaddings.java]
+      import java.util.*;
+
+      public class ZeroPaddings implements Callback {
+        // Callback Method
+        public void zeroPadding1(HashMap<String, Integer> args) throws Exception { // Integer l, Integer n
+          if(!args.containsKey("l") || !args.containsKey("n")) {
+            throw new Exception("NoArgumentError");
+          }
+          System.out.println(String.format("%0" + args.get("l") + "d", args.get("n")));
+        }
+
+        // Callback Method
+        public void zeroPadding2(HashMap<String, Integer> args) throws Exception { // Integer l, Integer n
+          if(!args.containsKey("l") || !args.containsKey("n")) {
+            throw new Exception("NoArgumentError");
+          }
+          int nLen = (int)Math.log10((double)args.get("n")) + 1;
+          String preStr = (nLen >= args.get("l")) ? "" : repeatStr("0", args.get("l") - nLen);
+          System.out.println(preStr + args.get("n"));
+        }
+
+        private String repeatStr(String str, int repeatNum) {
+          String res = "";
+          if(repeatNum == 0) {
+            return res;
+          }
+          for(int i = 0; i < repeatNum; i++) {
+            res += str;
+          }
+          return res;
+        }
+      }
+      ```
+      コールバックを持つクラスの例です．  
+      今回は!!前回の記事!!(/articles/2020/1)に倣い，ゼロ埋めのコードの処理速度を比較するという名目で，ゼロ埋めの処理をコールバックとして実装しました．  
+      ここで，コールバックの引数のHashMapのバリューの型について，今回は全ての引数が共通して整数型で良かったので，Object型からInteger型に型キャストするようにしています．
+
+      ```java[Main.java]
+      import java.util.*;
+
+      public class Main {
+        public static void main(String[] args) {
+          Timer timer = new Timer();
+          Callback callbackInstance = new ZeroPaddings();
+          
+          HashMap<String, Object> argsCallback = new HashMap<>();
+          argsCallback.put("l", 20);
+          argsCallback.put("n", 100);
+          timer.nanoTimer(callbackInstance, "zeroPadding1", argsCallback);
+          timer.nanoTimer(callbackInstance, "zeroPadding2", argsCallback);
+        }
+      }
+      :::output
+      00000000000000000100
+      0.0230162
+      --------------------------------
+      00000000000000000100
+      3.699E-4
+      --------------------------------
+      :::
+      ```
+      Callerにコールバックを渡して実行するコードです．  
+      コールバックの引数をHashMapで表現しているため，コールバックの引数を定義する変数を独立した行に書いてから，Callerに渡さないといけなくなっています．
+      
+      以上が案1の構成です．これらを踏まえると，下記のことが言え，ボツになりました．
+      - コールバックの引数を，バリューをObject型にしたHashMapで表現しているため，コールバック内で引数の存在判定や型判定・型キャストを実装しなければならない．面倒．
+      - ただ今回のようにコールバックの引数全てが共通の型(今回の場合Integer)で良いならば，コールバックの引数にその型を指定してObject型から型キャストすれば良い…が，コールバックの引数が別々の型である場合，コールバック内で個別に判定や型キャストを実装しなければならなくなる．面倒．
+      - コールバック内で前述した引数に対する処理を書かなければならないため，処理時間が増加する可能性がある．
+  - headline: 【案2】Interface + Static Inner Class
+    body: |
+      続いて案2では，案1の問題点を解決できるように考え直して実装してみました．  
+      その結果使用したのは，InterfaceとStaticなInnerクラス(内部クラス)でした．  
+      Innerクラスって不思議ですね，その特徴をうまく活かせた気がします．
+      
+      具体的には，Callbackインタフェースの用意は案1と同じですが，案1からの，下記2点の主な修正を実装しました．
+      - コールバックの引数の表現方法をHashMapからStaticなInnerクラスに変更することで，Innerクラス内に引数を個別に定義できるようにし，型判定・型キャストの手間を減らす．
+      - `CallbackArgsInterface`インタフェースを追加で用意することで，Callbackインタフェースのデフォルトメソッド`callback()`にあらゆるコールバックの引数を表現したInnerクラスを受け付けられるようにする．
+
+      ```java[Callback.java]
+      import java.lang.reflect.*;
+
+      public interface Callback {
+        public default void callback(String methodName, CallbackArgsInterface args) {
+          try {
+            Class<?> callbackClass = Class.forName(this.getClass().getName());
+            Object callbackInstance = callbackClass.newInstance();
+            
+            Method callbackMethod = callbackClass.getMethod(methodName, args.getClass());
+            callbackMethod.invoke(callbackInstance, args);
+          } catch(Exception e) {
+            e.printStackTrace();
+          }
+        }
+      }
+      ```
+      核であるCallbackインタフェースです(ほぼライブラリ化したと言って差し支えないかな←)．  
+      案1との違いは，デフォルト引数`callback()`の2つ目の引数であるコールバックの引数の表現方法であり，HashMapではなく，(`Zeropaddingsjava`で)後述するコールバックの引数を定義するためのInnerクラスに実装するインタフェース`CallbackArgsInterface`を用いています．
+      ```java[CallbackArgsInterface.java]
+      public interface CallbackArgsInterface {}
+      ```
+      `CallbackArgsInterface`インタフェースを用意しています．  
+      コールバックの引数を定義するInnerクラスを包括的に受け付けられるようにするためなので，とくに中身はありません．
+      ```java[Timer.java]
+      public class Timer {
+        // Caller Method
+        public void nanoTimer(Callback callbackInstance, String methodName, CallbackArgsInterface args) {
+          double start = System.nanoTime();
+          // Run callback
+          callbackInstance.callback(methodName, args);
+          System.out.println((System.nanoTime() - start) / 1__000__000__000);
+          System.out.println("--------------------------------");
+        }
+      }
+      ```
+      コールバックを好きなタイミングで実行するCallerメソッドを持つクラスの例です．  
+      案1との違いはここでも同じく，コールバックの引数の表現方法が`CallbackArgsInterface`になっただけです．
+      ```java[ZeroPaddings.java]
+      public class ZeroPaddings implements Callback {
+        // Common argumens for callback methods
+        public static class ArgsZeroPadding implements CallbackArgsInterface {
+          private int l;
+          private int n;
+          ArgsZeroPadding(int l, int n) {
+            this.l = l;
+            this.n = n;
+          }
+          private int getL() {
+            return this.l;
+          }
+          private int getN() {
+            return this.n;
+          }
+        }
+
+        // Callback Method
+        public void zeroPadding1(ArgsZeroPadding args) {
+          System.out.println(String.format("%0" + args.getL() + "d", args.getN()));
+        }
+
+        // Callback Method
+        public void zeroPadding2(ArgsZeroPadding args) {
+          int nLen = (int)Math.log10((double)args.getN()) + 1;
+          String preStr = (nLen >= args.getL()) ? "" : repeatStr("0", args.getL() - nLen);
+          System.out.println(preStr + args.getN());
+        }
+
+        /**
+        *  repeatStr(String str, int repeatNum)は，案1と全く同じ
+        */
+      }
+      ```
+      コールバックを持つクラスの例です．  
+      ここで案1との大きな違いが2つあります．
+      - コールバックごとに，StaricなInnerクラスを用いて引数の定義を，コンストラクタとgetterによって行う．
+      - 各コールバックの引数の型を，先に用意したStaticなInnerクラスにする．
+
+      ```java[Main.java]
+      import ZeroPaddings.ArgsZeroPadding;
+
+      public class Main {
+        public static void main(String[] args) {
+          Timer timer = new Timer();
+          Callback callbackInstance = new ZeroPaddings();
+
+          timer.nanoTimer(
+            callbackInstance,
+            "zeroPadding1",
+            new ArgsZeroPadding(20, 100));
+          timer.nanoTimer(
+            callbackInstance,
+            "zeroPadding2",
+            new ArgsZeroPadding(20, 100));
+        }
+      }
+      :::output
+      00000000000001020553
+      0.0288068
+      --------------------------------
+      00000000000001020553
+      3.629E-4
+      --------------------------------
+      :::
+      ```
+      Callerにコールバックを渡して実行するコードです．  
+      HashMapではなくなったため，コールバックの引数の定義を独立した行で記述する必要がなくなり，Callerの引数に収めて記述することができるようになっています．
+      
+      以上が案2の構成です．  
+      案1に比べ，コールバックの引数のより細かな定義ができ，その上コールバック内で引数の有無判定・型判定を実装する必要がなくなりました．
+  - headline: まとめ
+    body: |
+      本記事で挙げたサンプルコードは，そのファイルの位置を簡潔に示すため同ディレクトリに配置しているイメージになってしまっています．  
+      しかし下記リンクではパッケージや，アノテーション・例外(案2=method2のみ)により少し整理したり機能拡張したりしていますので，また確認してください．  
+      [github.com/KagenoMoheji/MyLibraries/Java/callback/src/samples/](https://github.com/KagenoMoheji/MyMiniLibraries/tree/master/Java/callback/src/samples)
+
+      Callbackインタフェース等をライブラリとして公開してみようと思いましたが，修正点があると思うので，誰かOK言ってくれたらやる流れにしますｗ
+  - headline: 補足メモ
+    body: |
+      #### ※2020/05/31更新※
+      記事投稿直後にTwitterで教えていただきましたが，Java8以降では`Runnable`とLambda式でコールバックに引数を渡すコードを簡潔に書けるようですね(「はじめに」で述べた方法[4]のLambda式記述という感じですかね)．  
+      案2と比較すると，メソッドの呼び出し時にメソッド名を文字列で指定する必要がない上に，コールバックのメソッドにおいてgetterで引数を取得する必要がない…マジか…＼(^o^)／
+      
+      案2のメリットは…うーん…(  ´・∀・`)ﾊﾊｯっ  
+      (また教えてもらったけど，)Githubにある案2の拡張したコードにアノテーションが実装されているから，コールバックをリスト取得してループ処理を簡潔に書けそうかもしれない(白目)  
+      ~~そういう機能実装するか…？ｗ~~  
+      →[実装しました！ｗ](https://github.com/KagenoMoheji/MyMiniLibraries/blob/0069d43caf0e1240d0c9e1e8c0230e5ab1744e4b/Java/callback/src/samples/method2/Main.java#L46)
+
+      ```java[Timer.java]
+      public class Timer {
+        // Caller Method
+        public static void nanoTimer(Runnable proc) {
+          var start = System.nanoTime();
+          proc.run();
+          System.out.println((System.nanoTime() - start) / 1.0e9);
+          System.out.println("--------------------------------");
+        }
+      }
+      ```
+      ```java[ZeroPaddings.java]
+      public class ZeroPaddings {
+        public void zeroPadding1(int l, int n) {
+          System.out.println(String.format("%0" + l + "d", n));
+        }
+        
+        public void zeroPadding2(int l, int n) {
+          var nLen = (int)Math.log10((double)n) + 1;
+          var preStr = (nLen >= l) ? "" : repeatStr("0", l - nLen);
+          System.out.println(preStr + n);
+        }
+        
+        private static String repeatStr(String str, int repeatNum) {
+          var res = "";
+          if (repeatNum == 0) {
+            return res;
+          }
+          for (int i = 0; i < repeatNum; i++) {
+            res += str;
+          }
+          return res;
+        }
+      }
+      ```
+      ```java[Main.java]
+      public class Main {
+        public static void main(String[] args) {
+          int argL = 20;
+          int argN = 1020553;
+          Timer timer = new Timer();
+          ZeroPaddings callbackInstance = new ZeroPaddings();
+          
+          // You can run a function in lambda or ...
+          timer.nanoTimer(() -> callbackInstance.zeroPadding1(argL, argN));
+          // some code in lambda!
+          timer.nanoTimer(() -> {
+            callbackInstance.zeroPadding2(argL, argN);
+          });
+        }
+      }
+      :::output
+      00000000000001020553
+      0.017192325
+      --------------------------------
+      00000000000001020553
+      0.008481161
+      --------------------------------
+      :::
+      ```

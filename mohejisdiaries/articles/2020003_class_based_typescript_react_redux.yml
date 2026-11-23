@@ -1,0 +1,482 @@
+creator: KagenoMoheji
+createDate: 2020-09-23
+updateDate: !!timestamp 2020-09-23
+title: 俺的TypeScript x React x Redux (Class based component，サンプル付)
+tags:
+  - TypeScript
+  - React
+content:
+  - headline: はじめに
+    body: |
+      React&Reduxの俺的開発を忘れないための個人的なメモです．  
+      公式推奨に反する部分もあると思うのですが…
+      
+      俺的React&Redux開発の特徴は下記のとおりです．
+      - ComponentはClass-based．
+      - Action/Reducer/StoreはFunctional．
+      - importは絶対パスで．rootのエイリアスは設定ファイルで指定する．
+      - 型は極力つけるようにする．
+      - (まだ確定のルールじゃないですが)Action/Reducer/Storeを用いる処理は極力，特定のComponentだけしか使わない(そのComponentの名前がAction/Reducer/Storeのファイル名に付く)ようなものを避ける．
+      
+      なお，2020/09/22時点での使用モジュール群のバージョンは下記のとおりです．  
+      【使用バージョン】
+      - typescript：^4.0.2
+      - ts-node：^9.0.0
+      - react：^16.13.1
+      - react-dom：^16.13.1
+      - redux：^4.0.5
+      - react-redux：^7.2.1
+      - @types/node：^14.6.1
+      - @types/react：^16.9.48
+      - @types/react-dom：^16.9.8
+      - @types/react-redux：^7.1.9
+      - css-loader：^4.2.2
+      - saas-loader：^10.0.1
+      - style-loader：^1.2.1
+  - headline: 俺的React x Redux開発ディレクトリ構造
+    body: |
+      俺的React＆Redux開発でのディレクトリ構造は下記の通りです．  
+      環境構築方法の説明は省きます…記載されている設定ファイル群から察してください~~(分からなかったら聞いてください)~~
+      ```[俺的React＆Redux開発でのディレクトリ構造]
+      Project/
+        ├ README.md
+        ├ LICENSE
+        ├ .gitignore
+        ├ prod/ [distを踏まえた上で，実行可能アプリにビルドしたものをここに]
+        ├ src/
+          ├ package.json
+          ├ webpack.common.js
+          ├ webpack.dev.js
+          ├ webpack.prod.js
+          ├ tsconfig.json
+          ├ npm-install-dependencies.sh [自作の依存モジュールインストーラ]
+          ├ .eslintrc.json
+          ├ .prettierrc.json
+          ├ jsconfig.json
+          ├ main/
+            ├ index.html [HTMLの外枠のみ]
+            ├ Root.tsx [Componentのトップコンポネント]
+            ├ types/ [Component・Reducerをまたいで共有したい型を定義する場所．例えばPropsに格納するStoreの型とか．]
+              ├ index.ts
+              ├ <型定義名>.ts
+            ├ components/ [View部分．]
+              ├ App.tsx [Header・Container・Footerなどの大枠を統合してRoot.tsxに渡す]
+              ├ <component name>/
+                ├ <component name>.tsx
+                ├ <child component name>/ [子コンポネントの場合はフォルダを配置]
+                  ├ <child component name>.tsx
+                  ├ <grandchild component name>/
+                    ├ ...
+              ├ common/ [共通パーツはここに置いて使い回す]
+                ├ <common component name>/
+                  ├ <common component name>.tsx
+                  ├ <common child component name>/
+                    ├ <common child component name>.tsx
+                    ├ <common grandchild component name>/
+                      ├ ...
+            ├ states/ [状態管理に関するディレクトリ]
+              ├ stores/
+                ├ index.ts [全てのStoreをを持つ変数を生成してComponents側に渡すコードを記述]
+              ├ reducers/
+                ├ index.ts [全てのReducerを1つの変数に統合してStore側に渡すコードを記述]
+                ├ <reducer name>.ts
+              ├ actions/
+                ├ index.ts [重複したAction名が無いか検証するために用いる]
+                ├ <action name>.ts
+            ├ scss/
+              ├ Common.scss [CSSの初期化やテキストスタイルなど，全てのコンポネントのSCSSにインポートさせる共通SCSS．]
+              ├ <component name>.scss
+          ├ test/ [テストコード置き場．主にReducerのテスト．]
+            ├ testXXX.ts
+            ├ XXX.test.ts
+          ├ dist/ [動作確認コード置き場．TSのトランスパイル結果をここに]
+            ├ assets/ [画像等の置き場]
+            ├ ...
+      ```
+      Reduxに必要なAction/Reducer/Storeのディレクトリと型定義のディレクトリにおいて，名前衝突防止や統合といったそれぞれの役割のために，いずれも`index.ts`が不可欠となっています．  
+      `Root.tsx`と`App.tsx`について，意味的に逆ではないかと感じる人もいるかもしれないのですが，どっちの意味も取れると思うのでひとまずこの位置関係になっています．
+  - headline: サンプル1：カウンター(クローンなし)
+    body: |
+      サンプルは，Store付きComponentのクローンが不要/必要の場面で2種類用意しました．  
+      ここではクローンが不要な場合の実装です．  
+      コード全容は[Github](https://github.com/KagenoMoheji/MyMiniLibraries/tree/master/TypeScript/ReactRedux/sample-counter)に上げてあるので，参考にしてください．  
+      ここではReduxに関係するところのみ抜粋して説明していきます．
+      ```typescript[main/types/CounterState.ts]
+      export interface CounterState {
+        count: number;
+      }
+      ```
+      ```typescript[main/types/index.ts]
+      export * from "#/types/counterState";
+      ```
+      まず，カウンターという機能が保持・更新する状態の型定義します．  
+      なお，`types/`下に記述してく型は，基本的にComponents側とReducers側の両方で使う型になります．  
+      `types/index.ts`において型の重複定義をチェックする目的もあって，各状態の型定義を集約させていきます．
+      ```typescript[main/states/actions/counterAction.ts]
+      export interface CounterActionReturn {
+        type: string;
+        // payload: {};
+      }
+      export type CounterAction = () => CounterActionReturn;
+
+      export const incrementAction: CounterAction = () => ({
+        type: "INC",
+      });
+      export const decrementAction: CounterAction = () => ({
+        type: "DEC",
+      });
+      ```
+      ```typescript[main/states/actions/index.ts]
+      export * from "#/states/actions/counterAction";
+      ```
+      次にReduxにおける，イベントに対する処理(Reducer)の紐づけ・橋渡しをするメッセージオブジェクトとされる，Actionの実装です．  
+      `CounterActionReturn`はメッセージオブジェクトそのものの型定義であり，`CounterAction`はイベントから(Dispatcherで)渡される引数を元にメッセージオブジェクトを生成する関数型定義です．  
+      このサンプルではイベントから渡される引数は無いので，空になっています．  
+      そしてカウンター機能の処理として`increment(=1増やす)`と`decrement(=1減らす)`があり，それぞれのActionを，action-typeという文字列を定義して生成します．  
+      そして`states/actions/index.ts`に`states/actions/counterAction.ts`でexportしたActionを集約させることで，Actionの重複定義をチェックします．
+      ```typescript[main/states/reducers/counterReducer.ts]
+      import { CounterState } from "#/types";
+      import {
+        incrementAction,
+        decrementAction,
+        CounterActionReturn,
+      } from "#/states/actions";
+
+      const initialState: CounterState = {
+        count: 0,
+      };
+
+      export const counterReducer = (
+        state: CounterState = initialState,
+        action: CounterActionReturn
+      ): CounterState => {
+        switch (action.type) {
+          case incrementAction().type:
+            return {
+              ...state,
+              count: increment(state.count),
+            };
+          case decrementAction().type:
+            return {
+              ...state,
+              count: decrement(state.count),
+            };
+          default:
+            return state;
+        }
+      };
+
+      export const increment = (n: number): number => {
+        return n + 1;
+      };
+      export const decrement = (n: number): number => {
+        return n - 1;
+      };
+      ```
+      ```typescript[main/states/reducers/index.ts]
+      import { combineReducers } from "redux";
+
+      import { counterReducer } from "#/states/reducers/counterReducer";
+
+      export const allReducers = combineReducers({
+        counter: counterReducer,
+      });
+      ```
+      次にReduxにおける，状態の更新を行うReducerの実装です．  
+      `initialState`で状態が生成されていない場合の初期値を用意します．  
+      そして現在の状態~~(stateになってるけどpropsじゃね？とも思う…)~~とActionを元に更新した状態を返す`counterReducer`を実装します．  
+      `counterReducer`より下の関数群は，状態の値を実際に更新して返す関数群です．今回は処理量が少ないので不要にして良いのですが，参考のため実装しておいてます．また，exportになっているのは，テストのためです…本当はexportしないで隠蔽した方が良いと思うんですけどね．  
+      そして`states/reducers/index.ts`で，`states/reducers/counterReducer.ts`等のReducer群を1つに統合します．統合したものをStoreの方に渡していきます．
+      ```typescript[main/states/stores/index.ts]
+      import { createStore } from "redux";
+
+      import { allReducers } from "#/states/reducers";
+
+      export const allStores = createStore(allReducers);
+      ```
+      次にReduxにおける，状態の保持と状態とReducerの紐づけ(？)を行うStoreの実装です．  
+      `states/reducer/index.ts`で全てのReducerを統合してあるので，統合されて渡された変数でStoreを作るだけです．  
+      Storeのコードは一度実装したら，Action/Reducerが増減しても基本的に変更する必要は無いと思います．
+      ```typescript[main/components/counter/Counter.tsx]
+      import React from "react";
+      import { connect } from "react-redux";
+      import { Dispatch, Action } from "redux";
+      import { CounterState } from "#/types";
+      import {
+        incrementAction,
+        decrementAction,
+        CounterAction,
+      } from "#/states/actions";
+      import "#/scss/Counter.scss";
+
+      interface CounterProps {
+        counter: CounterState;
+        increment: CounterAction;
+        decrement: CounterAction;
+      }
+      class Counter extends React.Component<CounterProps> {
+        constructor(props: CounterProps) {
+          super(props);
+        }
+
+        render(): JSX.Element {
+          return (
+            <div className="counter">
+              <span>
+                <button
+                  type="button"
+                  onClick={() => this.props.decrement()}
+                >
+                  ー
+                </button>
+              </span>
+              <span>{this.props.counter.count}</span>
+              <span>
+                <button
+                  type="button"
+                  onClick={() => this.props.increment()}
+                >
+                  ＋
+                </button>
+              </span>
+            </div>
+          );
+        }
+      }
+
+      const mapState2Props = (state: CounterProps) => ({
+        counter: state.counter,
+      });
+      const mapDispatch2Props = (dispatch: Dispatch<Action<string>>) => ({
+        increment: () => dispatch(incrementAction()),
+        decrement: () => dispatch(decrementAction()),
+      });
+      export const ConnCounter = connect(mapState2Props, mapDispatch2Props)(Counter);
+      ```
+      ```typescript[main/components/App.tsx]
+      import React from "react";
+      import { ConnCounter } from "#/components/counter/Counter";
+
+      export class App extends React.Component {
+        render(): JSX.Element {
+          return (
+            <div>
+              <ConnCounter />
+            </div>
+          );
+        }
+      }
+      ```
+      ```typescript[main/Root.tsx]
+      import React from "react";
+      import ReactDOM from "react-dom";
+      import { Provider } from "react-redux";
+
+      import { App } from "#/components/App";
+      import { allStores } from "#/states/stores";
+
+      ReactDOM.render(
+        <Provider store={allStores}>
+          <App />
+        </Provider>,
+        document.getElementById("root")
+      );
+      ```
+      最後に，これまで実装したAction/Reducer/Storeを用いてComponentと状態操作の紐づけをしていきます．  
+      Component`Counter`のPropsの型定義においては，`main/types/counterState.ts`や`main/actions/counterAction.ts`で定義した型定義と関数型定義を用いることで記述を楽にするようにしてみました．  
+      そして`mapState2Props`にてStoreの状態とPropsを紐付けるのですが，この時のキー名は，`main/states/reducers/index.ts`におけるReducer群の統合の際に指定したキー名と一致させる必要があり(確かそうだったはず…)，注意です．  
+      更に親要素で自身のComponentを埋め込むためにexportするComponentは，ここでいうComponent`Counter`ではなく，Componentと状態操作を紐づけした`ConnCounter`であることに注意です．  
+      そして`main/Root.tsx`において，`main/states/stores/index.ts`で生成したStoreを全てのComponentに共有するためにComponent`Provider`を使う必要があります．
+      
+      以上で，サンプル1の説明終わりです．
+  - headline: サンプル2：カウンター(クローンあり)
+    body: |
+      サンプル2では，Store持ちのComponentをクローン(数は自明)したいけど，StoreはComponent別に独立して生成したい場合についての実装です．  
+      つまり，サンプル1でカウンターを1つ実装しましたが，例えば「同じStore持ちComponent`Counter`を使い回して複数のカウンターを設置したいけど，それぞれのカウンターは別々のStoreを持たせたい」といった感じです．今回はそれを実装していきます．  
+      ただし大部分はサンプル1と被っているので，変更している部分だけ抜粋して説明します．  
+      コード全容は[Github](https://github.com/KagenoMoheji/MyMiniLibraries/tree/master/TypeScript/ReactRedux/sample-counter-clone)に上げてあります．
+      
+      なお今回の「Store持ちComponentのクローン」の考え方としては，「同じ機能ならばキー違いで同じStoreにまとめてしまって，Reducerではキーを識別して必要な箇所だけ更新しよう」という感じになります．
+      ```typescript[main/types/counterState.ts]
+      export interface CounterState {
+        count: number;
+      }
+
+      export interface CounterStateList {
+      [key: string]: CounterState,
+      counter1: CounterState,
+      counter2: CounterState,
+      }
+      ```
+      まずは`main/types/counterState.ts`でのサンプル1からの変更です．  
+      `CounterStateList`を追加しました．`CounterStateList`はクローンの一覧を，クローン別の固有IDをキーに指定して保持します．  
+      したがって，クローンを1つ増やすごとに，`CounterStateList`へ固有IDを指定して追加していく形になります．  
+      なお`CounterStateList`における`[key: string]: CounterState`という記述は，後述のReducerなどで文字列でキー指定して状態を更新する際にエラーになることを回避する手段として必要になったので実装しています．
+      ```typescript[main/states/actions/counterAction.ts]
+      export interface CounterActionReturn {
+        type: string;
+        payload: {
+          counterId?: string;
+        };
+      }
+      export type CounterAction = (counterId?: string) => CounterActionReturn;
+
+      export const incrementAction: CounterAction = (counterId?) => ({
+        type: "INC",
+        payload: {
+          counterId: counterId,
+        },
+      });
+      export const decrementAction: CounterAction = (counterId?) => ({
+        type: "DEC",
+        payload: {
+          counterId: counterId,
+        },
+      });
+      ```
+      次に`main/states/actions/counterAction.ts`でのサンプル1からの変更です．  
+      複数のクローンComponentから1つのComponentを特定するために，イベントトリガー(onClickなど)から固有ID`counterId`を渡されてくる必要があるため，引数や`payload`に`counterId`を実装しています．  
+      ただし，Reducerからaction-typeのみを調べるためにActionの処理(ここでいう`incrementAction`と`decrementAction`)を呼び出すので，引数はundefined許容としています．
+      ```typescript[main/states/reducers/counterReducer.ts]
+      import { CounterStateList } from "#/types";
+      import {
+        incrementAction,
+        decrementAction,
+        CounterActionReturn,
+      } from "#/states/actions";
+
+      const initialState: CounterStateList = {
+        counter1: {
+          count: 0,
+        },
+        counter2: {
+          count: 0,
+        },
+      };
+
+      export const counterReducer = (
+        state: CounterStateList = initialState,
+        action: CounterActionReturn
+      ): CounterStateList => {
+        switch (action.type) {
+          case incrementAction().type:
+            return {
+              ...state,
+              [action.payload.counterId!]: {
+                count: increment(state[action.payload.counterId!].count), // (*)イベント起きた後，つまりレンダリング終了後の処理なので，どのみちcounterIdは存在するはず
+              },
+            };
+          case decrementAction().type:
+            return {
+              ...state,
+              [action.payload.counterId!]: {
+                count: decrement(state[action.payload.counterId!].count), // (*)イベント起きた後，つまりレンダリング終了後の処理なので，どのみちcounterIdは存在するはず
+              },
+            };
+          default:
+            return state;
+        }
+      };
+
+      ... // increment()とdecrement()はサンプル1と同じ
+      ```
+      ```typescript[main/states/reducers/index.ts]
+      ... // importはサンプル1と同じ
+
+      export const allReducers = combineReducers({
+        counterList: counterReducer,
+      });
+      ```
+      次に`main/states/reducers/counterReducer.ts`と`main/states/reducers/index.ts`におけるサンプル1からの変更です．  
+      `main/states/types/counterState.ts`において`CounterStateList`を実装したので，それに応じて`initialState`や`counterReducer`の戻り値の型の変更や，`counterReducer`におけるクローンComponentの固有ID`counterId`を指定した上での状態更新へのコード変更をしています．  
+      そして`main/states/reducers/index.ts`については，単にキー名を`counter`から`counterList`に変更しただけです．
+      ```typescript[main/components/counter/Counter.tsx]
+      import React from "react";
+      import { connect } from "react-redux";
+      import { Dispatch, Action } from "redux";
+      import { CounterStateList } from "#/types";
+      import {
+        incrementAction,
+        decrementAction,
+        CounterAction,
+      } from "#/states/actions";
+      import "#/scss/Counter.scss";
+
+      interface CounterProps {
+        counterId: string;
+        counterList: CounterStateList;
+        increment: CounterAction;
+        decrement: CounterAction;
+      }
+      class Counter extends React.Component<CounterProps> {
+        constructor(props: CounterProps) {
+          super(props);
+        }
+
+        render(): JSX.Element {
+          return (
+            <div className="counter">
+              <span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    this.props.decrement(this.props.counterId)
+                  }
+                >
+                  ー
+                </button>
+              </span>
+              <span>
+                {this.props.counterList[this.props.counterId].count}
+              </span>
+              <span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    this.props.increment(this.props.counterId)
+                  }
+                >
+                  ＋
+                </button>
+              </span>
+            </div>
+          );
+        }
+      }
+
+      const mapState2Props = (state: CounterProps) => ({
+        counterList: state.counterList,
+      });
+      const mapDispatch2Props = (dispatch: Dispatch<Action<string>>) => ({
+        increment: (counterId?: string) => dispatch(incrementAction(counterId)),
+        decrement: (counterId?: string) => dispatch(decrementAction(counterId)),
+      });
+      export const ConnCounter = connect(mapState2Props, mapDispatch2Props)(Counter);
+      ```
+      ```typescript[main/components/App.tsx]
+      ... // importはサンプル1と同じ
+
+      export class App extends React.Component {
+        render(): JSX.Element {
+          return (
+            <div>
+              <ConnCounter counterId="counter1" />
+              <ConnCounter counterId="counter2" />
+            </div>
+          );
+        }
+      }
+      ```
+      最後に`main/components/counter/Counter.tsx`と`main/components/App.tsx`におけるサンプル1からの変更です．  
+      `main/components/counter/Counter.tsx`では，親Componentで自分を配置させる際に固有ID`counterId`をHTML属性として受け取るので，Propsの型定義に`counterId`を追加しています．  
+      そしてDispatcherによるAction(を経由してReducer)への受け渡しでは，そのクローンComponentのみの状態ではなく，全クローンComponentの状態を一括して渡すように，`counterList`を指定しています(サンプル1でも注意として述べましたが，`main/states/reducers/index.ts`におけるキー名と一致させる必要から，今回キー名を変更したのでそれに合わせた，というのもあります)．  
+      そして`main/components/App.tsx`にて固有ID`counterId`を指定しつつComponent`ConnCounter`を使いまわして配置させていきます．
+
+      サンプル2を動かすと下記のgifになります。
+      ![サンプル2の動作](media/2020003_sample2.gif)
+      
+      以上でサンプル2の説明は終わりです．
+  - headline: 最後に
+    body: |
+      割と書きやすいかな〜て個人的に思うのですが，一般的に通用するでしょうかね…気になります．  
+      まだまだReact-RouterやHooksなどがあるので，どんどん勉強進めていきたいですね．

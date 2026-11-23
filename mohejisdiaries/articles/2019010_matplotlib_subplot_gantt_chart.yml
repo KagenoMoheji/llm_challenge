@@ -1,0 +1,167 @@
+creator: KagenoMoheji
+createDate: 2019-07-13
+updateDate: !!timestamp 2019-07-13
+title: 【Python】matplotlibでサブプロットの時系列ガントチャートを作る
+tags:
+  - Python
+  - 個人開発
+content:
+  - headline: はじめに
+    body: |
+      今月2本目です！  
+      前回と同じくPythonのお話です．
+      
+      今回は，ガントチャートを生成する実装について書いていきます．  
+      ただし，要件定義(？)は以下になります．
+      - ガントチャートを**サブプロットで**作って他のグラフと一緒にしたい！！
+      - **時系列データから**のガントチャートを作りたい！！
+      - 時系列データの最低単位に**秒(またはマイクロ秒)**を使いたい！！
+      - ~~`pandas`めんどいから使いたくない！~~(コラ)
+      
+      上記を満たす実装をグーグル先生に聞きまくっても，いくつかヒントになるものはありましたが，そのままコピペで使えるものはありませんでした．  
+      例えば，まず，ガントチャートを生成するモジュールとして，
+      - [1][Python-Gantt | Alexandre Norman](https://xael.org/pages/python-gantt-en.html)
+        - ガントチャートを簡単に生成できるPythonモジュールということですね．
+        - しかしサブプロットにできない，時系列の単位が年月日である，ということから使えません．
+      - [2][Gantt Charts in Python | plotly](https://plot.ly/python/gantt/)
+        - `Plotly`というグラフ描写モジュールは初めて聞きました．
+        - `matplotlib`のオンライングラフ生成版(？)のようで，かなり操作性高い図を得られるようです．
+        - それに実装も`matplotlib`より楽そう？サブプロット機能もあるみたいだし．
+        - …と期待が高まっていましたが，ガントチャートをサブプロットにすることは現状できないようです．やるとしても複雑になりそう．
+          - [Multiple gantt chart in a plot | plotly](https://community.plot.ly/t/multiple-gantt-chart-in-a-plot/21218/2)
+        - 更に秒単位にも対応しにくそうです．
+          - [Gantt chart using data in milliseconds | plotly](https://community.plot.ly/t/gantt-chart-using-data-in-milliseconds/21327)
+        - 時系列なので，秒までの時刻を目盛りに書きたいんですが，このモジュールでは厳しそうです．(それにオフラインでのグラフ保存の手順もやや煩雑)
+      
+      ここからは路線を変えて，`matplotlib`で頑張ってみる方針で行きましょう．  
+      ただし，`matplotlib`には標準でガントチャートを生成するコードを用意していないので，ちょっとした工夫が必要になります．
+      - [3][How to get gantt plot using matplotlib | stack overflow](https://stackoverflow.com/questions/43367690/how-to-get-gantt-plot-using-matplotlib/43372176#43372176)  
+        [Gantt chart using data in milliseconds | plotly](https://community.plot.ly/t/gantt-chart-using-data-in-milliseconds/21327)
+        - 良いですね～！`matplotlib`でも横長の範囲棒グラフを用いることでガントチャートを作れるんですね！  
+          希望が見えてきました！
+        - しかし上記2つのリンクでは`pandas`を使っているんですね…うーん(いや使おうよ)
+        - それにx軸が「秒までの時刻」でないことも気になります．
+        - それでも，`broken_barh()`などを使って工夫すればなんとかなりそうですね．
+      - [4][Quick Gantt Chart with Matplotlib](https://sukhbinder.wordpress.com/2016/05/10/quick-gantt-chart-with-matplotlib/)
+        - これは`pandas`を使っていませんね．
+        - ただ何だろう，月日単位で，`matplotlib`のWEEKLYだかのよくわからない定数とかでややこしいですね．
+        - 参考程度にしましょう…．
+      - [5][\[matplotlibの使い方\] 26. 非連続型水平棒グラフ](https://sabopy.com/py/matplotlib-26/)
+        - これはすごい，シンプルだ！！
+        - かなり参考になりそうです．[3]と合わせて実装の参考にしましょう．
+      
+      …というように，いろいろ調べた結果，`matplotlib`の範囲棒グラフを使ってガントチャートを作れば，サブプロットもできるんじゃね？ということになりました．  
+      というか[3]～[5]のいずれも**サブプロット**に触れてませんね，使う機会がないのかな…？
+  - headline: 実装してみよう
+    body: |
+      …ということで，簡単な時系列データを用いてサブプロットのガントチャートを実装したコードが以下です．
+      ```
+      from datetime import datetime
+      from datetime import timedelta
+      import matplotlib.pyplot as plt
+      import matplotlib.dates as pld
+      import matplotlib.font_manager as plf
+
+
+      fig = plt.figure(figsize=(10, 6))
+      # x軸の範囲の下限(開始時刻)・上限(終了時刻)を取得
+      init = datetime.strptime("2017/01/01 12:04:52.461693", "%Y/%m/%d %H:%M:%S.%f") # .replace(microsecond=0)
+      # init = pld.date2num(datetime.strptime("2017/01/01 12:04:52.461693", "%Y/%m/%d %H:%M:%S.%f") # .replace(microsecond=0))
+      last = datetime.strptime("2017/01/01 12:30:06.161382", "%Y/%m/%d %H:%M:%S.%f") # .replace(microsecond=0)
+      # last = pld.date2num(datetime.strptime("2017/01/01 12:30:06.161382", "%Y/%m/%d %H:%M:%S.%f") # .replace(microsecond=0))
+
+      # 1つ目のサブプロット(今回はこっちにガントチャートを描写)
+      ax1 = fig.add_subplot(2, 1, 1)
+      # グラフタイトル
+      plt.title("Time series GanttChart in (micro)seconds")
+      # x軸の範囲を設定
+      ax1.set_xlim(init, last)
+      # x軸の目盛りの時刻表記を設定
+      ax1.xaxis.set_major_formatter(pld.DateFormatter("%Y/%m/%d %H:%M:%S")) # .%f(マイクロ秒まで表示させるならこれも追加)
+      # x軸の目盛りのレイアウト
+      plt.tick_params(axis="x", labelsize=7, rotation=270)
+      # 横のグリッド線を引く(あった方が横並びが分かりやすい)
+      ax1.grid(axis="y")
+
+      # ガントチャートのデータ
+      # 時系列順になっていたリストをタスク名でgroupbyしたようなもの．
+      # 0番目のキーの0番目の開始時刻が最初の開始時刻である前提．
+      # Key:タスク名, Value:list[(開始時刻, 長さ),...]
+      df = {
+        "Task1": [
+          (datetime.strptime("2017/01/01 12:04:52.461693", "%Y/%m/%d %H:%M:%S.%f"), timedelta(seconds=10)), # .replace(microsecond=0)
+          (datetime.strptime("2017/01/01 12:07:03.523693", "%Y/%m/%d %H:%M:%S.%f"), timedelta(seconds=3)), # .replace(microsecond=0)
+          (datetime.strptime("2017/01/01 12:21:12.392575", "%Y/%m/%d %H:%M:%S.%f"), timedelta(minutes=7)) # .replace(microsecond=0)
+        ],
+        "Task2": [
+          (datetime.strptime("2017/01/01 12:07:30.151975", "%Y/%m/%d %H:%M:%S.%f"), timedelta(minutes=10)), # .replace(microsecond=0)
+          (datetime.strptime("2017/01/01 12:28:03.908538", "%Y/%m/%d %H:%M:%S.%f"), timedelta(seconds=47)) # .replace(microsecond=0)
+        ],
+        "Task3": [
+          (datetime.strptime("2017/01/01 12:14:53.239853", "%Y/%m/%d %H:%M:%S.%f"), timedelta(seconds=600)) # .replace(microsecond=0)
+        ]
+      }
+
+
+      # x軸の目盛りにする時刻を定義
+      # (1)dt秒間隔で表示する場合
+      # dt = 60
+      # dates = []
+      # t = init
+      # while (last - t).total_seconds() >= 0:
+      #   dates.append(t)
+      #   t += timedelta(seconds=dt)
+      # (2)各タスクの開始時刻を表示する場合
+      dates = [df[k][i][0] for k in df.keys() for i in range(len(df[k]))]
+      # 最後の時刻を追加
+      if (last - dates[len(dates) - 1]).total_seconds() > 0:
+        dates.append(last)
+      # datenums = pld.date2num(dates)
+      # x軸の目盛りに設定
+      ax1.set_xticks(dates)
+      # ax1.set_xticks(datenums)
+
+      # ガントチャートの中心軸のy座標の設定
+      # ここでは7.5，15，22.5，...の高さにする．
+      y = [7.5 + i * 10 for i in range(len(df.keys()))]
+      # 一番上の余白を足す
+      y.append(y[len(y) - 1] + 10)
+      # y軸の目盛りとして設定
+      ax1.set_yticks(y)
+
+      # y軸の各目盛りの名前をタスク名にする
+      ax1.set_yticklabels(df.keys())
+
+      # ガントチャートを区間横棒グラフで描写
+      for i, k in enumerate(df.keys()):
+        # 第1引数: list[(開始時刻, 期間)]
+        # 第2引数: (短形の左下の頂点の座標, 高さ)
+        ax1.broken_barh(df[k], (5+i*10, 5), facecolor="red")
+
+      # 2つのグラフ(ax1とax2)の間を十分に空ける
+      plt.subplots_adjust(hspace=0.8)
+
+
+      # 2つ目のサブプロット
+      ax2 = fig.add_subplot(2, 1, 2)
+
+      plt.show()
+      :::output
+      図1，図2に．
+      :::
+      ```
+      ![【図1】](media/2019010_g1.png)
+      ![【図2】](media/2019010_g2.png)
+      x軸の目盛りについて，時間等間隔にするかタスクの開始時刻にするか，で(1)と(2)のコードを書いてありますが，(1)のグラフが図1，(2)のグラフが図2になります．  
+      それぞれ，x軸の目盛りになっている時刻が異なることを確認できると思います．(ちなみに時間等間隔について，`dt=2秒`とかにすると間隔が狭すぎて目盛りが重複して潰れてしまったので`dt=60秒`にしていますｗ)
+      
+      また，ところどころのコメントアウトに`pld.date2num()`を用いたコードがあります．
+      これは`datetime.datetime`型で扱うか，もしくはそれを`matplotlib`標準の時間系データに変換して扱うかの違いなので，どちらかを実行しても同様のグラフが生成されます．
+      
+      最後に，`.replace(microsecond=0)`やx軸の目盛りの時刻表記の`.%f`といったコメントアウトについて，前者はどちらでも良かったですが，後者は有効に実装すると最低単位を秒からマイクロ秒に変えて描写できます．
+      
+      このように，`matplotlib`の基本の書き方の部分多めに，シンプルかつ柔軟に実装できました．
+  - headline: まとめ
+    body: |
+      ガントチャートをサブプロットにして別のグラフと合わせる機会は少ないんでしょうか？  
+      それでも，そうした機会が巡って必要になった時の参考になれたら幸いです(*´ω｀*)
