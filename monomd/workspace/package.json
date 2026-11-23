@@ -1,6 +1,6 @@
 {
   "name": "monomd",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A redundant-free Markdown parser where every symbol has its own unique role.",
   "main": "index.js",
   "scripts": {

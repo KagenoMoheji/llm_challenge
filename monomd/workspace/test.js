@@ -465,6 +465,25 @@ async function runTests() {
         failed++;
     }
 
+    // Test 28: Markdown inside Inline Code vs Inline Code inside Markdown
+    console.log('Test 28: Markdown inside Inline Code vs Inline Code inside Markdown');
+    try {
+        const md = '`~~hoge~~` and ~~`hoge`~~ and `**bold**` and **`bold`**';
+        const result = await renderMarkdown(md);
+        if (result.html.includes('<code>~~hoge~~</code>') && 
+            result.html.includes('<s><code>hoge</code></s>') && 
+            result.html.includes('<code>**bold**</code>') && 
+            result.html.includes('<b><code>bold</code></b>')) {
+            console.log('✅ Pass\n');
+            passed++;
+        } else {
+            throw new Error('Markdown inside inline code incorrectly parsed or wrapped code not parsed');
+        }
+    } catch (error) {
+        console.log(`❌ Fail: ${error.message}\n`);
+        failed++;
+    }
+
     // Summary
     console.log('='.repeat(50));
     console.log(`Tests Passed: ${passed}/${passed + failed}`);
