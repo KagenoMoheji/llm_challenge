@@ -1,0 +1,150 @@
+creator: KagenoMoheji
+createDate: 2021-06-12
+updateDate: !!timestamp 2021-06-12
+title: 【Python】我流requestsラッパ
+tags:
+  - Python
+content:
+  - headline: はじめに
+    body: |
+      今回もPythonです．Pythonばっか書いてるのでしょうがない(遠い目)  
+      今回は，APIを叩く際のコードで，Pythonモジュールの`requests`を我流にラップして使用するようになったのでそのメモです．
+      
+      まず`requests.get()`・`requests.post()`等で普通にAPI叩く分にはラッパを実装する必要ないと思います．  
+      しかしリトライ回数やリトライ待機間隔を指定した上でAPIを叩くために`requests.Session`や`urllib3.util.Retry`を合わせて使う必要が出てきた時に，下記の所感を覚えました．
+      - GET・POST等異なるHTTPリクエストを投げるために，いちいち`requests.Session`や`urllib3.util.Retry`で設定してSession変数にマウントする(ほぼ同じ)コードを書くのが面倒で，多重修正の手間．
+      - ほぼ同じ(設定周り)コードを保持するオブジェクトを1つ作って，使い回すことで，同一HTTPリクエスト設定をするために，各モジュールに`requests`等をimportする必要を無くせないか？
+      
+      【後述コードの動作確認できてる環境】
+      - Python：3.7-3.9
+      - 依存モジュール
+        - requests：2.25.1
+        - urllib3：1.26.5
+  - headline: 我流requestsラッパ
+    body: |
+      前述の所感を解決すべく我流に実装したrequestsモジュールのラッパです．  
+      [Github](https://github.com/KagenoMoheji/MyMiniLibraries/blob/master/Python/mysamples/workspace/myrequests/main/modules/myutils/myrequests.py)にも同じコードを上げてあります．
+      ```python[myrequests.py]
+      import copy
+      import json
+      import requests
+      from requests.adapters import HTTPAdapter
+      from requests.exceptions import RequestException
+      from urllib3.util import Retry
+
+      class MyRequests:
+        def __init__(
+          self,
+          timeout_connect = 10,
+          timeout_read = 30,
+          cnt_retry_request = 3,
+          interval_requests_sec = 5):
+          self._info_req_default = {
+            "timeout_connect": timeout_connect,
+            "timeout_read": timeout_read,
+            "cnt_retry_request": cnt_retry_request,
+            "interval_requests_sec": interval_requests_sec
+          }
+        
+        def _generate_session(
+          self,
+          cnt_retry_request,
+          interval_requests_sec):
+          sess = requests.Session()
+          retries = Retry(
+            total = cnt_retry_request,
+            backoff_factor = interval_requests_sec,
+            status_forcelist = [500, 502, 503, 504])
+          sess.mount("https://", HTTPAdapter(max_retries = retries))
+
+        def _get_info_req(self, info_req_local):
+          info_req = copy.deepcopy(self._info_req_default)
+          if info_req_local is None:
+            return info_req
+          for key in info_req_local:
+            if key in self._info_req_default:
+              info_req[key] = info_req_local[key]
+          return info_req
+        
+        def get(self, url, headers, info_req_local = None):
+          info_req = self._get_info_req(info_req_local)
+          sess = self._generate_session(
+            info_req["cnt_retry_request"],
+            info_req["interval_requests_sec"])
+          return sess.get(
+            url,
+            headers = headers,
+            timeout = (info_req["timeout_connect"], info_req["timeout_read"]))
+        
+        
+        def post(self, url, headers, payload, info_req_local = None):
+          info_req = self._get_info_req(info_req_local)
+          sess = self._generate_session(
+            info_req["cnt_retry_request"],
+            info_req["interval_requests_sec"])
+          return sess.post(
+            url,
+            headers = headers,
+            data = payload, # WARNING: 今回使うとこではjson.dumps()するとエラる
+            timeout = (info_req["timeout_connect"], info_req["timeout_read"]))
+        
+        def patch(self, url, headers, payload, info_req_local = None):
+          info_req = self._get_info_req(info_req_local)
+          sess = self._generate_session(
+            info_req["cnt_retry_request"],
+            info_req["interval_requests_sec"])
+          return sess.patch(
+            url,
+            headers = headers,
+            data = json.dumps(payload), # WARNING: 今回使うとこではjson.dumps()しないととエラる
+            timeout = (info_req["timeout_connect"], info_req["timeout_read"]))
+      ```
+      HTTPリクエスト設定は基本的に下記4つだと思うので，それらを保持するようにクラスフィールドにしています．
+      - 接続タイムアウト
+      - 取得タイムアウト
+      - リトライ回数
+      - リトライ待機間隔
+      
+      またSessionについて，APIで使用する用なので(クラスフィールドとして保持して)あまり長くオブジェクトを持たせたり使い回したりするのは良くないかなと考え，HTTPリクエストを投げる関数ごとに関数`_generate_session()`でSessionオブジェクトを得るように実装しています．  
+      上記のラッパのコードではGET/POST/PATCHのみ実装ですが，必要に応じてDELETE/PUT等追加で良いと思います．私のこの時は必要なかった．
+      
+      更に個別のHTTPリクエスト投げる際に設定を変えたい場合に，引数の`info_req_local`で前述の4つのHTTPリクエスト設定を上書きできるようにしています．
+  - headline: 我流requestsラッパの使用サンプル
+    body: |
+      前述の我流requestsラッパの使用サンプルです．下記について確認できると思います．
+      - 同一HTTPリクエスト設定を持ったオブジェクトを1つ生成し，HTTPリクエストを投げる関数に引数で渡すことで使い回せる．これにより，HTTPリクエストを投げる関数が別モジュールで使用されるときに，同じimportを記述する必要が無くなる．
+      - `requests.Session`や`urllib3.util.Retry`が隠蔽され，繰り返し記述する必要が無くなる．
+      ```
+      from modules.myutils.myrequests import MyRequests
+      from requests.exceptions import RequestException
+
+      def main():
+        req = MyRequests(
+          timeout_connect = 10,
+          timeout_read = 30,
+          cnt_retry_request = 3,
+          interval_requests_sec = 3)
+        test_post(req)
+
+      def test_post(req):
+        try:
+          headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authentication": "Bearer xxxxxx"
+          }
+          payload = {"id": 6}
+          url = "urlurlurlurlurlurlurlurl"
+          res = req.post(url, headers, payload)
+          if res.status_code != 204:
+            raise RequestException("ステータスコードがエラーだぉ")
+        except Exception as e:
+          raise e
+
+      if __name__ == "__main__":
+        main()
+      ```
+  - headline: おわりに
+    body: |
+      最近自称データエンジニア/データサイエンティストからWebアプリ開発者に幅が広がったよ(・∀・)  
+      2ヶ月に1つPJが投入されてて草．

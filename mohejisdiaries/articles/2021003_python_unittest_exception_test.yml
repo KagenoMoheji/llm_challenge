@@ -1,0 +1,184 @@
+creator: KagenoMoheji
+createDate: 2021-05-06
+updateDate: !!timestamp 2021-05-06
+title: 【Python】unittestで例外処理テスト
+tags:
+  - Python
+  - ソフトウェアテスト
+content:
+  - headline: はじめに
+    body: |
+      いつの間にか年度が変わっていますね…記事投稿の間隔が長い…  
+      今回もPythonのお話で，標準モジュールである`unittest`で例外処理の拾えているかをテストするコードについて，個人的所感をまとめます．
+      
+      まず，調べて出てきた方法を挙げてみると，とりわけ参考[1]が分かりやすいですが，**`unittest.TestCase`クラスを継承したクラスで，with構文で`assertRaises()`または`assertRaisesRegex()`を用いる方法**がほとんどを占めているでしょうか．  
+      しかし下記3点の個人的所感を抱えました．
+      - `assertRaises()`は引数msgがあれどエラーメッセージの一致判定を行っておらず，コンテキストマネージャ変数を用いて別途assertを用意しないといけない．
+      - `assertRaisesRegex()`はエラーメッセージの一致判定も正規表現で行ってくれるが，想定と異なる例外が投げられた際に，【出力1】のようにFAILUREではなくERRORと判定され，テストのSUCCESS/FAILUREと違った結果が出てしまう．
+      ```[【出力1】]
+      :::output
+      E
+      ======================================================================
+      ERROR: test_err_sample2 (__main__.TestException)
+      ----------------------------------------------------------------------
+      Traceback (most recent call last):
+        File "...", line 47, in test_err_sample2
+          sample()
+        File "...", line 30, in sample
+          raise ValueError("aaa")
+      ValueError: aaa
+
+      ----------------------------------------------------------------------
+      Ran 1 test in 0.005s
+
+      FAILED (errors=1)
+      :::
+      ```
+
+      結局のところ，`assertRaisesRegex()`でERRORはFAILの1つと見なしながらテストすればそれで良いですが…ｗ  
+      ちょっと気になったので，我流テストコードを作ってみることにしました．
+      
+      【参考】
+      - [1][Python Tips： unittest で例外のテストをしたい](https://www.lifewithpython.com/2018/11/python-testing-exceptions-with-unittest.html#2-%E4%BE%8B%E5%A4%96%E3%81%AE%E3%83%A1%E3%83%83%E3%82%BB%E3%83%BC%E3%82%B8%E3%82%82%E5%90%AB%E3%82%81%E3%81%A6%E3%83%86%E3%82%B9%E3%83%88%E3%81%99%E3%82%8B)
+  - headline: 我流テストコードのためのMyTestCaseクラスを実装
+    body: |
+      まず我流の例外処理テストのassert関数を`unittest.TestCase`クラスに追加拡張させた`MyTestCase`クラスを下記コードで実装します．
+      ```python[mytest/modules/myunittest.py]
+      import unittest
+      import traceback
+
+      class MyTestCase(unittest.TestCase):
+        def assertException(self, func, expect_exception):
+          def run(*args, **kwargs):
+            ret = None
+            try:
+              ret = func(*args, **kwargs)
+            except Exception as e:
+              # エラー名の検証
+              self.assertEqual(
+                expect_exception.__class__.__name__,
+                e.__class__.__name__)
+              # エラーメッセージの検証
+              self.assertRegex(
+                traceback.format_exception_only(type(e), e)[0].rstrip("\n"),
+                "^{}$".format(traceback.format_exception_only(type(expect_exception), expect_exception)[0].rstrip("\n")))
+              return ret
+            return run
+      ```
+  - headline: MyTestCaseクラスを使ってみる
+    body: |
+      unittest.TestCaseクラスの代わりにMyTestCaseクラスを継承させて例外処理テストをSUCCESS/FAILUREの両方で行ってみます．
+      ```python[mytest/sample_myunittest.py]
+      import unittest
+      from modules.myunittest import MyTestCase
+
+      def sample1(msg):
+        raise KeyError(msg)
+
+      def sample2(msg):
+        raise KeyError(msg + "61" + msg)
+
+      def sample3(msg):
+        raise ValueError(msg)
+
+      class TestException(MyTestCase):
+        def test_err_sample1_success(self):
+          self.assertException(
+            sample1,
+            KeyError("aaa") # ここで想定する例外・エラー．※メッセージは正規表現可．
+          )(
+            # ここにsample1の引数
+            "aaa"
+          )
+            
+        def test_err_sample1_fail(self):
+          '''
+          わざとエラーメッセージを違うものにする
+          '''
+          self.assertException(
+            sample1,
+            KeyError("aaa") # ここで想定する例外・エラー．※メッセージは正規表現可．
+          )(
+            # ここにsample1の引数
+            "aaab"
+          )
+        
+        def test_err_sample2_success(self):
+          self.assertException(
+            sample2,
+            KeyError("aaa[0-9].+aaa") # ここで想定する例外・エラー．※メッセージは正規表現可．
+          )(
+            # ここにsample2の引数
+            "aaa"
+          )
+        
+        def test_err_sample3_fail(self):
+          '''
+          わざと異なるエラー名にする
+          '''
+          self.assertException(
+            sample3,
+            KeyError("aaa") # ここで想定する例外・エラー．※メッセージは正規表現可．
+          )(
+            # ここにsample3の引数
+            "aaa"
+          )
+
+      if __name__ == "__main__":
+        unittest.main() # argv=['first-arg-is-ignored'], exit=False
+      :::output
+      F..F
+      ======================================================================
+      FAIL: test_err_sample1_fail (__main__.TestException)
+      わざとエラーメッセージを違うものにする
+      ----------------------------------------------------------------------
+      Traceback (most recent call last):
+        File "mytest/modules/myunittest.py", line 24, in run
+          try:
+        File "...", line 11, in sample1
+          raise KeyError(msg)
+      KeyError: 'aaab'
+
+      During handling of the above exception, another exception occurred:
+
+      Traceback (most recent call last):
+        File "...", line 32, in test_err_sample1_fail
+          self.assertException(
+        File "mytest/modules/myunittest.py", line 32, in run
+          # エラー短文の比較
+      AssertionError: Regex didn't match: "^KeyError: 'aaa'$" not found in "KeyError: 'aaab'"
+
+      ======================================================================
+      FAIL: test_err_sample3_fail (__main__.TestException)
+      わざと異なるエラー名にする
+      ----------------------------------------------------------------------
+      Traceback (most recent call last):
+        File "mytest/modules/myunittest.py", line 24, in run
+          try:
+        File "...", line 17, in sample3
+          raise ValueError(msg)
+      ValueError: aaa
+
+      During handling of the above exception, another exception occurred:
+
+      Traceback (most recent call last):
+        File "...", line 51, in test_err_sample3_fail
+          self.assertException(
+        File "mytest/modules/myunittest.py", line 26, in run
+          except Exception as e:
+      AssertionError: 'KeyError' != 'ValueError'
+      - KeyError
+      + ValueError
+
+
+      ----------------------------------------------------------------------
+      Ran 4 tests in 0.009s
+
+      FAILED (failures=2)
+      :::
+      ```
+      `assertRaisesRegex()`と違い，想定と異なるエラー名でもFAILUREと判定できていますね．
+  - headline: 終わりに
+    body: |
+      いや，別に"assertRaisesRegex()"でも良いんですよｗ  
+      気になっただけです…(´・ω・`)

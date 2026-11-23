@@ -1,0 +1,404 @@
+creator: KagenoMoheji
+createDate: 2021-06-12
+updateDate: !!timestamp 2021-06-12
+title: 【Python】我流logging使用方法 ~Databricks版を添えて~
+tags:
+  - Python
+  - Databricks
+  - Spark
+  - 分散処理
+  - 並列処理
+content:
+  - headline: はじめに
+    body: |
+      どうも，本日2記事目です．これまたまたまたPythonです．  
+      本記事では，初めてPython標準モジュール`logging`を使った際，色々詰まったのでメモをまとめてみました．  
+      いや～～難しいですね～`logging`…初見殺しですかねぇ～．  
+      慣れたら早いと思いますけどねｗ
+      
+      とまぁ置いときまして，慣れてきたときに`logging`に対して下記の所感を覚えました．
+      - `logging.config.dictConfig()`を使った，外部化させた`logging`用設定ファイルでの設定・読み込みをスマートに実装したい．
+      - `logging`自体がシングルトンであるため，コード全体の冒頭で`logging`用設定を読み込ませて以降，他のモジュールにて読み込ませなくてよいが，オブジェクトを共有(使いまわしている)感覚がしないので，設定が有効になっているかわかりにくくなりそう．
+      - 各モジュールに`import logging`してグローバルな`logger`オブジェクトを用意するのがなんかキモい．`logging`用設定を読み込ませた場所がわかりにくくなりそうだし読み込まれている事が共有されていると意識しにくそう(さっきと同じこと言ってる)．
+      - 関数のテストするときに`logger`によるログ出力処理を動かしたくないとかの時，モジュールにおけるグローバルな`logger`オブジェクトであるために動いてしまう不憫さがあり，ログ出力処理の有無切り替えを柔軟にできるようにしたい．
+      - なんか参考[1]によると，`import logging`を各モジュールでやってしまうダメパターンやられたくないな．
+      
+      つまり，`logging`がシングルトンであるがゆえの使いまわし方と`logging`用設定読み込み周りでつまずきやすそうなので少し分かりやすいと思う我流の実装のメモをしますよ，ということですね．
+      
+      【参考】
+      - [1][ログ出力のための print と import logging はやめてほしい | Qiita](https://qiita.com/amedama/items/b856b2f30c2f38665701#import-logging-%E3%81%99%E3%82%89%E8%85%B9%E7%AB%8B%E3%81%9F%E3%81%97%E3%81%84)
+      
+      【後述コードの動作確認できてる環境】
+      - Python：3.7-3.9
+  - headline: 我流logging使用方法
+    body: |
+      我流の`logging`の使用方法としているコードを記載していきます．  
+      [Github](https://github.com/KagenoMoheji/MyMiniLibraries/tree/master/Python/mysamples/workspace/mylogging/main)にも同じコードを上げてあります．  
+      大きく分けて下記3つで説明していきます．
+      - (1)`logging`のラッパ
+      - (2)外部ファイル化させた`logging`用設定ファイル
+      - (3)使用サンプル
+      
+      ### (1)`logging`のラッパ
+      下記のように，コード全体の冒頭で`logging`用設定ファイルを読み込ませる初期化関数`init_logging()`と，loggerオブジェクトを取得する関数`get_logger()`の2つを実装しています．  
+      関数`init_logging()`において，引数に`CONF_LOGGER`と`filename`の2つがあります．`CONF_LOGGER`は後述する`logging`用設定を戻り値とする関数です．そして`filename`はログファイル名ですが，もし指定がなかった場合に，`CONF_LOGGER`から得た辞書型の`logging`用設定からファイル出力のハンドラ関係の設定を除去する(標準出力のみになる)ように実装しています．  
+      更にここで`import logging`は一切していないし，このラッパを使わせることで`import logging`を他の人がやってしまう懸念を抑える意図もあります(教育的)．
+      ```python[(1)logger.py]
+      import os
+      from logging import getLogger
+      from logging.config import dictConfig
+
+      def init_logging(CONF_LOGGER, filename = None):
+        '''
+        - Args
+          - CONF_LOGGER:func: loggingの辞書型設定を戻り地とする関数．
+          - filename:str: ログ出力ファイル名．ファイル出力したくない場合はNoneを．
+        '''
+        NAME_FILEHANDLER = "fileHandler"
+        conf_logger = CONF_LOGGER(filename)
+
+        if filename:
+          os.makedirs("/".join(filename.split("/")[:-1]) + "/", exist_ok = True)
+        else:
+          del conf_logger["handlers"][NAME_FILEHANDLER]
+          for logger in conf_logger["loggers"]:
+            if NAME_FILEHANDLER in conf_logger["loggers"][logger]["handlers"]:
+              pre_handlers = conf_logger["loggers"][logger]["handlers"]
+              conf_logger["loggers"][logger]["handlers"] = [handler for handler in pre_handlers if handler != NAME_FILEHANDLER]
+
+        dictConfig(conf_logger)
+
+      def get_logger(appname):
+        return getLogger(appname)
+      ```
+
+      ### (2)`logging`用設定ファイル
+      `logging`用設定を記述した辞書型を返す関数`CONF_LOGGER()`のみです．  
+      ログ出力フォーマットやハンドラ，そして`logger`オブジェクトの定義ををするところですね．  
+      参考[2]で`logging`用設定に関してわかりやすくまとめられているので参考にしてください．  
+      個人的にはキー`loggers`と`root`以外はデフォルトとして基本変更せずに使っていただいて，(検証が済んで)本当に必要な場合に変更するという気持ちで関数`CONF_LOGGER()`を使っていただきたいと考えてます．  
+      どうしても変更する際は，(1)の関数`init_loggin()`において関数`CONF_LOGGER()`の戻り値を格納した辞書型変数に対し，値を上書き・追加するコードを追記して検証してから検討するのが良いと思います．
+      
+      【参考】
+      - [2][Pythonでprintを卒業してログ出力をいい感じにする | Qiita](https://qiita.com/FukuharaYohei/items/92795107032c8c0bfd19#3-%E7%92%B0%E5%A2%83%E8%A8%AD%E5%AE%9A%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E3%82%92%E4%BD%BF%E3%81%86)
+
+      ```python[(2)config_logging.py]
+      def CONF_LOGGER(filename):
+        return {
+          "version": 1,
+          "disable_existing_loggers": False,
+          "formatters": {
+            "default": {
+              "format": "%(asctime)s.%(msecs)03d@%(filename)s:%(levelname)s: %(message)s",
+              "datefmt": "%Y-%m-%d %H:%M:%S"
+            }
+          },
+          "handlers": {
+            "consoleHandler": {
+              "class": "logging.StreamHandler",
+              "level": "INFO",
+              "formatter": "default", # "formatters"から選択
+              "stream": "ext://sys.stdout"
+            },
+            "fileHandler": {
+              "class": "logging.FileHandler",
+              "level": "INFO",
+              "formatter": "default", # "formatters"から選択
+              "filename": filename
+            }
+          },
+          "loggers": {
+            "__main__": {
+              "level": "INFO",
+              "handlers": ["consoleHandler", "fileHandler"], # "handlers"から選択
+              "propagate": False
+            },
+            "modules": { # パッケージでの指定もできるらしい．すごいね
+              "level": "WARNING",
+              "handlers": ["consoleHandler", "fileHandler"], # "handlers"から選択
+              "propagate": False
+            }
+          },
+          # "root": {
+          #   "level": "WARNING"
+          # }
+        }
+      ```
+      
+      ### (3)使用サンプル  
+      メインモジュール`app.py`と外部モジュールで`logging`使うサンプル`a.py`を実装しています．  
+      ここでのポイントは，下記の2つあります．
+      - `logging`のモジュールは一切importして使わせず，(1)のラッパを使ってもらう．
+      - 外部モジュール(ここでは`a.py`)の関数を含む他の関数内でloggerオブジェクトを使いたい際は，その関数にオプショナル引数として関数`get_logger()`を受け取る引数(デフォルト値は`None`)を用意し，ログ出力させたい場合に関数`get_logger()`を関数に渡せば良いように実装する．
+      
+      上記により，冒頭の問題に挙げた「各モジュールにおけるグローバルなloggerオブジェクト」と「loggerオブジェクトによるログ出力処理の有無切り替えを柔軟にしたい」を解決していると考えます．
+      ```python[(3)app.py]
+      from conf.conf_logging import CONF_LOGGER
+      from modules.logger.logger import (
+        init_logging,
+        get_logger
+      )
+      from modules.md_a.a import (
+        func_warn, func_error
+      )
+
+      def main():
+        # アプリ全体で用いるロギングの初期設定とloggerオブジェクト取得
+        init_logging(
+          CONF_LOGGER,
+          PYPATH + "./../logs/test.log")
+        logger = get_logger(__name__)
+
+        logger.info("Start app.")
+
+        func_warn("hoge", get_logger = get_logger)
+        func_error("fuga")
+
+      if __name__ == "__main__":
+        main()
+      ```
+      ```python[(3)modules/md_a/a.py]
+      def func_warn(name, get_logger = None):
+        logger = None
+        if get_logger is not None:
+          logger = get_logger(__name__)
+
+        if logger is not None:
+          logger.info("Run func_warn.")
+
+        msg = "{} is dangerous.".format(name)
+        print(msg)
+        if logger is not None:
+          logger.warn(msg)
+
+
+      def func_error(name, get_logger = None):
+        logger = None
+        if get_logger is not None:
+          logger = get_logger(__name__)
+        
+        if logger is not None:
+          logger.info("Run func_error.")
+        
+        msg = "Attacked by {}.".format(name)
+        print(msg)
+        if logger is not None:
+          logger.error(msg)
+      ```
+  - headline: Databricks版ログ出力
+    body: |
+      ここからはちょっと特殊な，Databricksにおけるログ出力の実装の話です．  
+      Databricksを使う上で，DatabricksFileStoreにコード上の挙動を書き出すログ出力をしたかったのですが，Sparkによる分散処理の性質上，Python標準モジュール`logging`を使うとうまくファイル出力できなかったことと，自作のログ出力モジュールを実装するにもちょっと厄介だったのでメモします．  
+      一応補足すると，DatabricksではNotebook形式で実行結果を表示してくれる機能がありますが…一応，一応ね，ログファイルも出しとこうということです．  
+      【下記コードの動作確認できてる環境】
+      - Python：3.8
+      
+      [Github](https://github.com/KagenoMoheji/MyMiniLibraries/blob/master/Python/mysamples/workspace/mylogging/main/modules/myutils/mylogger_databricks.py)にも同じコードを上げてあります．
+      
+      なお，すべての外部ファイルのコードを載せるのが面倒だったので，下記コードが依存している下記2つの自作モジュールのGithubリンクを貼っておきます(同じディレクトリに置いてあります)．
+      - [mydbutils.py](https://github.com/KagenoMoheji/MyMiniLibraries/blob/master/Python/mysamples/workspace/mylogging/main/modules/myutils/mydbutils.py)
+      - [mysingleton.py](https://github.com/KagenoMoheji/MyMiniLibraries/blob/master/Python/mysamples/workspace/mylogging/main/modules/myutils/mysingleton.py)
+      
+      Databricks版ログ出力`mylogger_databricks.py`におけるポイントとしては下記になります．
+      - Sparkの分散処理の性質上Pythonから同一ログファイルに対し追記等書き出しを行えないので，「各ログ出力関数(`debug()`/`info()`など)の実行ごとに一時ファイルの書き出しを行い，`dbutils.fs.cp`によるログファイル上書きをする」実装により，同一ログファイルの追記処理を実現しました．
+      - 一時ファイルにおいても，直前のログ出力が間に合っていないログファイルを読み込ませるのは良くないので，シングルトンクラス`TmpLogStacks`を実装し，「直前のログ出力が完了するまで読み込みを待機させる」ようにしました．
+      なお`TmpLogsStacks`がシングルトンである理由は，分散処理において各ワーカーノードが異なるオブジェクトを持って操作してしまう懸念をなくすためです．
+      
+      Databricks版ログ出力クラス`MyLogger`もシングルトンにするか悩みましたが，今の所困っていないので，ひとまずシングルトンにしていません．困ったらシングルトンにするかもです．
+      ```python[mylogger_databricks.py]
+      import os
+      import re
+      import uuid
+      from datetime import (
+        datetime as dt,
+        timedelta,
+        timezone
+      )
+      import time
+      from modules.myutils.mydbutils import ( # 実際は"%run"でインポートさせてる．
+        dbfs_path_spark2nonspark,
+        dbutils_exists
+      )
+      from modules.myutils.mysingleton import Singleton # 実際は"%run"でインポートさせてる．
+
+      TZ_JST = timezone(timedelta(hours = 9), "JST")
+
+      class TmpLogStacks(Singleton):
+        __stacks_started = {}
+        __stacks_completed = {}
+        def _init_instance(self):
+          TmpLogStacks.__stacks_started = {}
+          TmpLogStacks.__stacks_completed = {}
+        
+        @staticmethod
+        def clear_stacks():
+          TmpLogStacks.__stacks_started = {}
+          TmpLogStacks.__stacks_completed = {}
+        
+        @staticmethod
+        def push_started(fname_target, fname_tmp):
+          if fname_target in TmpLogStacks.__stacks_started.keys():
+            TmpLogStacks.__stacks_started[fname_target].append(fname_tmp)
+          else:
+            TmpLogStacks.__stacks_started[fname_target] = [fname_tmp]
+          # print("Pushed started: {}".format(TmpLogStacks.__stacks_started))
+            
+        @staticmethod
+        def push_completed(fname_target, fname_tmp):
+          if fname_target in TmpLogStacks.__stacks_completed.keys():
+            TmpLogStacks.__stacks_completed[fname_target].append(fname_tmp)
+          else:
+            TmpLogStacks.__stacks_completed[fname_target] = [fname_tmp]
+          # print("Pushed completed: {}".format(TmpLogStacks.__stacks_completed))
+
+        @staticmethod
+        def get_pre_started(fname_target, fname_tmp):
+          if not fname_target in TmpLogStacks.__stacks_started.keys():
+            return None
+          if not fname_tmp in TmpLogStacks.__stacks_started[fname_target]:
+            return None
+          return TmpLogStacks.__stacks_started[fname_target][TmpLogStacks.__stacks_started[fname_target].index(fname_tmp) - 1]
+        
+        @staticmethod
+        def get_pre_completed(fname_target, fname_tmp):
+          if not fname_target in TmpLogStacks.__stacks_completed.keys():
+            return None
+          if not fname_tmp in TmpLogStacks.__stacks_completed[fname_target]:
+            return None
+          return TmpLogStacks.__stacks_completed[fname_target][TmpLogStacks.__stacks_completed[fname_target].index(fname_tmp) - 1]
+
+        @staticmethod
+        def count_started(fname_target):
+          if not fname_target in TmpLogStacks.__stacks_started.keys():
+            return 0
+          return len(TmpLogStacks.__stacks_started[fname_target])
+        
+        @staticmethod
+        def get_last_completed(fname_target):
+          if not fname_target in TmpLogStacks.__stacks_completed.keys():
+            return None
+          return TmpLogStacks.__stacks_completed[fname_target][-1]
+
+
+      class MyLogger():
+        __DIR_TMP_LOGS = "dbfs:/FileStore/logs/tmp" # FS_ROOT_SPARK + "/logs/tmp"
+        __MAP_LOGLEVEL = {
+          "DEBUG": 1,
+          "INFO": 2,
+          "WARNING": 3,
+          "ERROR": 4,
+          "CRITICAL": 5
+        }
+        def __init__(self,
+          loglevel,
+          fmt_log = "{asctime}.{msecs:03d}@{appname}:{levelname}: {message}",
+          fmt_date = "{Y:04d}-{m:02d}-{d:02d} {H:02d}:{M:02d}:{S:02d}",
+          console = True,
+          fname = None,
+          appname = "APPNAME"):
+          if not loglevel in self.__MAP_LOGLEVEL.keys():
+            raise ValueError(
+              "loglevel should selected from {}.".format(self.__MAP_LOGLEVEL.keys()))
+          self.__loglevel = loglevel
+          self.__fmt_log = fmt_log
+          if re.fullmatch(r"^.*{msecs:0[1-9][0-9]*d}.*$", self.__fmt_log):
+            self.__len_msecs = int(re.search(r"{msecs:0([1-9][0-9]*)d}", self.__fmt_log).group(1))
+            if self.__len_msecs > 6:
+              # マイクロ秒の6桁を超える桁数だったら⑥桁にする
+              self.__fmt_log = re.sub(r"{msec:0[1-9][0-9]*d)}", "{msecs:06d}", self.__fmt_log)
+              self.__len_msecs = 6
+          else:
+            self.__len_msecs = 3
+          self.__fmt_date = fmt_date
+          self.__console = console
+          self.__fname = fname
+          self.__appname = appname
+
+          # (一時・最終)ログファイル出力先のディレクトリがなければ作っておく
+          dbutils.fs.mkdirs(self.__DIR_TMP_LOGS)
+          dbutils.fs.mkdirs("/".join(self.__fname.split("/")[:-1]) + "/")
+
+          # 一時ログファイルのシングルトンスタック(TmpLogStacks)の中身をクリア
+          TmpLogStacks.clear_stacks()
+
+        def __del__(self):
+          # MyLoggerオブジェクトが削除される際に，一時ファイルをすべて消す
+          dbutils.fs.rm(self.__DIR_TMP_LOGS, recurse = True)
+        
+        def __output(self, msg, loglevel, appname = None) -> Exception:
+          if self.__MAP_LOGLEVEL[loglevel] < self.__MAP_LOGLEVEL[self.__loglevel]:
+            return None
+          now = dt.now(TZ_JST)
+          log = self.__fmt_log.format(
+            asctime = self.__fmt_date.format(
+              Y = now.year, m = now.month, d = now.day,
+              H = now.hour, M = now.minute, S = now.second),
+            msecs = int(now.microsecond / pow(10, (6 - self.__len_msecs))),
+            appname = appname if appname else self.__appname,
+            levelname = loglevel,
+            message = msg)
+          if self.__fname is not None:
+            try:
+              fname_tmp = "{0}{1}_{2}.log".format(
+                self.__DIR_TMP_LOGS,
+                int(time.mktime(now.timetuple())),
+                str(uuid.uuid4()))
+              TmpLogStacks.push_started(self.__fname, fname_tmp)
+              pre_log = ""
+              if TmpLogStacks.count_started(self.__fname) > 1:
+                pre_fname = TmpLogStacks.get_pre_started(self.__fname, fname_tmp)
+                while pre_fname != TmpLogStacks.get_last_completed(self.__fname):
+                  time.sleep(1)
+                with open(dbfs_path_spark2nonspark(pre_fname_tmp), mode = "r", encoding = "utf-8") as f:
+                  pre_log = f.read()
+                dbutils.fs.rm(pre_fname_tmp)
+              else:
+                if dbutils_exists(self.__fname):
+                  # 同じ最終出力ファイルが既存だった場合，そのログを取得しておく
+                  with open(dbfs_path_spark2nonspark(self.__fname), mode = "r", encoding = "utf-8") as f:
+                    pre_log = f.read()
+              dbutils.fs.put(fname_tmp, pre_log + log + "\n")
+              dbutils.fs.cp(fname_tmp, self.__fname)
+              TmpLogStacks.push_completed(self.__fname, fname_tmp)
+            except Exception as e:
+              return e
+          if self.__console:
+            print(log)
+          return None
+        
+        def debug(self, msg, appname = None):
+          err = self.__output(msg, "DEBUG", appname)
+          if err is not None:
+            raise err
+        def info(self, msg, appname = None):
+          err = self.__output(msg, "INFO", appname)
+          if err is not None:
+            raise err
+        def warn(self, msg, appname = None):
+          err = self.__output(msg, "WARNING", appname)
+          if err is not None:
+            raise err
+        def error(self, msg, appname = None):
+          err = self.__output(msg, "ERROR", appname)
+          if err is not None:
+            raise err
+        def critical(self, msg, appname = None):
+          err = self.__output(msg, "CRITICAL", appname)
+          if err is not None:
+            raise err
+      ```
+
+      下記にDatabricks版ログ出力クラス`MyLogger`を使ったサンプルコードを軽く載せます．
+      ```python[app.py]
+      logger = MyLogger(
+        "INFO",
+        console = True,
+        fname = "dbfs:/FileStore/logs/sample.log",
+        appname = "app")
+
+      logger.info("infotest")
+      logger.debug("debugtest")
+      ```
+  - headline: おわりに
+    body: |
+      ロギング難しいね

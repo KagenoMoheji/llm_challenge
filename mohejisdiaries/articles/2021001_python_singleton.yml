@@ -1,0 +1,154 @@
+creator: KagenoMoheji
+createDate: 2021-01-21
+updateDate: !!timestamp 2021-01-21
+title: 【Python】Singleton実装を極めてみる
+tags:
+  - Python
+  - Spark
+  - 分散処理
+  - 並列処理
+  - 自然言語処理
+  - Databricks
+content:
+  - headline: Singletonについてさっくり
+    body: |
+      いつの間にか年が変わっていますね…
+      
+      Singletonは簡単に言うと「1度インスタンス化されたら2度目以降はインスタンス化されないようにするデザインパターン」ということになります．  
+      Singletonパターンは，参考[1]のようにSparkのように分散処理するノードに対しオブジェクトを渡したいけど，型制約によりオブジェクトを渡せない際に，初回のみインスタンス化によって2回目以降のインスタンス化を軽量化させて対応させるといったことに活用できる手法です．
+  - headline: 今回実装するSingletonコードとは
+    body: |
+      PythonでのSingletonパターンの実装に関する記事は，ググればかなり出てきます．  
+      `__new__`を使うパターンと静的関数でインスタンスをフィールドに格納するパターンといった，だいたい2パターンで紹介されていると思います．  
+      ただ今回は，下記の3つ要件を満たすサンプルコードが見当たらず，少々工夫したので記事にまとめます．
+      - (1)例えば形態素解析器のインスタンスをSingletonクラスのフィールドに持たせる時，importを含む複数行に渡るコードを書く必要がある．
+      - (2)初回インスタンス化時のみ呼び出す関数に上記の処理を書きたい．
+      - (3)それでいて，Singletonスーパークラスを実装して機能集約させて使い回せるようにしたい．
+      
+      さて，上記の要件を満たすSingletonパターンの実装について，参考リンクの手法をなぜ採用しなかったか述べていきます．  
+      参考[1]については，まさしく今回の要件が発生した目的に一致していたため最もヒントになりました．  
+      しかしこちらのサイトでは`__call__`が用いられている一方で，PythonのSingletonパターンの実装を調べると`__new__`を用いる実装があり，`__new__`での実装の方がスッキリできそうだったので，こちらで実装してみたいと考えました．  
+      次に参考[2]について，`__new__`を使ったSingletonクラスを実装していますが，Singletonクラスのサブクラスにて`__init__`が用いられることでクラスを呼び出すたびに`__init__`の処理が呼び出されることになり，Singletonかというと微妙に違うような…そんな気がします(setter使ってフィールド更新するとかならまだ分かる)．  
+      さらに，要件(1)で例示した形態素解析器のインスタンスをSingletonクラスのフィールドに持たせるためにインスタンス化するコードを`__init__`に書いた場合，そのインスタンス化が毎回実行されてしまうことになり，例えばユーザ辞書の読み込みで重くなる，といったことが起こりえます．  
+      最後に参考[3]について，こちらも`__new__`を用いた実装になっていますが，Singletonクラスのようにスーパークラスを用意して使い回すということは想定していないサンプルコードになっています．
+      
+      【参考】
+      - [1][レコメンド#2 Sparkで機械学習モデルを高速分散推論させる](https://ariseanalytics.com/activities/report/20201220-2/)
+      - [2][Pythonで、デザインパターン「Singleton」を学ぶ | Qiita](https://qiita.com/ttsubo/items/c4af71ceba15b5b213f8#-singleton%E3%81%AE%E3%82%B5%E3%83%B3%E3%83%97%E3%83%AB%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%A0)
+      - [3][Python でシングルトンパターンを実装する](https://blog.bitmeister.jp/?p=4806)
+  - headline: Singletonスーパークラス
+    body: |
+      では，Singletonスーパークラスのコードを実装してみます．  
+      【使用バージョン】
+      - Python3.7.9
+
+      ```python[mysingleton.py]
+      class Singleton(object):
+        def __new__(cls, *args, **kwargs):
+          if not hasattr(cls, "_instance"):
+            print("Singletonサブクラスの初回インスタンス化")
+            cls._instance = super(Singleton, cls).__new__(cls)
+            cls._instance._init_instance(*args, **kwargs)
+          else:
+            print("Singletonサブクラスのインスタンス化済みです")
+          return cls._instance
+        
+        def _init_instance(*args, **kwargs):
+          pass
+      ```
+      Singletonスーパークラスを用いるにあたり，Singletonスーパークラスを継承するサブクラスにおける個人的な実装ルールが4つあります．
+      - 初回インスタンス化時のみ実行する処理は，関数`_init_instance`をオーバーライド(`@staticmethod`は付けない)する形で実装する．
+      - 関数`_init_instance`や関数`_init_instance`で(初回インスタンス化時のみ)呼び出す関数の関数名は`_`で始めるものとする．
+      - 上記の関数名と区別するため，Singletonスーパークラスを継承するサブクラスにおけるPrivate関数の関数名は`__`で始めるものとする．
+      - Singletonスーパークラスを継承するサブクラスにおける初回インスタンス化のみ呼び出す関数以外の関数は，基本的に(`@staticmethod`を付けて)静的関数である．(Private関数まで静的にするかはちょっと微妙にわからん)
+      
+      Singletonスーパークラスについて，大部分は参考[2]と同じですが，異なるのは関数`_init_instance`を追加していることです．そしてこの関数`_init_instance`を初回インスタンス化と一緒に実行させています．  
+      これにより，Singletonスーパークラスを継承したサブクラスで関数`_init_instance`をオーバーライドした処理が初回インスタンス化の直後のみに実行されるようになります．
+  - headline: 使用サンプル
+    body: |
+      Singletonスーパークラスを用いたサンプルコードを実装してみます．  
+      今回はJanomeによる形態素解析器のSingleton実装です．
+      ```python[sample_tokenizer.py]
+      import pandas as pd
+      from mysingleton import Singleton
+      class JanomeTokenizer(Singleton):
+        tokenizer = None
+
+        def _init_instance(self, udic = None, udic_type = "ipadic"):
+          JanomeTokenizer.tokenizer = JanomeTokenizer._create_tokenizer(udic, udic_type)
+        
+        def _create_tokenizer(udic = None, udic_type = "ipadic"):
+          from janome.tokenizer import Tokenizer
+          t = None
+          if udic is None:
+            t = Tokenizer()
+          else:
+            t = Tokenizer(udic, udic_type = udic_type, udic_enc = "utf8")
+          return t
+
+        @staticmethod
+        def str_joined_tokenize(s, list_stopword = [], sep = "|"):
+          tokens = JanomeTokenizer.tokenize(s, list_stopword = list_stopword)
+          return sep.join([token.surface for token in tokens])
+        
+        @staticmethod
+        def tokenize(s, list_stopword = []):
+          return JanomeTokenizer.__remove_stopwords(
+            JanomeTokenizer.tokenizer.tokenize(s),
+            list_stopword = list_stopword
+          )
+        
+        @staticmethod
+        def __remove_stopwords(tokens, list_stopword = []):
+          new_tokens = []
+          for token in tokens:
+            if "記号,空白,*,*" in token.part_of_speech:
+              continue
+            if "記号,括弧開,*,*" in token.part_of_speech:
+              continue
+            if "記号,括弧閉,*,*" in token.part_of_speech:
+              continue
+            if "助詞,連体化,*,*" in token.part_of_speech:
+              continue
+            if token.surface in list_stopword:
+              continue
+            new_tokens.append(token)
+          return new_tokens
+
+      def addcol_str_joined_tokenize(df, target_cols, udic = None, udic_type = "ipadic", list_stopword = [], sep = "|"):
+        def __apply_tokenize(field):
+          return JanomeTokenizer(udic = udic, udic_type = udic_type) \
+            .str_joined_tokenize(field, list_stopword = list_stopword, sep = sep)
+        for target_col in target_cols:
+          colname_joined_tokens = "tokens_" + target_col
+          df[colname_joined_tokens] = df[target_col].apply(__apply_tokenize)
+        return df
+
+      list_s = [
+        "こんにちは，私の名前はもへじです．",
+        "今夜は月が綺麗ですね．",
+        "明日も残業かなぁ？"
+      ]
+      df = pd.DataFrame(list_s, columns = ["sentence"])
+      options = {
+        "udic": None,
+        "udic_type": "ipadic",
+        "list_stopword": ["．", "，"],
+        "sep": "|"
+      }
+      df = addcol_str_joined_tokenize(df, ["sentence"], **options)
+      print(df)
+      :::output
+      Singletonサブクラスの初回インスタンス化
+      Singletonサブクラスのインスタンス化済みです
+      Singletonサブクラスのインスタンス化済みです
+                  sentence        tokens_sentence
+      0  こんにちは，私の名前はもへじです．  こんにちは|私|名前|は|も|へ|じ|です
+      1        今夜は月が綺麗ですね．       今夜|は|月|が|綺麗|です|ね
+      2          明日も残業かなぁ？         明日|も|残業|か|なぁ|？
+      :::
+      ```
+      3つの文章をSingletonの形態素解析器インスタンスで形態素解析していますが，2つ目以降で再インスタンス化を防止できていることを確認できると思います．
+  - headline: 終わりに
+    body: |
+      PySpark実装で色々工夫がいるよな～って感じるこの頃です．
