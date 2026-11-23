@@ -1,5 +1,154 @@
 [
   {
+    "id": "2021005",
+    "fileName": "2021005_python_logging_wrapper.yml",
+    "title": "【Python】我流logging使用方法 ~Databricks版を添えて~",
+    "createDate": "2021-06-12",
+    "updateDate": "2021-06-12",
+    "tags": [
+      "Python",
+      "Databricks",
+      "Spark",
+      "分散処理",
+      "並列処理"
+    ]
+  },
+  {
+    "id": "2021004",
+    "fileName": "2021004_python_requests_wrapper.yml",
+    "title": "【Python】我流requestsラッパ",
+    "createDate": "2021-06-12",
+    "updateDate": "2021-06-12",
+    "tags": [
+      "Python"
+    ]
+  },
+  {
+    "id": "2021003",
+    "fileName": "2021003_python_unittest_exception_test.yml",
+    "title": "【Python】unittestで例外処理テスト",
+    "createDate": "2021-05-06",
+    "updateDate": "2021-05-06",
+    "tags": [
+      "Python",
+      "ソフトウェアテスト"
+    ]
+  },
+  {
+    "id": "2021002",
+    "fileName": "2021002_python_import_from_custom_root.yml",
+    "title": "【Python】指定PathをRootにしてimportする",
+    "createDate": "2021-01-24",
+    "updateDate": "2021-05-05",
+    "tags": [
+      "Python"
+    ]
+  },
+  {
+    "id": "2021001",
+    "fileName": "2021001_python_singleton.yml",
+    "title": "【Python】Singleton実装を極めてみる",
+    "createDate": "2021-01-21",
+    "updateDate": "2021-01-21",
+    "tags": [
+      "Python",
+      "Spark",
+      "分散処理",
+      "並列処理",
+      "自然言語処理",
+      "Databricks"
+    ]
+  },
+  {
+    "id": "2020003",
+    "fileName": "2020003_class_based_typescript_react_redux.yml",
+    "title": "俺的TypeScript x React x Redux (Class based component，サンプル付)",
+    "createDate": "2020-09-23",
+    "updateDate": "2020-09-23",
+    "tags": [
+      "TypeScript",
+      "React"
+    ]
+  },
+  {
+    "id": "2020002",
+    "fileName": "2020002_java_oop_callback.yml",
+    "title": "【Java】オブジェクト指向のコールバック実装を考えてみる",
+    "createDate": "2020-05-31",
+    "updateDate": "2020-05-31",
+    "tags": [
+      "Java"
+    ]
+  },
+  {
+    "id": "2020001",
+    "fileName": "2020001_java_zero_padding_benchmark.yml",
+    "title": "【Java】ゼロ埋めのコード速度比較",
+    "createDate": "2020-05-28",
+    "updateDate": "2020-05-28",
+    "tags": [
+      "Java"
+    ]
+  },
+  {
+    "id": "2019012",
+    "fileName": "2019012_make_japan_blackout_platform.yml",
+    "title": "日本はブラックアウトのプラットフォーマになるべきでは？",
+    "createDate": "2019-09-08",
+    "updateDate": "2019-09-08",
+    "tags": [
+      "雑感",
+      "ビジネス"
+    ]
+  },
+  {
+    "id": "2019011",
+    "fileName": "2019011_hacku.yml",
+    "title": "Hack Uでヤフー賞獲ったどー",
+    "createDate": "2019-09-04",
+    "updateDate": "2019-09-04",
+    "tags": [
+      "ハッカソン",
+      "機械学習",
+      "AR"
+    ]
+  },
+  {
+    "id": "2019010",
+    "fileName": "2019010_matplotlib_subplot_gantt_chart.yml",
+    "title": "【Python】matplotlibでサブプロットの時系列ガントチャートを作る",
+    "createDate": "2019-07-13",
+    "updateDate": "2019-07-13",
+    "tags": [
+      "Python",
+      "個人開発"
+    ]
+  },
+  {
+    "id": "2019009",
+    "fileName": "2019009_python_typing_indicator.yml",
+    "title": "【Python】クロスプラットフォームでのタイプカウンターの実装",
+    "createDate": "2019-07-01",
+    "updateDate": "2019-07-01",
+    "tags": [
+      "Python",
+      "個人開発"
+    ]
+  },
+  {
+    "id": "2019008",
+    "fileName": "2019008_coordinatehopper.yml",
+    "title": "クリック座標をフラグメント識別子にして検索できるChrome拡張機能を開発した",
+    "createDate": "2019-05-19",
+    "updateDate": "2020-02-20",
+    "tags": [
+      "React",
+      "TypeScript",
+      "Chrome拡張機能",
+      "個人開発"
+    ]
+  },
+  {
     "id": "2019007",
     "fileName": "2019007_mac_automator.yml",
     "title": "Macで欲しいアレコレをAutomatorで",
