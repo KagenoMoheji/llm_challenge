@@ -31,7 +31,7 @@ content:
 
       自分が作る各種アプリでも使おうとして取り急ぎnpmにも出してますが、しっかりしたパッケージにまだしていないので、ひとまず下記の感じで入れて試してください…。
       ```
-      <script src="https://cdn.jsdelivr.net/npm/monomd@1.0.6/index.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/monomd/index.js"></script>
       ```
 
       前述の各不満に対してどう対応したか、述べていきます。
