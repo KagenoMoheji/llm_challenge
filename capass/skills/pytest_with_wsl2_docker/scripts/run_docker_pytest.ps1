@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     WSL2 + Docker コンテナを用いて、ホスト環境を汚さずに pytest を実行するヘルパースクリプト。
 
@@ -63,8 +63,9 @@ if ($ZipPath -ne "") {
             sh -c $cmd
     }
     elseif ($Target -eq "server") {
-        # サーバー用環境変数
-        $cmd = "python -m zipfile -e /tmp/in.zip /tmp/src && " +
+        # サーバー用環境変数（Fernet 暗号化鍵はコンテナ内部で動的生成）
+        $cmd = "export CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS=`$(python3 -c 'import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())') && " +
+               "python -m zipfile -e /tmp/in.zip /tmp/src && " +
                "ROOT=`$(ls -d /tmp/src/* | head -n 1) && " +
                "pip install --no-cache-dir -e `"`$ROOT/server[dev]`" && " +
                "pytest -vv `"`$ROOT/server/tests`""
@@ -79,14 +80,13 @@ if ($ZipPath -ne "") {
             -e CAPASS_SERVER_DB_NAME=capass `
             -e CAPASS_SERVER_DB_USER=capass `
             -e CAPASS_SERVER_DB_PASSWORD=capass `
-            -e CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS="dGVzdF9mZXJuZXRfa2V5XzMyYnl0ZXNfbG9uZ19mb3JfdGVzdHM9" `
             $Image `
             sh -c $cmd
     }
 }
 else {
-    # リポジトリ直接テスト
-    $repoRootWin = (Resolve-Path "$PSScriptRoot\..\..\..\..").Path
+    # リポジトリ直接テスト (capass ルート)
+    $repoRootWin = (Resolve-Path "$PSScriptRoot\..\..\..").Path
     $repoRootWsl = ConvertTo-WslPath $repoRootWin
     Write-Host "Testing from repository tree: $repoRootWin" -ForegroundColor Green
 
@@ -98,6 +98,23 @@ else {
         wsl docker run --rm `
             -v "${repoRootWsl}:/workspace" `
             -w /workspace `
+            $Image `
+            sh -c $cmd
+    }
+    elseif ($Target -eq "server") {
+        $cmd = "export CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS=`$(python3 -c 'import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())') && " +
+               "pip install --no-cache-dir -e ./server[dev] && " +
+               "pytest -vv ./server/tests"
+
+        wsl docker run --rm `
+            -v "${repoRootWsl}:/workspace" `
+            -w /workspace `
+            -e CAPASS_SERVER_ENV=LOCAL_DEV `
+            -e CAPASS_SERVER_DB_HOST=127.0.0.1 `
+            -e CAPASS_SERVER_DB_PORT=5432 `
+            -e CAPASS_SERVER_DB_NAME=capass `
+            -e CAPASS_SERVER_DB_USER=capass `
+            -e CAPASS_SERVER_DB_PASSWORD=capass `
             $Image `
             sh -c $cmd
     }

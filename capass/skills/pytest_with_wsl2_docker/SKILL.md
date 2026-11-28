@@ -49,7 +49,7 @@ wsl docker run --rm `
 ```
 
 ### ② `server` 配下のテスト実行 (zip ファイル指定)
-サーバーのテストに必要なインメモリ DB 設定および Fernet 暗号化鍵をコンテナ起動時（`-e` オプション）に環境変数として注入して実行します。
+サーバーのテストに必要なインメモリ DB 設定を環境変数として注入し、**Fernet 暗号化鍵はコンテナ内部で動的に自動生成**して環境変数に設定して実行します（固定キー直書き不要）。
 
 ```powershell
 wsl docker run --rm `
@@ -62,31 +62,49 @@ wsl docker run --rm `
   -e CAPASS_SERVER_DB_NAME=capass `
   -e CAPASS_SERVER_DB_USER=capass `
   -e CAPASS_SERVER_DB_PASSWORD=capass `
-  -e CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS="dGVzdF9mZXJuZXRfa2V5XzMyYnl0ZXNfbG9uZ19mb3JfdGVzdHM9" `
   python:3.11-slim `
-  sh -c "python -m zipfile -e /tmp/capass.zip /tmp/src && pip install --no-cache-dir -e /tmp/src/capass-v0.1.6-3/server[dev] && pytest -vv /tmp/src/capass-v0.1.6-3/server/tests"
+  sh -c "export CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS=\`$(python3 -c 'import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())') && python -m zipfile -e /tmp/capass.zip /tmp/src && pip install --no-cache-dir -e /tmp/src/capass-v0.1.6-3/server[dev] && pytest -vv /tmp/src/capass-v0.1.6-3/server/tests"
 ```
 
 ### ③ git リポジトリ上のソースツリーを直接テストする場合
 zip ではなく、リポジトリに展開済みのソースコードを直接テストする場合は、リポジトリルートをマウントします。
 
 ```powershell
+# 1. toolserver のテスト実行 (25 件)
 wsl docker run --rm `
   -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/capass:/workspace `
   -w /workspace `
   python:3.11-slim `
   sh -c "pip install --no-cache-dir -e ./core && pip install --no-cache-dir -e ./toolserver[dev] && pytest -vv ./toolserver/tests"
+
+# 2. server のテスト実行 (218 件)
+wsl docker run --rm `
+  -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/capass:/workspace `
+  -w /workspace `
+  -e CAPASS_SERVER_ENV=LOCAL_DEV `
+  -e CAPASS_SERVER_DB_HOST=127.0.0.1 `
+  -e CAPASS_SERVER_DB_PORT=5432 `
+  -e CAPASS_SERVER_DB_NAME=capass `
+  -e CAPASS_SERVER_DB_USER=capass `
+  -e CAPASS_SERVER_DB_PASSWORD=capass `
+  python:3.11-slim `
+  sh -c "export CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS=\`$(python3 -c 'import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())') && pip install --no-cache-dir -e ./server[dev] && pytest -vv ./server/tests"
 ```
 
 ---
 
 ## 4. ワンライナーの技術的ポイント
 
-1. **`python -m zipfile -e` での展開**:
+1. **Fernet 暗号化鍵のコンテナ内動的自動生成**:
+   - `server` の暗号化機能（トークン暗号化）では 32 バイトの URL-safe Base64 文字列（Fernet キー）が必須です。
+   - 固定のテスト用ダミーキーをホスト側の Docker 引数に直書きする代わりに、コンテナ内のシェルスクリプト先頭で標準ライブラリ（`secrets`, `base64`）を用いて有効な鍵をミリ秒で動的生成・`export` しています。
+   - ホスト環境（Windows）に Python や暗号化ツールをインストールする必要がなく、完全なワンライナーで安全に完結します。
+   - （※PowerShell から実行する際、`$(...)` が PowerShell のサブ式として解釈されないよう `` `$(...) `` とエスケープしています）
+2. **`python -m zipfile -e` での展開**:
    - `python:3.11-slim` などの軽量コンテナには `unzip` コマンドが入っていませんが、Python 標準の `zipfile` CLI を利用することで、追加パッケージをインストールすることなく高速・確実に解凍できます。
-2. **コンテナ内 `/tmp` での作業完結**:
+3. **コンテナ内 `/tmp` での作業完結**:
    - 解凍先や pip のビルド成果物はすべてコンテナ内の `/tmp` で処理されるため、ホスト側のマウント元ディレクトリにゴミファイルが一切残りません。
-3. **`--rm` による自動破棄**:
+4. **`--rm` による自動破棄**:
    - テスト完了（またはエラー終了）と同時にコンテナが自動的に破棄されるため、リソースの解放やプロセス管理が不要です。
 
 ---
