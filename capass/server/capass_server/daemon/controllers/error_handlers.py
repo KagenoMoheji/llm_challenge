@@ -1,0 +1,54 @@
+import os
+import inspect
+import sys
+import time
+import traceback
+PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe())))[0]
+
+# その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from capass_server.daemon.common import errors
+from capass_server.daemon.common.globals import SIGNATURE_AUTH_SCHEME
+
+# service層の業務エラー -> HTTPステータス。isinstanceで上から順に判定するので、サブクラスを先に書く
+_STATUS_BY_ERROR: list[tuple[type[errors.ServiceError], int]] = [
+    (errors.SignatureError, 401),
+    (errors.NotAdminError, 403),
+    (errors.PermissionDeniedError, 403),
+    (errors.InvalidToolServerUrlError, 422),
+    (errors.InvalidToolParamsError, 422),
+    (errors.ToolServerNotApprovedError, 403),
+    (errors.AgentNotApprovedError, 403),
+    (errors.ToolServerNotFoundError, 404),
+    (errors.AgentNotFoundError, 404),
+    (errors.ToolNotFoundError, 404),
+    (errors.GrantNotFoundError, 404),
+    (errors.NotAuthorizedError, 403),
+    (errors.DuplicateToolServerError, 409),
+    (errors.DuplicateAgentError, 409),
+    (errors.DuplicateAgentToolError, 409),
+    (errors.DuplicateToolError, 409),
+    (errors.ReplacementNotAllowedError, 409),
+    (errors.InvalidApprovalStateError, 409),
+    (errors.RateLimitExceededError, 429),
+    (errors.ToolServerUnavailableError, 502),
+    (errors.ToolServerBadResponseError, 502),
+    (errors.ToolServerTimeoutError, 504),
+]
+
+
+def register_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(errors.ServiceError)
+    async def _handle_service_error(_: Request, exc: errors.ServiceError) -> JSONResponse:
+        status_code = next((code for cls, code in _STATUS_BY_ERROR if isinstance(exc, cls)), 500)
+        headers = None
+        if status_code == 401:
+            headers = {"WWW-Authenticate": SIGNATURE_AUTH_SCHEME}
+        elif isinstance(exc, errors.RateLimitExceededError):
+            headers = {"Retry-After": str(exc.retry_after_sec)}
+        content = {"detail": str(exc)}
+        if isinstance(exc, errors.InvalidToolParamsError):
+            content["errors"] = exc.errors  # AIエージェントが、パラメータを直せるように、問題の場所と内容を返す
+        return JSONResponse(status_code=status_code, content=content, headers=headers)

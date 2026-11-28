@@ -19,7 +19,7 @@ dependencies = [
 dev = ["pytest", "httpx"]
 
 [project.scripts]
-capass-server = "capass_server.main:run"
+capass-server = "capass_server.daemon.main:run"
 
 [tool.setuptools.packages.find]
 include = ["capass_server*"]

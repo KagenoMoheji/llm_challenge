@@ -1,6 +1,6 @@
 # CaPass QUICKSTART(暫定版)
 
-> **この文書は暫定版です。** CaPassクライアント(CLI)がまだ未実装のため、キー作成(`keygen`)や各API呼び出しは、暫定クライアント [`examples/provisional_client.py`](examples/provisional_client.py) で代用しています。CLIの実装後に置き換えます。
+> **この文書は暫定版です。** CaPassクライアント(`capass` コマンド)は、ツールサーバの初期導入 `capass init` だけが実装済みです(`core/` と `toolserver/` を参照)。それ以外のキー作成(AIエージェント用、管理者用)と、各API呼び出しは、暫定クライアント [`examples/provisional_client.py`](examples/provisional_client.py) で代用しています。CLIの実装後に置き換えます。
 > 動作するAPIは、下表のとおりです(登録・承認・ツールの登録と割り当て、AIエージェントによるツール一覧の取得・実行、ツールサーバのリプレース(予約・切り替え・切り戻し)、ツール代理トークンの更新)。
 
 ## 0. 前提: CaPassが制御するものと、しないもの
@@ -284,6 +284,40 @@ export AGENT_PRIVATE_KEY='<AIエージェントのPRIVATE>'
 python provisional_client.py agent-register --agent-id agent-1 --email agent-owner@example.com
 # 201 {"agent_id": "agent-1", ..., "applicant_email": "agent-owner@example.com", "status": "pending", ...}
 ```
+
+**ツールサーバの初期導入は、`capass` コマンドでできます**(`capass init`。root権限が必要です)。`capass` コマンドは、モードごとのパッケージで提供されます。ツールサーバでは、次のようにインストールします。
+
+```bash
+pip install "capass[toolserver]"       # パッケージサーバに置いた場合。capass(共通部品とcapassコマンド)と、capass-toolserver が、入る
+pip install ./core ./toolserver        # このリポジトリから、インストールする場合
+
+capass --help                          # コマンドと、モード(toolserver / agent / server)、インストール済みのモード、このサーバのモードが分かる
+sudo "$(which capass)" init            # 既定: ユーザ capass、ポート 31000、ログ /opt/capass/logs、データ /opt/capass/data
+sudo "$(which capass)" init --user svc --port 32000 --log-dir /var/log/capass --data-dir /var/lib/capass   # 指定する場合
+# 公開鍵(Base64)とフィンガープリントを表示する(管理者が、承認の前に、別の経路で照合する)
+
+# 暫定クライアントで使うときは、秘密鍵のファイルを、環境変数に読み込む(秘密鍵は、実行ユーザとrootだけが読める)
+export TOOL_SERVER_PRIVATE_KEY="$(sudo cat /opt/capass/keys/toolserver.key)"
+```
+
+`capass init` は、次を、全て行います。アプリディレクトリは、`/opt/capass` で固定です。
+
+| 作るもの | 場所 | 持ち主と権限 |
+|---|---|---|
+| 実行ユーザ/グループ(ログインできないシステムユーザ) | `capass`(`--user` で変更) | |
+| 実行ファイル | `/opt/capass/bin/capass` | root、0755(実行ユーザは、書き換えられない) |
+| CLIのバージョンと設定 | `/opt/capass/confs/capass.conf` | root、0644 |
+| 鍵(秘密鍵 `toolserver.key`、公開鍵 `toolserver.pub`) | `/opt/capass/keys/` | 実行ユーザ、ディレクトリ 0700、秘密鍵 0600 |
+| ログ、一時データ | `/opt/capass/logs`、`/opt/capass/data`(`--log-dir`、`--data-dir` で変更) | 実行ユーザ、0750 / 0700 |
+| systemdのサービスファイル | `/etc/systemd/system/capass.service` | root、0644 |
+
+- **サービス(受け口 `capass serve`)は、まだ実装されていません。** `init` は、サービスファイルを作るだけで、`systemctl` の操作は行いません。`init` の最後に表示される「次の手順」に従ってください。
+- **いまは、RPM/yum系のLinux(systemd)だけを想定しています。** 他のOSへの対応は、`docs/TODO.md` にあります。
+- **AIエージェントとツールサーバを、同じサーバに同居させないための確認が、2段階あります。**
+  1. **同じPython環境の中:** モードのパッケージ(`capass-toolserver`、`capass-agent`、`capass-server`)が、2つ以上インストールされていると、`capass` コマンドが、エラー(終了コード11)になります。1つもインストールされていない場合は、エラー(終了コード10)です。
+  2. **サーバ全体:** アプリディレクトリは、サーバ全体で `/opt/capass` の1つだけです。別のモードが使われている(設定ファイルのモード、`agent.key` などの鍵ファイル、または、別のモードの常駐プロセス(`systemctl` と `ps` で確認)がある)場合は、`capass` コマンドの実行ごとに、エラー(終了コード3)になり、`init` は、何も作りません。**別のPython環境(venv)やユーザで、別のモードを入れていても、検出できます。** 一般ユーザは、`keys/` の中を調べられないので、設定ファイルのモードで検出します。プロセスの確認は、目安です(コンテナの中などでは、調べられません。`docs/TODO.md` の 2.1)。
+  同居すると、AIエージェントが、ツールサーバの秘密鍵や認証情報に直接アクセスでき、CaPassサーバの承認と署名の確認を、迂回できてしまうためです。
+- すでに初期化済みの場合は、エラー(終了コード4)になります(設定の変更と再初期化は、まだありません)。途中で失敗した場合は、設定ファイルが作られていないので、原因を直して、再実行できます(作成済みの鍵は、そのまま使います)。
 
 秘密鍵は、ツールサーバ/AIエージェント上だけで保管します。CaPassにも管理者にも渡しません。
 

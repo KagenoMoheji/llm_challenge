@@ -17,11 +17,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from capass_server.common.db import Base, get_db
-from capass_server.common.tool_client import ToolServerResponse
-from capass_server.controllers import dependencies
-from capass_server.main import app
-from capass_server.services import agent_tool
+from capass_server.daemon.common.db import Base, get_db
+from capass_server.daemon.common.tool_client import ToolServerResponse
+from capass_server.daemon.controllers import dependencies
+from capass_server.daemon.main import app
+from capass_server.daemon.services import agent_tool
 from testlib import seed_admin
 
 # DBはテスト用のインメモリSQLiteに差し替える(PostgreSQLの起動は不要)

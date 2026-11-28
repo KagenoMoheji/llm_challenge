@@ -17,8 +17,8 @@ from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from sqlalchemy import select
-from capass_server.common.crypto import encrypt_token
-from capass_server.common.signature import (
+from capass_server.daemon.common.crypto import encrypt_token
+from capass_server.daemon.common.signature import (
     SIGN_CONTEXT_AGENT_EXEC,
     SIGN_CONTEXT_AGENT_GRANT,
     SIGN_CONTEXT_AGENT_LISTTOOLS,
@@ -33,7 +33,7 @@ from capass_server.common.signature import (
     SIGN_CONTEXT_TOOLSERVER_REPLACE_ROLLBACK,
     build_signing_message,
 )
-from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblAgentTool, TblTool, TblToolServer
+from capass_server.daemon.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblAgentTool, TblTool, TblToolServer
 
 APPLICANT_EMAIL = "applicant@example.com"
 ADMIN_EMAIL = "admin@example.com"

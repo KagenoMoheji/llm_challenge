@@ -66,7 +66,8 @@
 
 | サブコマンド | 役割 | 対応するAPI |
 |---|---|---|
-| `keygen` | 公開鍵/秘密鍵の作成(ツールサーバ、AIエージェント、管理者) | なし(ローカル) |
+| `init` | サーバの初期導入(root権限)。**モード toolserver は実装済み**(実行ユーザ、アプリディレクトリ、実行ファイル、鍵、systemdのサービスファイル、設定ファイル)。agent / server は未実装 | なし(ローカル) |
+| `serve` | 受け口(常駐)。1. を参照 | 未実装 |
 | `regist` | ツールサーバ/AIエージェントの初回登録、ツール(ロール単位)の登録、AIエージェントへの割り当ての申請 | `toolservers/register`、`agents/register`、`tools/addtool`、`agents/{agent_id}/grant/{tool_endpoint}` |
 | `list executable` | 使用できるツールの一覧(AIエージェント側) | `agents/{agent_id}/tools` |
 | `exec` | ツールの実行(AIエージェント側) | `agents/{agent_id}/exec/{tool_endpoint}` |
@@ -77,7 +78,42 @@
 | 管理者用 | 承認(`approve`)、割り当ての承認・取り消し、予約(`replace/reserve`)、承認待ち一覧 | `toolservers/{toolserver_id}/approve`、`agents/{agent_id}/approve`、`agents/{agent_id}/grant/{tool_endpoint}/approve`、`agents/{agent_id}/revoke/{tool_endpoint}`、`toolservers/{toolserver_id}/replace/reserve` |
 
 - AIエージェント側のCLI(`list executable` / `exec`)は、**`params_schema` を、AIエージェントが使うツール定義(MCPの `inputSchema` など)へ、そのまま渡せる形で出力する**と、AIエージェントが扱いやすい。
-- 秘密鍵の保管場所(ファイル権限、OSのキーストアなど)を決める。
+### 2.1 `capass init`(初期導入)の、残りの課題
+
+実装済み: `capass init`(モード toolserver)。アプリディレクトリは `/opt/capass` で固定。実行ユーザ/グループ、`bin/`(実行ファイル)、`confs/`(バージョンと設定)、`keys/`(鍵)、`logs/`、`data/`、`/etc/systemd/system/capass.service` を作る。モードの同居は、(1) 同じPython環境のパッケージ(`capass_server` / `capass_toolserver` / `capass_agent` が、2つ以上あればエラー)と、(2) サーバ全体の `/opt/capass`(設定ファイルのモードと、鍵のファイル名 `<モード>.key`)の、2段階で防ぐ。
+
+- **`capass serve`(受け口)の実装。** サービスファイルの `ExecStart` は、`/opt/capass/bin/capass serve` を指しているが、まだ無い。実装先は `toolserver/capass_toolserver/daemon/`。`systemctl enable --now` は、`serve` の実装後。ポート番号は、設定ファイル(`confs/capass.conf` の `[service] port`)から読む。
+- **`agent` / `server` モードの `init`。** 各モードの `cli/commands/init.py` に、手順(`run_init`)を書く。共通の部品(`capass_core.cli.common.init_steps` など)を、組み合わせる。AIエージェントの作業環境は、待ち受けのサービスを持たない(サービスファイルを作る部品は、呼ばない。`create_app_dirs` は、ログとデータのディレクトリを渡さない)。`capass_agent.cli` と `capass_server.cli` に、`register(subparsers, context)` を書くと、`capass` コマンドに、登録される(`core/capass_core/cli/main.py`)。CaPassサーバは、そのほか、暗号化鍵(`TOKEN_ENCRYPTION_KEYS`)の生成、管理者の登録(`tbl_admin`)、DBの設定も、必要になる。
+- **CaPassサーバのモードの、残りの課題。** `server/capass_server/daemon/` は、v0.1.5までのサーバ(importのパスを `capass_server.daemon.` に変えただけ)。`server/capass_server/cli/` は、まだコマンドを持たない(`capass` コマンドでは、「未実装」)。`server/pyproject.toml` に、`capass` への依存(`capass==0.1.6`)を、`capass_server.cli` の実装時に追加する(`toolserver` と `agent` は、すでに依存している)。
+- **再初期化、設定の変更、アンインストール**(いまは、初期化済みなら、エラーで止まる)。ポート番号・実行ユーザ・ログの場所などの変更と、`capass uninit`(ユーザ、ディレクトリ、サービスファイルの削除)。
+- **鍵の作り直し(ローテーション)のコマンド。** 鍵を作り直すと、CaPassサーバに登録した公開鍵が、使えなくなる。再登録や、ツールサーバのリプレース(`replace`)と、組み合わせた手順を決める。
+- **秘密鍵の保管:** いまは、`/opt/capass/keys/toolserver.key`(実行ユーザだけが読み書きできる権限 0600)に、暗号化せずに保存している。パスフレーズでの保護や、OSのキーストアへの保存を検討する。
+- **Python環境の配置:** いまの `bin/capass` は、`init` を実行したPython環境(`sys.executable`)の `capass_core.cli.main` を起動するシェルスクリプト。専用のvenv(`/opt/capass/venv`)に、インストールする形や、バイナリ(PyInstaller、zipappなど)の配置に、置き換える。
+- **ファイアウォール・SELinux:** `init` は、ポートを開けない(接続元を、CaPassサーバのIPアドレスに限る設定は、運用者が行う)。RPM/yum系では、SELinuxの設定(ポートの許可、ファイルのコンテキスト)が、必要になる場合がある。
+- **`daemon-reload` 等:** `init` は、systemdの操作(`daemon-reload`、`enable`、`start`)を行わない(次の手順として、表示する)。
+- 設定ミスを防ぐ仕組みで、悪意のある操作(ファイルの削除など)は、防げない。
+
+**同居の確認(`ensure_host_mode`)の、限界と課題:**
+
+- いまの確認は、`capass` コマンドの実行ごとに、(1) 同じPython環境のモードのパッケージ、(2) `/opt/capass` の設定ファイルのモードと鍵のファイル名(一般ユーザは、`keys/` の中を調べられないので、設定ファイルのモードだけで検出する)、(3) 稼働中の常駐プロセス(`systemctl is-active capass.service` と `ps`)を、確認する。
+- **プロセスの確認は、目安。** `python -m capass_<モード>`、`capass_<モード>.xxx:app`(uvicornなど)、`capass-<モード>` の、起動の形だけを見る(プログラムが、pythonかASGIサーバのものだけ)。コンテナの中(`ps` や `systemctl` が、使えない、またはホストのプロセスが見えない)では、調べられない。別の名前で起動されたプロセスは、検出できない。
+- 実行のたびに `ps` と `systemctl` を実行する(各5秒まで)。遅さが問題になる場合は、`init` のときだけ確認する、結果をキャッシュする、などを検討する。
+- 別のコンテナや別のホストで動く、他のモードは、検出できない(同じサーバの中だけ)。
+
+**他のOSへの横展開(いまは、RPM/yum系のLinux + systemdだけを想定している):**
+
+- Debian / Ubuntu系(apt): ログインできないシェルのパス(`/usr/sbin/nologin`)、`useradd` のオプション、ファイアウォール(ufw)。サービスファイルの置き場所は、`/etc/systemd/system/` で、同じ。
+- SUSE系、Arch系など、他のLinuxディストリビューション。
+- systemdを使わない環境(コンテナ、Kubernetes): `init` は、使わない。コンテナのイメージ、Helm、マニフェストの雛形を、別に用意する。
+- macOS / Windows: サービスの仕組み(launchd、Windowsサービス)が違う。必要になった時点で、検討する。
+- OSごとの差(シェルのパス、サービスファイルの場所、ユーザ作成のコマンド、ファイアウォール)は、`core/capass_core/cli/common/system.py` の、OSの操作の部分と、`paths.py` の定数に、集める。
+
+### 2.2 パッケージ構成・配布の、残りの課題
+
+- **配布:** `capass`(`core/`)、`capass-toolserver`、`capass-agent`、`capass-server` の、4つのパッケージ(wheel)を、ビルドして、社内のパッケージサーバに置く手順。バージョンは、全て同じ値に固定している(`capass==0.1.6` など。上げるときは、各 `pyproject.toml` の固定も、そろえる)。`capass` の extras(`capass[toolserver]`)と、`capass-toolserver` が `capass` に依存する関係は、循環している(pipは扱えるが、他のツールでの動作は、確認していない)。
+- **開発時の環境:** モードのパッケージは、同じvenvに、複数インストールできない(`capass` コマンドが、エラーにする)。モードごとに、別のvenvを使う(AGENTS.md)。
+- **`toolserver` の extras に、受け口のHTTPサーバなどの依存を追加する**(`capass-toolserver` の `pyproject.toml` の `dependencies`)。AIエージェントのモードには、入れない。
+- 共通部品(`capass_core`)と、サーバ(`capass_server`)で、重複している署名の処理(いまは、サーバと暫定クライアントに、同じ規則が、別々に書かれている)を、`capass_core` に、まとめる。
 
 ## 3. サーバの未実装(シーケンス図のうち、まだ無いもの)
 
@@ -108,3 +144,30 @@
 - **ツール代理トークンの暗号鍵:** 環境変数ではなく、KMSなどで管理する。
 - **ツールサーバへの接続:** 接続の再利用(コネクションプール)や、非同期化が必要になったら、標準ライブラリの `urllib` から、HTTPクライアントのライブラリ(httpxなど)への置き換えを検討する。
 - **`params` のサイズ上限:** `exec` のボディのサイズに、上限を設ける。
+- **ツール実行結果の返し方(ストリーミングとページネーション)**: 6. を参照。
+
+## 6. ツール実行結果の返し方(ストリーミングとページネーション)
+
+**いまの状態:** `exec` は、ツールサーバの応答を、全て受け取ってから、AIエージェントへ返す(最大サイズ `TOOL_SERVER_MAX_RESPONSE_BYTES` まで、メモリに溜める)。
+
+**認識合わせの結果:**
+
+- **ストリーミングは、経路の全ての区間で、そろえる必要がある。** リソース(PostgreSQL、SaaSのREST API)→ ツール本体 → 受け口(`capass_toolserver.daemon`)→ CaPassサーバ → AIエージェント。どこか1つの区間で、全部を溜めてから渡すと、そこで待ちが生じて、効果が出ない。実装は、各区間で、チャンクを順に取り出して渡す形にする(Pythonでは、ジェネレータ(`yield`)、非同期イテレータ)。
+- **ただし、AIエージェント(LLM)向けには、大量の結果を、ストリーミングで全部流すのは、最適ではない。** LLMは、コンテキストの長さに上限があり、ツールの結果は、多くの場合、全体を受け取ってから、次の推論に使われる(途中経過だけでは、使えない)。大量のデータは、そもそも、LLMに渡さないほうがよい(絞り込み、集計をツール側で行う)。
+- **ページネーションの取得(PostgreSQLの `LIMIT` とキーセット、SaaSの `next_page_token` など)は、ツールサーバが、リソースに対して行う。**
+
+**方針案:**
+
+1. **標準は、「1回の実行 = 1ページ(上限つき)」と、カーソルによるページネーション。** ツールの結果に、`next_cursor`(続きがある場合)、`truncated`(切り詰めた場合)、件数を含め、AIエージェントが、続きが必要かを判断し、同じツールを、`cursor` をparamsに入れて、もう一度実行する(MCPのページネーションと同じ考え方)。1回の実行で取得するページは1つだけにして、AIエージェントが、途中で止められるようにする。ページサイズ(`limit`)の上限は、受け口(ツール側)と、CaPassサーバ(`TOOL_SERVER_MAX_RESPONSE_BYTES`)の、二重に設ける。
+2. **ストリーミングは、「追加の選択肢」として用意する。** 向いているのは、(a) 実行に時間がかかり、最初の結果までの待ちを短くしたい、(b) 進捗を返したい、(c) AIエージェントではなく、人やプログラムが、逐次処理する、場合。形式は、NDJSON(1行1JSON)かSSE。**ページ単位のイベント**で流し、最後に、完了のイベント(`done`、`next_cursor`)を送る。つまり、「ページネーションごとにストリーミングで返す」は、標準にはせず、「ストリーミング版」として、選べるようにする。
+3. **ツールサーバが、全ページを自動で取り集めて、1つの結果にまとめるのは、避ける**(巨大なレスポンスになる)。やる場合は、件数・サイズの上限をつける。
+4. **ツール定義(`params_schema`)に、`cursor` と `limit` の書き方を、ガイドに追加する**(QUICKSTART 5.8)。AIエージェントが、ページネーションを使えるよう、`description` に、「`next_cursor` が返ったら、その値を `cursor` に指定して、もう一度実行する」と書く。
+
+**実装時の論点(ストリーミング版):**
+
+- CaPassサーバの中継(`call_tool_server`)を、ツールサーバの応答を、受け取りながら渡す形(チャンクを返すジェネレータ)にして、FastAPIの `StreamingResponse` に渡す。
+- **ステータスコードは、最初のチャンクの前に確定する。** 途中で起きたエラーは、ストリームの中の、エラーのイベントで返す。
+- **タイムアウトは、全体と、チャンクの間(アイドル)の、2つにする。** 合計サイズの上限も、守る。
+- **AIエージェントが切断したら、ツールサーバへの接続も、切る。**
+- `tool_used_at` の更新のタイミング(開始時か、完了時か)。ツール代理トークンと `params` を、ログに出さない。DBのトランザクションを、ストリームの間、保持しない(いまも、中継の前に commit している)。
+- AIエージェント側のCLI(`exec`)は、受け取りながら標準出力に出す(`--stream`)か、完了まで溜めて渡す(既定)かを、選べるようにする。
