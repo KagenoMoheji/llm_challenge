@@ -10,17 +10,17 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
-from capass_server.common.errors import (
+from capass_server.daemon.common.config import SIGNATURE_MAX_SKEW_SEC
+from capass_server.daemon.common.errors import (
     AgentNotApprovedError,
     InvalidSignatureError,
     NotAdminError,
     ReplayedRequestError,
     SignatureExpiredError,
 )
-from capass_server.common.signature import build_signing_message, is_within_skew, verify_ed25519
-from capass_server.models import mappers
-from capass_server.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblRequestNonce
+from capass_server.daemon.common.signature import build_signing_message, is_within_skew, verify_ed25519
+from capass_server.daemon.models import mappers
+from capass_server.daemon.models.entities import ApprovalStatus, TblAdmin, TblAgent, TblRequestNonce
 
 
 def verify_signed_request(public_key_b64: str, sign_context: bytes, payload: dict, signature_b64: str) -> None:

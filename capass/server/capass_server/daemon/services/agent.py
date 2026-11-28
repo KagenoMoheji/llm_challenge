@@ -10,13 +10,13 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from capass_server.common.errors import AgentNotFoundError, DuplicateAgentError, InvalidApprovalStateError
-from capass_server.common.signature import SIGN_CONTEXT_AGENT_APPROVE, SIGN_CONTEXT_AGENT_REGISTER
-from capass_server.models import mappers
-from capass_server.models.entities import ApprovalStatus, TblAgent
-from capass_server.schemas.agent import AgentRegisterRequest
-from capass_server.schemas.approve import ApproveRequest
-from capass_server.services.signed_request import verify_admin_request, verify_signed_request
+from capass_server.daemon.common.errors import AgentNotFoundError, DuplicateAgentError, InvalidApprovalStateError
+from capass_server.daemon.common.signature import SIGN_CONTEXT_AGENT_APPROVE, SIGN_CONTEXT_AGENT_REGISTER
+from capass_server.daemon.models import mappers
+from capass_server.daemon.models.entities import ApprovalStatus, TblAgent
+from capass_server.daemon.schemas.agent import AgentRegisterRequest
+from capass_server.daemon.schemas.approve import ApproveRequest
+from capass_server.daemon.services.signed_request import verify_admin_request, verify_signed_request
 
 
 def register_agent(db: Session, req: AgentRegisterRequest) -> TblAgent:

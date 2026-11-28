@@ -10,7 +10,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from datetime import datetime
 from typing import Any
 from pydantic import BaseModel, Field, field_validator
-from capass_server.common.globals import (
+from capass_server.daemon.common.globals import (
     AGENT_ID_MAX_LEN,
     AGENT_ID_PATTERN,
     EMAIL_MAX_LEN,
@@ -19,7 +19,7 @@ from capass_server.common.globals import (
     NONCE_MIN_LEN,
     NONCE_PATTERN,
 )
-from capass_server.schemas.base import SignedRequest, validate_public_key_format
+from capass_server.daemon.schemas.base import SignedRequest, validate_public_key_format
 
 
 class AgentRegisterRequest(SignedRequest):

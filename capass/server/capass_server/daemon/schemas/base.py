@@ -9,7 +9,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from typing import ClassVar
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
-from capass_server.common.signature import decode_ed25519_public_key, decode_ed25519_signature
+from capass_server.daemon.common.signature import decode_ed25519_public_key, decode_ed25519_signature
 
 
 def validate_public_key_format(v: str) -> str:

@@ -10,7 +10,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from datetime import datetime
 from typing import Any
 from pydantic import BaseModel, Field, field_validator
-from capass_server.common.globals import (
+from capass_server.daemon.common.globals import (
     NONCE_MAX_LEN,
     NONCE_MIN_LEN,
     NONCE_PATTERN,
@@ -18,8 +18,8 @@ from capass_server.common.globals import (
     TOOL_ENDPOINT_PATTERN,
     TOOL_PROXY_TOKEN_MAX_LEN,
 )
-from capass_server.common.params_schema import validate_params_schema_definition
-from capass_server.schemas.base import SignedRequest, validate_public_key_format
+from capass_server.daemon.common.params_schema import validate_params_schema_definition
+from capass_server.daemon.schemas.base import SignedRequest, validate_public_key_format
 
 
 class ToolAddRequest(SignedRequest):

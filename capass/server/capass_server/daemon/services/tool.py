@@ -10,13 +10,13 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from capass_server.common.crypto import encrypt_token
-from capass_server.common.errors import DuplicateToolError, ToolNotFoundError, ToolServerNotApprovedError
-from capass_server.common.signature import SIGN_CONTEXT_TOOL_ADDTOOL, SIGN_CONTEXT_TOOL_CHTKN
-from capass_server.models import mappers
-from capass_server.models.entities import ApprovalStatus, TblTool
-from capass_server.schemas.tool import ToolAddRequest, ToolChangeTokenRequest
-from capass_server.services.signed_request import consume_request_nonce, verify_signed_request
+from capass_server.daemon.common.crypto import encrypt_token
+from capass_server.daemon.common.errors import DuplicateToolError, ToolNotFoundError, ToolServerNotApprovedError
+from capass_server.daemon.common.signature import SIGN_CONTEXT_TOOL_ADDTOOL, SIGN_CONTEXT_TOOL_CHTKN
+from capass_server.daemon.models import mappers
+from capass_server.daemon.models.entities import ApprovalStatus, TblTool
+from capass_server.daemon.schemas.tool import ToolAddRequest, ToolChangeTokenRequest
+from capass_server.daemon.services.signed_request import consume_request_nonce, verify_signed_request
 
 
 def add_tool(db: Session, req: ToolAddRequest) -> TblTool:

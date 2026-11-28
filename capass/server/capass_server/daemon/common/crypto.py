@@ -8,7 +8,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from cryptography.fernet import Fernet, MultiFernet
-from capass_server.common.config import TOKEN_ENCRYPTION_KEYS
+from capass_server.daemon.common.config import TOKEN_ENCRYPTION_KEYS
 
 
 def create_token_cipher(keys: list[str]) -> MultiFernet:

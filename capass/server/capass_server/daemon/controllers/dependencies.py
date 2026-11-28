@@ -8,14 +8,14 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from fastapi import Request
-from capass_server.common.config import (
+from capass_server.daemon.common.config import (
     RATE_LIMIT_ENABLED,
     RATE_LIMIT_REGISTER_MAX_REQUESTS,
     RATE_LIMIT_REGISTER_WINDOW_SEC,
     TRUSTED_PROXY_COUNT,
 )
-from capass_server.common.errors import RateLimitExceededError
-from capass_server.common.rate_limit import SlidingWindowRateLimiter, extract_client_ip
+from capass_server.daemon.common.errors import RateLimitExceededError
+from capass_server.daemon.common.rate_limit import SlidingWindowRateLimiter, extract_client_ip
 
 # 初回登録API(toolservers/register, agents/register)で共有するレート制限。クライアントIPごとにカウントする
 register_rate_limiter = SlidingWindowRateLimiter(RATE_LIMIT_REGISTER_MAX_REQUESTS, RATE_LIMIT_REGISTER_WINDOW_SEC)

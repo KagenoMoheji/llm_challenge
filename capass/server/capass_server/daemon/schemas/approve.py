@@ -8,7 +8,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from pydantic import Field, field_validator
-from capass_server.schemas.base import SignedRequest, validate_public_key_format
+from capass_server.daemon.schemas.base import SignedRequest, validate_public_key_format
 
 
 class ApproveRequest(SignedRequest):

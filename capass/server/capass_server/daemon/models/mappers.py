@@ -10,7 +10,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from datetime import datetime
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
-from capass_server.models.entities import (
+from capass_server.daemon.models.entities import (
     ApprovalStatus,
     TblAdmin,
     TblAgent,

@@ -13,7 +13,7 @@ import socket
 import urllib.error
 import urllib.request
 from typing import NamedTuple
-from capass_server.common.errors import ToolServerBadResponseError, ToolServerTimeoutError, ToolServerUnavailableError
+from capass_server.daemon.common.errors import ToolServerBadResponseError, ToolServerTimeoutError, ToolServerUnavailableError
 
 _CHUNK_SIZE = 64 * 1024
 

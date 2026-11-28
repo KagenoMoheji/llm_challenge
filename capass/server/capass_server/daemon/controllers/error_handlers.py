@@ -9,8 +9,8 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from capass_server.common import errors
-from capass_server.common.globals import SIGNATURE_AUTH_SCHEME
+from capass_server.daemon.common import errors
+from capass_server.daemon.common.globals import SIGNATURE_AUTH_SCHEME
 
 # service層の業務エラー -> HTTPステータス。isinstanceで上から順に判定するので、サブクラスを先に書く
 _STATUS_BY_ERROR: list[tuple[type[errors.ServiceError], int]] = [

@@ -13,9 +13,9 @@ from jsonschema.exceptions import SchemaError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from capass_server import __version__
-from capass_server.common.config import TOOL_SERVER_MAX_RESPONSE_BYTES, TOOL_SERVER_TIMEOUT_SEC
-from capass_server.common.crypto import decrypt_token
-from capass_server.common.errors import (
+from capass_server.daemon.common.config import TOOL_SERVER_MAX_RESPONSE_BYTES, TOOL_SERVER_TIMEOUT_SEC
+from capass_server.daemon.common.crypto import decrypt_token
+from capass_server.daemon.common.errors import (
     DuplicateAgentToolError,
     GrantNotFoundError,
     InvalidApprovalStateError,
@@ -27,20 +27,20 @@ from capass_server.common.errors import (
     ToolServerBadResponseError,
     ToolTokenDecryptionError,
 )
-from capass_server.common.params_schema import validate_params
-from capass_server.common.signature import (
+from capass_server.daemon.common.params_schema import validate_params
+from capass_server.daemon.common.signature import (
     SIGN_CONTEXT_AGENT_EXEC,
     SIGN_CONTEXT_AGENT_GRANT,
     SIGN_CONTEXT_AGENT_GRANT_APPROVE,
     SIGN_CONTEXT_AGENT_LISTTOOLS,
     SIGN_CONTEXT_AGENT_REVOKE,
 )
-from capass_server.common.tool_client import ToolServerResponse, call_tool_server
-from capass_server.models import mappers
-from capass_server.models.entities import ApprovalStatus, TblAgentTool, TblTool
-from capass_server.schemas.agent import AgentExecRequest, AgentGrantRequest, AgentRevokeRequest
-from capass_server.schemas.approve import ApproveRequest
-from capass_server.services.signed_request import (
+from capass_server.daemon.common.tool_client import ToolServerResponse, call_tool_server
+from capass_server.daemon.models import mappers
+from capass_server.daemon.models.entities import ApprovalStatus, TblAgentTool, TblTool
+from capass_server.daemon.schemas.agent import AgentExecRequest, AgentGrantRequest, AgentRevokeRequest
+from capass_server.daemon.schemas.approve import ApproveRequest
+from capass_server.daemon.services.signed_request import (
     consume_request_nonce,
     verify_admin_request,
     verify_agent_request,

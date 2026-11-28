@@ -8,8 +8,8 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from fastapi import FastAPI
-from capass_server.common.globals import API_V1_PREFIX
-from capass_server.controllers import api_v1, root
+from capass_server.daemon.common.globals import API_V1_PREFIX
+from capass_server.daemon.controllers import api_v1, root
 
 
 def register_routes(app: FastAPI) -> None:

@@ -4,7 +4,7 @@ import sys
 import time
 import traceback
 PYPATH = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-ROOTPATH = os.path.abspath(f"{PYPATH}/..")
+ROOTPATH = os.path.abspath(f"{PYPATH}/../..")
 MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe())))[0]
 # 以下のROOTPATHでimportの起点を指定
 sys.path.append(ROOTPATH)
@@ -15,11 +15,11 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import uvicorn
 from capass_server import __version__
-from capass_server.common.config import ENV_TYPE, DB_RETRY_COUNT, DB_RETRY_DELAY_SEC, TOOL_SERVER_ALLOW_HTTP
-from capass_server.common.db import Base, engine, get_db, wait_for_db
-from capass_server.models import entities  # noqa: F401  (create_all の対象にするため、テーブル定義をBase.metadataへ登録する)
-from capass_server.controllers.error_handlers import register_error_handlers
-from capass_server.routes import register_routes
+from capass_server.daemon.common.config import ENV_TYPE, DB_RETRY_COUNT, DB_RETRY_DELAY_SEC, TOOL_SERVER_ALLOW_HTTP
+from capass_server.daemon.common.db import Base, engine, get_db, wait_for_db
+from capass_server.daemon.models import entities  # noqa: F401  (create_all の対象にするため、テーブル定義をBase.metadataへ登録する)
+from capass_server.daemon.controllers.error_handlers import register_error_handlers
+from capass_server.daemon.routes import register_routes
 
 
 
@@ -45,7 +45,7 @@ register_error_handlers(app)
 
 
 def run() -> None:
-    uvicorn.run("capass_server.main:app", host="127.0.0.1", port=8000)
+    uvicorn.run("capass_server.daemon.main:app", host="127.0.0.1", port=8000)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 # アプリ全体で共有する固定値(環境変数で変えない値)を集約する。環境変数由来の設定はconfig.py、署名の規則(署名プレフィックス等)はsignature.pyに置く。
-# このモジュールは他のモジュールに依存しない。使うときは `from capass_server.common.globals import X` と名前を指定してimportする(モジュールごとimportすると、組み込みのglobals()を隠してしまう)。
+# このモジュールは他のモジュールに依存しない。使うときは `from capass_server.daemon.common.globals import X` と名前を指定してimportする(モジュールごとimportすると、組み込みのglobals()を隠してしまう)。
 
 # ---------- 文字列長の上限(スキーマの検証と、DBのカラム長で共有する) ----------
 PUBLIC_KEY_MAX_LEN = 64  # Ed25519の生32バイトをBase64にした44文字に、余裕を持たせた長さ

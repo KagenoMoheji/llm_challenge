@@ -11,8 +11,8 @@ from datetime import datetime, timedelta, timezone
 from typing import NamedTuple
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from capass_server.common.config import TOOL_SERVER_ALLOW_HTTP, TOOL_SERVER_RESERVATION_TTL_SEC, TOOL_SERVER_STANDBY_TTL_SEC
-from capass_server.common.errors import (
+from capass_server.daemon.common.config import TOOL_SERVER_ALLOW_HTTP, TOOL_SERVER_RESERVATION_TTL_SEC, TOOL_SERVER_STANDBY_TTL_SEC
+from capass_server.daemon.common.errors import (
     DuplicateToolServerError,
     InvalidApprovalStateError,
     InvalidNewKeySignatureError,
@@ -22,7 +22,7 @@ from capass_server.common.errors import (
     ToolServerNotApprovedError,
     ToolServerNotFoundError,
 )
-from capass_server.common.signature import (
+from capass_server.daemon.common.signature import (
     SIGN_CONTEXT_TOOLSERVER_APPROVE,
     SIGN_CONTEXT_TOOLSERVER_REGISTER,
     SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW,
@@ -30,16 +30,16 @@ from capass_server.common.signature import (
     SIGN_CONTEXT_TOOLSERVER_REPLACE_RESERVE,
     SIGN_CONTEXT_TOOLSERVER_REPLACE_ROLLBACK,
 )
-from capass_server.models import mappers
-from capass_server.models.entities import ApprovalStatus, TblToolServer
-from capass_server.schemas.approve import ApproveRequest
-from capass_server.schemas.tool_server import (
+from capass_server.daemon.models import mappers
+from capass_server.daemon.models.entities import ApprovalStatus, TblToolServer
+from capass_server.daemon.schemas.approve import ApproveRequest
+from capass_server.daemon.schemas.tool_server import (
     ToolServerRegisterRequest,
     ToolServerReplaceActivateRequest,
     ToolServerReplaceReserveRequest,
     ToolServerReplaceRollbackRequest,
 )
-from capass_server.services.signed_request import verify_admin_request, verify_signed_request
+from capass_server.daemon.services.signed_request import verify_admin_request, verify_signed_request
 
 
 def register_tool_server(db: Session, req: ToolServerRegisterRequest) -> TblToolServer:

@@ -10,11 +10,11 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy.orm import Session
-from capass_server.common.config import TOKEN_MAX_AGE_SEC
-from capass_server.common.db import get_db
-from capass_server.common.globals import HEADER_SIGNATURE, HEADER_SIGNED_AT
-from capass_server.controllers.dependencies import rate_limit_register
-from capass_server.schemas.agent import (
+from capass_server.daemon.common.config import TOKEN_MAX_AGE_SEC
+from capass_server.daemon.common.db import get_db
+from capass_server.daemon.common.globals import HEADER_SIGNATURE, HEADER_SIGNED_AT
+from capass_server.daemon.controllers.dependencies import rate_limit_register
+from capass_server.daemon.schemas.agent import (
     AgentApproveResponse,
     AgentExecRequest,
     AgentGrantApproveResponse,
@@ -27,9 +27,9 @@ from capass_server.schemas.agent import (
     AgentToolItem,
     AgentToolListResponse,
 )
-from capass_server.schemas.approve import ApproveRequest
-from capass_server.schemas.tool import ToolAddRequest, ToolAddResponse, ToolChangeTokenRequest, ToolChangeTokenResponse
-from capass_server.schemas.tool_server import (
+from capass_server.daemon.schemas.approve import ApproveRequest
+from capass_server.daemon.schemas.tool import ToolAddRequest, ToolAddResponse, ToolChangeTokenRequest, ToolChangeTokenResponse
+from capass_server.daemon.schemas.tool_server import (
     ToolServerApproveResponse,
     ToolServerRegisterRequest,
     ToolServerRegisterResponse,
@@ -39,16 +39,16 @@ from capass_server.schemas.tool_server import (
     ToolServerReplaceResponse,
     ToolServerReplaceRollbackRequest,
 )
-from capass_server.services.agent import approve_agent, register_agent
-from capass_server.services.agent_tool import (
+from capass_server.daemon.services.agent import approve_agent, register_agent
+from capass_server.daemon.services.agent_tool import (
     approve_agent_tool_grant,
     exec_agent_tool,
     list_executable_tools,
     request_agent_tool_grant,
     revoke_agent_tool_grant,
 )
-from capass_server.services.tool import add_tool, change_tool_token
-from capass_server.services.tool_server import (
+from capass_server.daemon.services.tool import add_tool, change_tool_token
+from capass_server.daemon.services.tool_server import (
     ReplacementResult,
     activate_tool_server_replacement,
     approve_tool_server,

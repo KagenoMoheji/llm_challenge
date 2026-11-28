@@ -13,7 +13,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 from jsonschema.validators import validator_for
-from capass_server.common.globals import PARAMS_ERROR_MAX_COUNT, PARAMS_ERROR_MAX_LEN, PARAMS_SCHEMA_MAX_BYTES
+from capass_server.daemon.common.globals import PARAMS_ERROR_MAX_COUNT, PARAMS_ERROR_MAX_LEN, PARAMS_SCHEMA_MAX_BYTES
 
 # 参照("$ref")は、ルート("#")と、ルート直下の定義("#/$defs/<名前>"、"#/definitions/<名前>")だけ使える。
 # それ以外(外部のスキーマ、スキーマ中の任意の場所、アンカー)を許すと、下の正規表現の禁止を、迂回できてしまう

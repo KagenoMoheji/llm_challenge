@@ -10,9 +10,9 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 from datetime import datetime
 from typing import ClassVar
 from pydantic import BaseModel, Field, field_validator
-from capass_server.common.globals import EMAIL_MAX_LEN, EMAIL_PATTERN, EXEC_URL_MAX_LEN, EXEC_URL_PATTERN, TOOL_SERVER_NAME_MAX_LEN
-from capass_server.common.signature import decode_ed25519_signature
-from capass_server.schemas.base import SignedRequest, validate_public_key_format
+from capass_server.daemon.common.globals import EMAIL_MAX_LEN, EMAIL_PATTERN, EXEC_URL_MAX_LEN, EXEC_URL_PATTERN, TOOL_SERVER_NAME_MAX_LEN
+from capass_server.daemon.common.signature import decode_ed25519_signature
+from capass_server.daemon.schemas.base import SignedRequest, validate_public_key_format
 
 
 class ToolServerRegisterRequest(SignedRequest):

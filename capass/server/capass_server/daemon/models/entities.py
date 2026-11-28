@@ -11,8 +11,8 @@ import enum
 from datetime import datetime
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
-from capass_server.common.db import Base
-from capass_server.common.globals import (
+from capass_server.daemon.common.db import Base
+from capass_server.daemon.common.globals import (
     AGENT_ID_MAX_LEN,
     EMAIL_MAX_LEN,
     EXEC_URL_MAX_LEN,
