@@ -35,6 +35,7 @@ Windows ホスト環境に Python や `uv`、依存パッケージを一切イ�
 ## 3. 即座に使える Docker ワンライナー (PowerShell)
 
 Windows の PowerShell からそのままコピー＆ペーストして実行できるワンライナーです。
+（※`-e PYTHONDONTWRITEBYTECODE=1` および `-p no:cacheprovider` により、ホスト側に `__pycache__` や `.pytest_cache` などのゴミファイルを一切生成させません）
 
 ### ① `toolserver` 配下のテスト実行 (zip ファイル指定)
 共通基盤パッケージ `core`（`capass`）を先行インストールした上で、`toolserver` のテスト（全 6 件）を実行します。
@@ -44,8 +45,9 @@ wsl docker run --rm `
   -v /mnt/c/Users/${env:USERNAME}/path/to/capass-v0.1.6-3.zip:/tmp/capass.zip:ro `
   -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/capass/skills/pytest_with_wsl2_docker:/workspace `
   -w /workspace `
+  -e PYTHONDONTWRITEBYTECODE=1 `
   python:3.11-slim `
-  sh -c "python -m zipfile -e /tmp/capass.zip /tmp/src && pip install --no-cache-dir -e /tmp/src/capass-v0.1.6-3/core && pip install --no-cache-dir -e /tmp/src/capass-v0.1.6-3/toolserver[dev] && pytest -vv /tmp/src/capass-v0.1.6-3/toolserver/tests"
+  sh -c "python -m zipfile -e /tmp/capass.zip /tmp/src && pip install --no-cache-dir -e /tmp/src/capass-v0.1.6-3/core && pip install --no-cache-dir -e /tmp/src/capass-v0.1.6-3/toolserver[dev] && pytest -vv -p no:cacheprovider /tmp/src/capass-v0.1.6-3/toolserver/tests"
 ```
 
 ### ② `server` 配下のテスト実行 (zip ファイル指定)
@@ -56,6 +58,7 @@ wsl docker run --rm `
   -v /mnt/c/Users/${env:USERNAME}/path/to/capass-v0.1.6-3.zip:/tmp/capass.zip:ro `
   -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/capass/skills/pytest_with_wsl2_docker:/workspace `
   -w /workspace `
+  -e PYTHONDONTWRITEBYTECODE=1 `
   -e CAPASS_SERVER_ENV=LOCAL_DEV `
   -e CAPASS_SERVER_DB_HOST=127.0.0.1 `
   -e CAPASS_SERVER_DB_PORT=5432 `
@@ -63,7 +66,7 @@ wsl docker run --rm `
   -e CAPASS_SERVER_DB_USER=capass `
   -e CAPASS_SERVER_DB_PASSWORD=capass `
   python:3.11-slim `
-  sh -c "export CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS=\`$(python3 -c 'import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())') && python -m zipfile -e /tmp/capass.zip /tmp/src && pip install --no-cache-dir -e /tmp/src/capass-v0.1.6-3/server[dev] && pytest -vv /tmp/src/capass-v0.1.6-3/server/tests"
+  sh -c "export CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS=\`$(python3 -c 'import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())') && python -m zipfile -e /tmp/capass.zip /tmp/src && pip install --no-cache-dir -e /tmp/src/capass-v0.1.6-3/server[dev] && pytest -vv -p no:cacheprovider /tmp/src/capass-v0.1.6-3/server/tests"
 ```
 
 ### ③ git リポジトリ上のソースツリーを直接テストする場合
@@ -74,13 +77,15 @@ zip ではなく、リポジトリに展開済みのソースコードを直接�
 wsl docker run --rm `
   -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/capass:/workspace `
   -w /workspace `
+  -e PYTHONDONTWRITEBYTECODE=1 `
   python:3.11-slim `
-  sh -c "pip install --no-cache-dir -e ./core && pip install --no-cache-dir -e ./toolserver[dev] && pytest -vv ./toolserver/tests"
+  sh -c "pip install --no-cache-dir -e ./core && pip install --no-cache-dir -e ./toolserver[dev] && pytest -vv -p no:cacheprovider ./toolserver/tests"
 
 # 2. server のテスト実行 (218 件)
 wsl docker run --rm `
   -v /mnt/c/Users/${env:USERNAME}/git/llm_challenge/main/llm_challenge/capass:/workspace `
   -w /workspace `
+  -e PYTHONDONTWRITEBYTECODE=1 `
   -e CAPASS_SERVER_ENV=LOCAL_DEV `
   -e CAPASS_SERVER_DB_HOST=127.0.0.1 `
   -e CAPASS_SERVER_DB_PORT=5432 `
@@ -88,30 +93,35 @@ wsl docker run --rm `
   -e CAPASS_SERVER_DB_USER=capass `
   -e CAPASS_SERVER_DB_PASSWORD=capass `
   python:3.11-slim `
-  sh -c "export CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS=\`$(python3 -c 'import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())') && pip install --no-cache-dir -e ./server[dev] && pytest -vv ./server/tests"
+  sh -c "export CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS=\`$(python3 -c 'import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())') && pip install --no-cache-dir -e ./server[dev] && pytest -vv -p no:cacheprovider ./server/tests"
 ```
 
 ---
 
 ## 4. ワンライナーの技術的ポイント
 
-1. **Fernet 暗号化鍵のコンテナ内動的自動生成**:
+1. **`__pycache__` および `.pytest_cache` の完全抑止**:
+   - ホスト側のソースディレクトリをマウントしてテストを実行すると、通常は Python や pytest が `.pyc` やキャッシュファイルを大量に生成し、git の未追跡ファイルとして散らかってしまいます。
+   - `-e PYTHONDONTWRITEBYTECODE=1` を指定することで、コンテナ内の Python インタプリタ全体に対してバイトコードキャッシュの生成を禁止し、**`__pycache__` ディレクトリを一切作成させません**。
+   - pytest のオプションに `-p no:cacheprovider` を指定することで、**`.pytest_cache` ディレクトリの生成も完全に抑止**します。
+   - これにより、ホスト側の git ワーキングツリーを一切汚さずにテストを完結できます。
+2. **Fernet 暗号化鍵のコンテナ内動的自動生成**:
    - `server` の暗号化機能（トークン暗号化）では 32 バイトの URL-safe Base64 文字列（Fernet キー）が必須です。
    - 固定のテスト用ダミーキーをホスト側の Docker 引数に直書きする代わりに、コンテナ内のシェルスクリプト先頭で標準ライブラリ（`secrets`, `base64`）を用いて有効な鍵をミリ秒で動的生成・`export` しています。
    - ホスト環境（Windows）に Python や暗号化ツールをインストールする必要がなく、完全なワンライナーで安全に完結します。
    - （※PowerShell から実行する際、`$(...)` が PowerShell のサブ式として解釈されないよう `` `$(...) `` とエスケープしています）
-2. **`python -m zipfile -e` での展開**:
+3. **`python -m zipfile -e` での展開**:
    - `python:3.11-slim` などの軽量コンテナには `unzip` コマンドが入っていませんが、Python 標準の `zipfile` CLI を利用することで、追加パッケージをインストールすることなく高速・確実に解凍できます。
-3. **コンテナ内 `/tmp` での作業完結**:
+4. **コンテナ内 `/tmp` での作業完結**:
    - 解凍先や pip のビルド成果物はすべてコンテナ内の `/tmp` で処理されるため、ホスト側のマウント元ディレクトリにゴミファイルが一切残りません。
-4. **`--rm` による自動破棄**:
+5. **`--rm` による自動破棄**:
    - テスト完了（またはエラー終了）と同時にコンテナが自動的に破棄されるため、リソースの解放やプロセス管理が不要です。
 
 ---
 
 ## 5. ヘルパースクリプトによる実行 (`scripts/run_docker_pytest.ps1`)
 
-長大なワンライナーを毎回手動で組み立てる代わりに、同梱の PowerShell スクリプトを利用して手軽にテストを実行できます。
+長大なワンライナーを毎回手動で組み立てる代わりに、同梱の PowerShell スクリプトを利用して手軽にテストを実行できます（内部で `PYTHONDONTWRITEBYTECODE=1` および `-p no:cacheprovider` が自動適用されます）。
 
 ```powershell
 # zip を指定して toolserver のテストを実行
@@ -120,8 +130,11 @@ wsl docker run --rm `
 # zip を指定して server のテストを実行
 .\scripts\run_docker_pytest.ps1 -ZipPath "C:\path\to\capass-v0.1.6-3.zip" -Target server
 
-# zip を指定せず、ローカルのリポジトリツリーを直接テスト
+# zip を指定せず、ローカルのリポジトリツリーを直接テスト (toolserver)
 .\scripts\run_docker_pytest.ps1 -Target toolserver
+
+# zip を指定せず、ローカルのリポジトリツリーを直接テスト (server)
+.\scripts\run_docker_pytest.ps1 -Target server
 ```
 
 ---

@@ -53,12 +53,13 @@ if ($ZipPath -ne "") {
                "ROOT=`$(ls -d /tmp/src/* | head -n 1) && " +
                "pip install --no-cache-dir -e `"`$ROOT/core`" && " +
                "pip install --no-cache-dir -e `"`$ROOT/toolserver[dev]`" && " +
-               "pytest -vv `"`$ROOT/toolserver/tests`""
+               "pytest -vv -p no:cacheprovider `"`$ROOT/toolserver/tests`""
 
         wsl docker run --rm `
             -v "${zipWsl}:/tmp/in.zip:ro" `
             -v "${workspaceWsl}:/workspace" `
             -w /workspace `
+            -e PYTHONDONTWRITEBYTECODE=1 `
             $Image `
             sh -c $cmd
     }
@@ -68,12 +69,13 @@ if ($ZipPath -ne "") {
                "python -m zipfile -e /tmp/in.zip /tmp/src && " +
                "ROOT=`$(ls -d /tmp/src/* | head -n 1) && " +
                "pip install --no-cache-dir -e `"`$ROOT/server[dev]`" && " +
-               "pytest -vv `"`$ROOT/server/tests`""
+               "pytest -vv -p no:cacheprovider `"`$ROOT/server/tests`""
 
         wsl docker run --rm `
             -v "${zipWsl}:/tmp/in.zip:ro" `
             -v "${workspaceWsl}:/workspace" `
             -w /workspace `
+            -e PYTHONDONTWRITEBYTECODE=1 `
             -e CAPASS_SERVER_ENV=LOCAL_DEV `
             -e CAPASS_SERVER_DB_HOST=127.0.0.1 `
             -e CAPASS_SERVER_DB_PORT=5432 `
@@ -93,22 +95,24 @@ else {
     if ($Target -eq "toolserver") {
         $cmd = "pip install --no-cache-dir -e ./core && " +
                "pip install --no-cache-dir -e ./toolserver[dev] && " +
-               "pytest -vv ./toolserver/tests"
+               "pytest -vv -p no:cacheprovider ./toolserver/tests"
 
         wsl docker run --rm `
             -v "${repoRootWsl}:/workspace" `
             -w /workspace `
+            -e PYTHONDONTWRITEBYTECODE=1 `
             $Image `
             sh -c $cmd
     }
     elseif ($Target -eq "server") {
         $cmd = "export CAPASS_SERVER_TOKEN_ENCRYPTION_KEYS=`$(python3 -c 'import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())') && " +
                "pip install --no-cache-dir -e ./server[dev] && " +
-               "pytest -vv ./server/tests"
+               "pytest -vv -p no:cacheprovider ./server/tests"
 
         wsl docker run --rm `
             -v "${repoRootWsl}:/workspace" `
             -w /workspace `
+            -e PYTHONDONTWRITEBYTECODE=1 `
             -e CAPASS_SERVER_ENV=LOCAL_DEV `
             -e CAPASS_SERVER_DB_HOST=127.0.0.1 `
             -e CAPASS_SERVER_DB_PORT=5432 `
