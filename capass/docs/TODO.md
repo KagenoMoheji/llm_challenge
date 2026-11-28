@@ -83,8 +83,8 @@
 実装済み: `capass init`(モード toolserver)。アプリディレクトリは `/opt/capass` で固定。実行ユーザ/グループ、`bin/`(実行ファイル)、`confs/`(バージョンと設定)、`keys/`(鍵)、`logs/`、`data/`、`/etc/systemd/system/capass.service` を作る。モードの同居は、(1) 同じPython環境のパッケージ(`capass_server` / `capass_toolserver` / `capass_agent` が、2つ以上あればエラー)と、(2) サーバ全体の `/opt/capass`(設定ファイルのモードと、鍵のファイル名 `<モード>.key`)の、2段階で防ぐ。
 
 - **`capass serve`(受け口)の実装。** サービスファイルの `ExecStart` は、`/opt/capass/bin/capass serve` を指しているが、まだ無い。実装先は `toolserver/capass_toolserver/daemon/`。`systemctl enable --now` は、`serve` の実装後。ポート番号は、設定ファイル(`confs/capass.conf` の `[service] port`)から読む。
-- **`agent` / `server` モードの `init`。** AIエージェントの作業環境は、待ち受けのサービスを持たない(サービスファイルは作らない)。`capass_agent.cli` に、`register(subparsers, context)` を書くと、`capass` コマンドに、登録される(`core/capass_core/cli/main.py`)。CaPassサーバは、`capass_core.init_steps.run_init` を使う(`InitSpec` を渡す)。そのほか、暗号化鍵(`TOKEN_ENCRYPTION_KEYS`)の生成、管理者の登録(`tbl_admin`)、DBの設定も、必要になる。
-- **`server/daemon/` の再編。** いまは、v0.1.5までのサーバを、中身を変えずに、`server/daemon/` へ移しただけ(パッケージ名は `capass_server` のまま)。モードのパッケージの構成(`capass_server/cli/` と `capass_server/daemon/`)に、そろえる。`capass_server.cli` ができると、`capass` コマンドが、サーバのモードを使えるようになる(いまは、「未実装」)。
+- **`agent` / `server` モードの `init`。** 各モードの `cli/commands/init.py` に、手順(`run_init`)を書く。共通の部品(`capass_core.cli.common.init_steps` など)を、組み合わせる。AIエージェントの作業環境は、待ち受けのサービスを持たない(サービスファイルを作る部品は、呼ばない。`create_app_dirs` は、ログとデータのディレクトリを渡さない)。`capass_agent.cli` と `capass_server.cli` に、`register(subparsers, context)` を書くと、`capass` コマンドに、登録される(`core/capass_core/cli/main.py`)。CaPassサーバは、そのほか、暗号化鍵(`TOKEN_ENCRYPTION_KEYS`)の生成、管理者の登録(`tbl_admin`)、DBの設定も、必要になる。
+- **CaPassサーバのモードの、残りの課題。** `server/capass_server/daemon/` は、v0.1.5までのサーバ(importのパスを `capass_server.daemon.` に変えただけ)。`server/capass_server/cli/` は、まだコマンドを持たない(`capass` コマンドでは、「未実装」)。`server/pyproject.toml` に、`capass` への依存(`capass==0.1.6`)を、`capass_server.cli` の実装時に追加する(`toolserver` と `agent` は、すでに依存している)。
 - **再初期化、設定の変更、アンインストール**(いまは、初期化済みなら、エラーで止まる)。ポート番号・実行ユーザ・ログの場所などの変更と、`capass uninit`(ユーザ、ディレクトリ、サービスファイルの削除)。
 - **鍵の作り直し(ローテーション)のコマンド。** 鍵を作り直すと、CaPassサーバに登録した公開鍵が、使えなくなる。再登録や、ツールサーバのリプレース(`replace`)と、組み合わせた手順を決める。
 - **秘密鍵の保管:** いまは、`/opt/capass/keys/toolserver.key`(実行ユーザだけが読み書きできる権限 0600)に、暗号化せずに保存している。パスフレーズでの保護や、OSのキーストアへの保存を検討する。
@@ -93,13 +93,20 @@
 - **`daemon-reload` 等:** `init` は、systemdの操作(`daemon-reload`、`enable`、`start`)を行わない(次の手順として、表示する)。
 - 設定ミスを防ぐ仕組みで、悪意のある操作(ファイルの削除など)は、防げない。
 
+**同居の確認(`ensure_host_mode`)の、限界と課題:**
+
+- いまの確認は、`capass` コマンドの実行ごとに、(1) 同じPython環境のモードのパッケージ、(2) `/opt/capass` の設定ファイルのモードと鍵のファイル名(一般ユーザは、`keys/` の中を調べられないので、設定ファイルのモードだけで検出する)、(3) 稼働中の常駐プロセス(`systemctl is-active capass.service` と `ps`)を、確認する。
+- **プロセスの確認は、目安。** `python -m capass_<モード>`、`capass_<モード>.xxx:app`(uvicornなど)、`capass-<モード>` の、起動の形だけを見る(プログラムが、pythonかASGIサーバのものだけ)。コンテナの中(`ps` や `systemctl` が、使えない、またはホストのプロセスが見えない)では、調べられない。別の名前で起動されたプロセスは、検出できない。
+- 実行のたびに `ps` と `systemctl` を実行する(各5秒まで)。遅さが問題になる場合は、`init` のときだけ確認する、結果をキャッシュする、などを検討する。
+- 別のコンテナや別のホストで動く、他のモードは、検出できない(同じサーバの中だけ)。
+
 **他のOSへの横展開(いまは、RPM/yum系のLinux + systemdだけを想定している):**
 
 - Debian / Ubuntu系(apt): ログインできないシェルのパス(`/usr/sbin/nologin`)、`useradd` のオプション、ファイアウォール(ufw)。サービスファイルの置き場所は、`/etc/systemd/system/` で、同じ。
 - SUSE系、Arch系など、他のLinuxディストリビューション。
 - systemdを使わない環境(コンテナ、Kubernetes): `init` は、使わない。コンテナのイメージ、Helm、マニフェストの雛形を、別に用意する。
 - macOS / Windows: サービスの仕組み(launchd、Windowsサービス)が違う。必要になった時点で、検討する。
-- OSごとの差(シェルのパス、サービスファイルの場所、ユーザ作成のコマンド、ファイアウォール)は、`core/capass_core/system.py` の、OSの操作の部分と、`paths.py` の定数に、集める。
+- OSごとの差(シェルのパス、サービスファイルの場所、ユーザ作成のコマンド、ファイアウォール)は、`core/capass_core/cli/common/system.py` の、OSの操作の部分と、`paths.py` の定数に、集める。
 
 ### 2.2 パッケージ構成・配布の、残りの課題
 
