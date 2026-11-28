@@ -11,8 +11,8 @@ sys.path.append(ROOTPATH)
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from pathlib import Path
-from capass_core.paths import AppPaths
-from capass_core.systemd import UNIT_MARKER, render_unit
+from capass_core.cli.common.paths import AppPaths
+from capass_core.cli.common.systemd import UNIT_MARKER, render_unit
 
 
 def test_unit_runs_the_wrapper_as_the_service_user():

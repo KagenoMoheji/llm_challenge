@@ -14,7 +14,7 @@ import pytest
 from types import SimpleNamespace
 from capass_core import __version__
 from capass_core.cli.main import load_mode_cli, main
-from capass_core.testing import make_context
+from capass_core.cli.common.testing import FakeSystemOps, make_context
 
 
 def _finder(*packages):
@@ -137,3 +137,77 @@ def test_load_mode_cli_does_not_hide_import_errors_inside_the_cli(tmp_path):
         sys.path.remove(str(tmp_path))
         for name in ("capass_brokencli", "capass_brokencli.cli"):
             sys.modules.pop(name, None)
+
+
+# ---------- サーバ全体の確認(別のモードの設定、鍵、稼働中のプロセス) ----------
+CONF_TEXT = "[capass]\nmode = {mode}\nversion = 0.1.6\ninitialized_at = x\n[service]\nuser = u\ngroup = g\nport = 31000\n[paths]\nlog_dir = /l\ndata_dir = /d\n"
+
+
+def _toolserver_only(tmp_path, ops=None):
+    return make_context(tmp_path, ops), _finder("capass_toolserver")
+
+
+def test_a_key_of_another_mode_on_the_server_blocks_commands_with_3(tmp_path, capsys):
+    ctx, find_spec = _toolserver_only(tmp_path)
+    ctx.paths.keys_dir.mkdir(parents=True)
+    ctx.paths.private_key_path("agent").write_text("x\n", encoding="utf-8")  # 別のPython環境で、AIエージェントとして設定済み
+    assert main(["hello"], context=ctx, find_spec=find_spec, load_cli=lambda m: _fake_cli([])) == 3
+    err = capsys.readouterr().err
+    assert "AIエージェント" in err and "同居" in err and str(ctx.paths.private_key_path("agent")) in err
+
+
+def test_the_conf_of_another_mode_blocks_commands_with_3(tmp_path):
+    ctx, find_spec = _toolserver_only(tmp_path)
+    ctx.paths.confs_dir.mkdir(parents=True)
+    ctx.paths.conf_file.write_text(CONF_TEXT.format(mode="server"), encoding="utf-8")
+    assert main(["hello"], context=ctx, find_spec=find_spec, load_cli=lambda m: _fake_cli([])) == 3
+
+
+def test_a_running_process_of_another_mode_blocks_commands_with_3(tmp_path, capsys):
+    ops = FakeSystemOps()
+    ops.processes = ["/venv/bin/python /venv/bin/uvicorn capass_server.daemon.main:app --port 8000"]  # capass init を使わずに起動された、サーバ
+    ctx, find_spec = _toolserver_only(tmp_path, ops)
+    assert main(["hello"], context=ctx, find_spec=find_spec, load_cli=lambda m: _fake_cli([])) == 3
+    assert "CaPassサーバ" in capsys.readouterr().err
+
+
+def test_a_running_service_of_another_mode_blocks_commands_with_3(tmp_path):
+    ops = FakeSystemOps()
+    ctx, find_spec = _toolserver_only(tmp_path, ops)
+    ctx.paths.confs_dir.mkdir(parents=True)
+    ctx.paths.conf_file.write_text(CONF_TEXT.format(mode="agent"), encoding="utf-8")
+    ops.active_services.add("capass.service")  # systemd のサービスが、稼働中
+    assert main(["hello"], context=ctx, find_spec=find_spec, load_cli=lambda m: _fake_cli([])) == 3
+
+
+def test_the_same_mode_on_the_server_does_not_block(tmp_path):
+    ops = FakeSystemOps()
+    ops.processes = ["/venv/bin/python /venv/bin/capass-toolserver"]
+    ctx, find_spec = _toolserver_only(tmp_path, ops)
+    ctx.paths.keys_dir.mkdir(parents=True)
+    ctx.paths.private_key_path("toolserver").write_text("x\n", encoding="utf-8")
+    calls = []
+    assert main(["hello"], context=ctx, find_spec=find_spec, load_cli=lambda m: _fake_cli(calls)) == 0
+    assert calls == [ctx]
+
+
+def test_help_still_works_when_the_server_check_fails(tmp_path, capsys):
+    ctx, find_spec = _toolserver_only(tmp_path)
+    ctx.paths.keys_dir.mkdir(parents=True)
+    ctx.paths.private_key_path("agent").write_text("x\n", encoding="utf-8")
+    with pytest.raises(SystemExit) as e:
+        main(["--help"], context=ctx, find_spec=find_spec, load_cli=lambda m: _fake_cli([]))
+    assert e.value.code == 0
+    out = capsys.readouterr().out
+    assert "このサーバでは、コマンドを使えません" in out and "同居" in out
+
+
+def test_package_check_runs_before_the_server_check(tmp_path):
+    loaded = []
+    ops = FakeSystemOps()
+    ops.processes = ["/venv/bin/python -m capass_server.daemon.main"]
+    ctx = make_context(tmp_path, ops)
+    # 2つのモードのパッケージ: パッケージの確認(11)が先。サーバの確認には、進まない
+    assert main(["hello"], context=ctx, find_spec=_finder("capass_agent", "capass_toolserver"), load_cli=lambda m: loaded.append(m)) == 11
+    assert main(["hello"], context=ctx, find_spec=_finder()) == 10  # モードが無い
+    assert loaded == []

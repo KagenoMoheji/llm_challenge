@@ -12,9 +12,9 @@ sys.path.append(ROOTPATH)
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import pytest
 from pathlib import Path
-from capass_core.conf import read_conf, read_installed_mode, render_conf
-from capass_core.errors import AppDirectoryError
-from capass_core.paths import AppPaths
+from capass_core.cli.common.conf import read_conf, read_installed_mode, render_conf
+from capass_core.cli.common.errors import AppDirectoryError
+from capass_core.cli.common.paths import AppPaths
 
 
 def test_render_and_read_roundtrip(tmp_path):

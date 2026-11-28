@@ -12,9 +12,9 @@ sys.path.append(ROOTPATH)
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import pytest
 from pathlib import Path
-from capass_core.errors import InvalidOptionError
-from capass_core.paths import AppPaths
-from capass_core.init_steps import InitOptions, validate_options
+from capass_core.cli.common.errors import InvalidOptionError
+from capass_core.cli.common.paths import AppPaths
+from capass_core.cli.common.init_steps import InitOptions, validate_options
 
 PATHS = AppPaths(root=Path("/opt/capass"))
 

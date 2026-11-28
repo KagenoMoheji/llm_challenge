@@ -15,11 +15,11 @@ import os
 import stat
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
-from capass_core.errors import AppDirectoryError
-from capass_core.keys import create_key_files, encode_b64, fingerprint, generate_keypair, load_key_info
-from capass_core.paths import AppPaths
-from capass_core.modes import MODE_TOOLSERVER
-from capass_core.testing import FakeSystemOps
+from capass_core.cli.common.errors import AppDirectoryError
+from capass_core.cli.common.keys import create_key_files, encode_b64, fingerprint, generate_keypair, load_key_info
+from capass_core.cli.common.paths import AppPaths
+from capass_core.cli.common.modes import MODE_TOOLSERVER
+from capass_core.cli.common.testing import FakeSystemOps
 
 
 def _paths(tmp_path):
