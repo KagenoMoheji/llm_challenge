@@ -12,7 +12,7 @@ sys.path.append(ROOTPATH)
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
-from capass_server.common.crypto import create_token_cipher, decrypt_token, encrypt_token
+from capass_server.daemon.common.crypto import create_token_cipher, decrypt_token, encrypt_token
 
 
 def _key() -> str:

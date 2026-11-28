@@ -14,9 +14,9 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
-from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
-from capass_server.common.signature import SIGN_CONTEXT_AGENT_APPROVE
-from capass_server.models.entities import ApprovalStatus, TblAgent
+from capass_server.daemon.common.config import SIGNATURE_MAX_SKEW_SEC
+from capass_server.daemon.common.signature import SIGN_CONTEXT_AGENT_APPROVE
+from capass_server.daemon.models.entities import ApprovalStatus, TblAgent
 from testlib import ADMIN_EMAIL, APPLICANT_EMAIL, agent_register_body, approve_body, pub_b64, seed_admin, seed_agent
 
 REGISTER_PATH = "/api/v1/agents/register"

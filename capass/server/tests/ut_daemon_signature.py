@@ -13,7 +13,7 @@ sys.path.append(ROOTPATH)
 import base64
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from capass_server.common.signature import (
+from capass_server.daemon.common.signature import (
     build_signing_message,
     canonical_json_bytes,
     is_within_skew,

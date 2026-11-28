@@ -13,8 +13,8 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
-from capass_server.models.entities import ApprovalStatus
+from capass_server.daemon.common.config import SIGNATURE_MAX_SKEW_SEC
+from capass_server.daemon.models.entities import ApprovalStatus
 from testlib import PARAMS_SCHEMA, list_tools_headers, seed_agent, seed_agent_tool, seed_tool_server
 
 

@@ -15,9 +15,9 @@ import time
 from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
-from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC, TOKEN_MAX_AGE_SEC
-from capass_server.common.crypto import decrypt_token
-from capass_server.models.entities import ApprovalStatus, TblRequestNonce, TblTool
+from capass_server.daemon.common.config import SIGNATURE_MAX_SKEW_SEC, TOKEN_MAX_AGE_SEC
+from capass_server.daemon.common.crypto import decrypt_token
+from capass_server.daemon.models.entities import ApprovalStatus, TblRequestNonce, TblTool
 from testlib import chtkn_body, exec_body, seed_agent, seed_agent_tool, seed_tool_server
 
 

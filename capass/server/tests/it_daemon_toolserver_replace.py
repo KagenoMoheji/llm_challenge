@@ -15,10 +15,10 @@ import time
 from datetime import datetime, timezone
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
-from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC, TOOL_SERVER_RESERVATION_TTL_SEC, TOOL_SERVER_STANDBY_TTL_SEC
-from capass_server.common.signature import SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW, SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_OLD
-from capass_server.models.entities import ApprovalStatus, TblTool, TblToolServer
-from capass_server.services import tool_server as tool_server_service
+from capass_server.daemon.common.config import SIGNATURE_MAX_SKEW_SEC, TOOL_SERVER_RESERVATION_TTL_SEC, TOOL_SERVER_STANDBY_TTL_SEC
+from capass_server.daemon.common.signature import SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_NEW, SIGN_CONTEXT_TOOLSERVER_REPLACE_ACTIVATE_OLD
+from capass_server.daemon.models.entities import ApprovalStatus, TblTool, TblToolServer
+from capass_server.daemon.services import tool_server as tool_server_service
 from testlib import (
     ADMIN_EMAIL,
     APPLICANT_EMAIL,

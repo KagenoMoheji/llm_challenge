@@ -11,8 +11,8 @@ sys.path.append(ROOTPATH)
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import pytest
-from capass_server.common.globals import PARAMS_ERROR_MAX_COUNT, PARAMS_SCHEMA_MAX_BYTES
-from capass_server.common.params_schema import validate_params, validate_params_schema_definition
+from capass_server.daemon.common.globals import PARAMS_ERROR_MAX_COUNT, PARAMS_SCHEMA_MAX_BYTES
+from capass_server.daemon.common.params_schema import validate_params, validate_params_schema_definition
 
 SQL_SCHEMA = {
     "type": "object",

@@ -14,8 +14,8 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
-from capass_server.common.errors import ToolServerBadResponseError, ToolServerTimeoutError, ToolServerUnavailableError
-from capass_server.common.tool_client import ToolServerResponse, call_tool_server
+from capass_server.daemon.common.errors import ToolServerBadResponseError, ToolServerTimeoutError, ToolServerUnavailableError
+from capass_server.daemon.common.tool_client import ToolServerResponse, call_tool_server
 
 
 class _Handler(BaseHTTPRequestHandler):

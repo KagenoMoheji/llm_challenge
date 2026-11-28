@@ -13,10 +13,10 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
-from capass_server.common.signature import SIGN_CONTEXT_TOOLSERVER_APPROVE
-from capass_server.models.entities import ApprovalStatus, TblToolServer
-from capass_server.services import tool_server as tool_server_service
+from capass_server.daemon.common.config import SIGNATURE_MAX_SKEW_SEC
+from capass_server.daemon.common.signature import SIGN_CONTEXT_TOOLSERVER_APPROVE
+from capass_server.daemon.models.entities import ApprovalStatus, TblToolServer
+from capass_server.daemon.services import tool_server as tool_server_service
 from testlib import ADMIN_EMAIL, APPLICANT_EMAIL, EXEC_URL, approve_body, pub_b64, seed_admin, seed_tool_server, toolserver_register_body
 
 REGISTER_PATH = "/api/v1/toolservers/register"

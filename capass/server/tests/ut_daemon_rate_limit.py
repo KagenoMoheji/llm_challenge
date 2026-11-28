@@ -11,7 +11,7 @@ sys.path.append(ROOTPATH)
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import pytest
-from capass_server.common.rate_limit import SlidingWindowRateLimiter, extract_client_ip
+from capass_server.daemon.common.rate_limit import SlidingWindowRateLimiter, extract_client_ip
 
 
 def test_allows_up_to_max_then_denies_with_retry_after():

@@ -14,9 +14,9 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
-from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC, TOKEN_MAX_AGE_SEC
-from capass_server.common.crypto import decrypt_token
-from capass_server.models.entities import ApprovalStatus, TblAgentTool, TblTool
+from capass_server.daemon.common.config import SIGNATURE_MAX_SKEW_SEC, TOKEN_MAX_AGE_SEC
+from capass_server.daemon.common.crypto import decrypt_token
+from capass_server.daemon.models.entities import ApprovalStatus, TblAgentTool, TblTool
 from testlib import PARAMS_SCHEMA, pub_b64, seed_tool_server, tool_add_body
 
 PATH = "/api/v1/tools/addtool"

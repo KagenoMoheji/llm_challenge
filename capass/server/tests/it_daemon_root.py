@@ -11,7 +11,7 @@ sys.path.append(ROOTPATH)
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from fastapi.testclient import TestClient
-from capass_server.main import app
+from capass_server.daemon.main import app
 
 client = TestClient(app)
 

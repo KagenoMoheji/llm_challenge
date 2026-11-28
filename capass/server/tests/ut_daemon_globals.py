@@ -11,7 +11,7 @@ sys.path.append(ROOTPATH)
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import re
-from capass_server.common.globals import (
+from capass_server.daemon.common.globals import (
     AGENT_ID_MAX_LEN,
     AGENT_ID_PATTERN,
     EMAIL_PATTERN,

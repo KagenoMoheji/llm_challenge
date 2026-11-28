@@ -13,9 +13,9 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from capass_server.common.rate_limit import SlidingWindowRateLimiter
-from capass_server.common.signature import SIGN_CONTEXT_TOOLSERVER_APPROVE
-from capass_server.controllers import dependencies
+from capass_server.daemon.common.rate_limit import SlidingWindowRateLimiter
+from capass_server.daemon.common.signature import SIGN_CONTEXT_TOOLSERVER_APPROVE
+from capass_server.daemon.controllers import dependencies
 from testlib import agent_register_body, approve_body, toolserver_register_body
 
 TOOLSERVER_REGISTER = "/api/v1/toolservers/register"

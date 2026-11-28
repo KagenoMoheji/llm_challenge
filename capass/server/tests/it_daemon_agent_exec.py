@@ -14,10 +14,10 @@ sys.path.append(PYPATH)  # testlib.py(テスト共通の補助関数)をimport�
 import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
-from capass_server.common.config import SIGNATURE_MAX_SKEW_SEC
-from capass_server.common.errors import ToolServerTimeoutError, ToolServerUnavailableError
-from capass_server.common.tool_client import ToolServerResponse
-from capass_server.models.entities import ApprovalStatus, TblAgentTool, TblRequestNonce, TblTool, TblToolServer
+from capass_server.daemon.common.config import SIGNATURE_MAX_SKEW_SEC
+from capass_server.daemon.common.errors import ToolServerTimeoutError, ToolServerUnavailableError
+from capass_server.daemon.common.tool_client import ToolServerResponse
+from capass_server.daemon.models.entities import ApprovalStatus, TblAgentTool, TblRequestNonce, TblTool, TblToolServer
 from testlib import EXEC_URL, PARAMS_SCHEMA, exec_body, seed_agent, seed_agent_tool, seed_grant, seed_tool, seed_tool_server
 
 
