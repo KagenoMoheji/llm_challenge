@@ -11,7 +11,7 @@ sys.path.append(ROOTPATH)
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from capass_core.cli.main import main
-from capass_core.testing import make_context
+from capass_core.cli.common.testing import make_context
 
 
 def _only_agent(name):
