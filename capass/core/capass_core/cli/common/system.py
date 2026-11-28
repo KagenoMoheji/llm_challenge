@@ -11,8 +11,8 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from capass_core.errors import SystemCommandError
-from capass_core.paths import SYSTEMD_UNIT_DIR, AppPaths
+from capass_core.cli.common.errors import SystemCommandError
+from capass_core.cli.common.paths import SYSTEMD_UNIT_DIR, AppPaths
 
 
 class SystemOps:
@@ -40,6 +40,14 @@ class SystemOps:
     def python_executable(self) -> str:
         """CLIを実行しているPythonのパス(実行ファイルのラッパーが、これを使う)。"""
         raise NotImplementedError
+
+    def service_active(self, name: str) -> bool:
+        """systemdのサービスが、稼働中(active)か。systemdが無い環境などでは、False。"""
+        return False
+
+    def process_command_lines(self) -> list[str]:
+        """稼働中のプロセスの、コマンドライン(引数を含む)の一覧。調べられない環境では、空。"""
+        return []
 
 
 class LinuxSystemOps(SystemOps):
@@ -77,6 +85,24 @@ class LinuxSystemOps(SystemOps):
 
     def python_executable(self) -> str:
         return sys.executable
+
+    def service_active(self, name: str) -> bool:
+        if shutil.which("systemctl") is None:
+            return False
+        try:
+            result = subprocess.run(["systemctl", "is-active", name], capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return result.stdout.strip() == "active"
+
+    def process_command_lines(self) -> list[str]:
+        if shutil.which("ps") is None:
+            return []
+        try:
+            result = subprocess.run(["ps", "-eo", "args="], capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return []
+        return [line.strip() for line in result.stdout.splitlines() if line.strip()] if result.returncode == 0 else []
 
     @staticmethod
     def _run(command: list[str]) -> None:

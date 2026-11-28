@@ -12,8 +12,8 @@ import io
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from capass_core.errors import AppDirectoryError
-from capass_core.paths import AppPaths
+from capass_core.cli.common.errors import AppDirectoryError
+from capass_core.cli.common.paths import AppPaths
 
 CONF_HEADER = "# CaPassクライアントの設定(capass init が作成しました)。サービスの再起動が必要な設定は、変更後に、systemctl restart capass してください。\n"
 

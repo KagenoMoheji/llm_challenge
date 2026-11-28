@@ -8,8 +8,8 @@ MODNAME = os.path.splitext(os.path.basename(inspect.getfile(inspect.currentframe
 
 # その他のモジュールやROOTPATHのディレクトリ起点の相対パスでのimport
 from pathlib import Path
-from capass_core.paths import AppPaths
-from capass_core.system import SystemContext, SystemOps
+from capass_core.cli.common.paths import AppPaths
+from capass_core.cli.common.system import SystemContext, SystemOps
 
 
 class FakeSystemOps(SystemOps):
@@ -21,6 +21,8 @@ class FakeSystemOps(SystemOps):
         self.groups = set(groups or set())
         self.calls: list[tuple] = []
         self.chowns: dict[str, tuple[str, str]] = {}  # パス → (ユーザ, グループ)
+        self.active_services: set[str] = set()  # 稼働中のsystemdのサービス
+        self.processes: list[str] = []  # 稼働中のプロセスのコマンドライン
 
     def is_root(self) -> bool:
         return self.root
@@ -44,6 +46,12 @@ class FakeSystemOps(SystemOps):
 
     def python_executable(self) -> str:
         return "/usr/bin/python3"
+
+    def service_active(self, name: str) -> bool:
+        return name in self.active_services
+
+    def process_command_lines(self) -> list[str]:
+        return list(self.processes)
 
 
 def make_context(tmp_path: Path, ops: FakeSystemOps | None = None, with_systemd_dir: bool = True) -> SystemContext:

@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, PublicFormat
-from capass_core.errors import AppDirectoryError
-from capass_core.fileio import write_atomic
-from capass_core.paths import AppPaths
-from capass_core.system import SystemOps
+from capass_core.cli.common.errors import AppDirectoryError
+from capass_core.cli.common.fileio import write_atomic
+from capass_core.cli.common.paths import AppPaths
+from capass_core.cli.common.system import SystemOps
 
 PRIVATE_KEY_MODE = 0o600  # 秘密鍵は、所有者(実行ユーザ)だけが読み書きできる
 PUBLIC_KEY_MODE = 0o644
